@@ -59,7 +59,7 @@
 
       <section id="capabilities">
         <h2>What you can do</h2>
-        <p>Today you can open the workspace, create website apps and draft tasks, and revisit their addresses. Teaching needs a hosted browser connection; the earlier local tests are dormant. Teaching real tasks and using them from your assistant are still aspirational. The table lists each feature from your point of view, with the proof that it works or the next step that builds it.</p>
+        <p>Today you can open the workspace, create website apps and draft tasks, and revisit their addresses. The private hosted teaching connection needs your production sign-in and recording test; earlier local tests are dormant. Teaching real tasks and using them from your assistant are still aspirational. The table lists each feature from your point of view, with the proof that it works or the next step that builds it.</p>
         <div class="table-wrap">
           <table>
             <caption>Features and their status</caption>
@@ -71,14 +71,14 @@
               <tr><th scope="row">Use app and task addresses</th><td><span class="badge badge--shipped">shipped</span></td><td>Opening an app or task changes its address. Browser Back and Forward restore that screen. Automatic checks passed; please test the live flow.</td></tr>
               <tr><th scope="row">Delete an app</th><td><span class="badge badge--shipped">shipped</span></td><td>Confirm deletion inside the app to remove its local drafts. Your website account and teaching browser stay intact. Automatic checks passed; the matching agent control remains a gap.</td></tr>
 
-              <tr><th scope="row">Open the teaching screen</th><td><span class="badge badge--shipped">shipped</span></td><td>The workspace shows the teaching screens for a draft task. The task screen explains that recording is unavailable until a hosted browser is connected.</td></tr>
+              <tr><th scope="row">Open the teaching screen</th><td><span class="badge badge--shipped">shipped</span></td><td>The workspace shows the teaching screens for a draft task. The task screen offers a private hosted Canvas teaching browser; the live school flow still needs your test.</td></tr>
               <tr><th scope="row">See each update published automatically</th><td><span class="badge badge--shipped">shipped</span></td><td>Each update to the main copy publishes to the production website, and the first automatic publication passed its checks on October 17, 2026.</td></tr>
               <tr><th scope="row">Sign in to your school account from a hidden browser</th><td><span class="badge badge--dormant">dormant</span></td><td>The earlier local sign-in test completed Berkeley sign-in, SMS verification, and Canvas access. You stayed signed in after a page refresh. It uses no Cloud credits or AI model, and it does not save your password or code.</td></tr>
               <tr><th scope="row">Send one written task to a hosted browser</th><td><span class="badge badge--dormant">dormant</span></td><td>A small tool sends one task to Browser Use, but the workspace does not use it. Only a basic error check has run, and that does not prove a live task works.</td></tr>
-              <tr><th scope="row">Teach through the hosted website</th><td><span class="badge badge--gap">gap</span></td><td>The task screen explains that a hosted browser is not connected. It opens no local helper or connection popup.</td></tr>
+              <tr><th scope="row">Teach through the hosted website</th><td><span class="badge badge--gap">gap</span></td><td>The private production flow connects Browser Use Cloud and a hosted recorder. Sign in with your Vercel account; no local helper or connection popup is used. Your live sign-in and recording test is still needed.</td></tr>
               <tr><th scope="row">Connect the local teaching browser</th><td><span class="badge badge--dormant">dormant</span></td><td>Earlier local controls captured two requests. Those controls are no longer offered; the recording was lost when the helper stopped.</td></tr>
               <tr><th scope="row">Capture observed reading requests</th><td><span class="badge badge--dormant">dormant</span></td><td>The earlier local test captured two requests, including a syllabus visit. This does not prove hosted recording.</td></tr>
-              <tr><th scope="row">Return to your task details</th><td><span class="badge badge--shipped">shipped</span></td><td>App and task draft details stay in this browser after navigation and refresh. Recording is unavailable until a hosted browser is connected. Automatic checks passed; please test the live navigation.</td></tr>
+              <tr><th scope="row">Return to your task details</th><td><span class="badge badge--shipped">shipped</span></td><td>App and task draft details stay in this browser after navigation and refresh. The private hosted session returns with your task for up to 30 minutes. Automatic checks passed; please test the live navigation.</td></tr>
               <tr><th scope="row">Test a captured request</th><td><span class="badge badge--gap">gap</span></td><td>Production testing needs a hosted capture and request execution path. A successful live request test is not established.</td></tr>
               <tr><th scope="row">Record pages you browse</th><td><span class="badge badge--aspirational">aspirational</span></td><td>A visible browser records the pages you choose to visit. The first stage proves one reading task from that session.</td></tr>
               <tr><th scope="row">Review several suggested tasks</th><td><span class="badge badge--aspirational">aspirational</span></td><td>One browsing session suggests task cards. You confirm each name, description, inputs, and result, then test changed inputs before enabling it.</td></tr>
@@ -100,10 +100,10 @@
         <h2>Known gaps today</h2>
         <p>Some shipped features have known missing pieces. These gaps do not stop you from trying the features, but they limit what each feature proves. We close each gap through the stage of work that needs it. The list below names every gap we know about.</p>
         <ul>
-          <li><span class="badge badge--gap">gap</span> Apps and draft details stay in this browser only. There is no account or shared storage. A refresh resets the teaching connection and test messages.</li>
-          <li><span class="badge badge--gap">gap</span> Draft tasks are not published tools. An earlier local capture check passed, but production capture and a successful request test are still needed. Earlier captures are unavailable.</li>
+          <li><span class="badge badge--gap">gap</span> Apps and draft details stay in this browser only. There are no product accounts or shared storage. The private pilot uses your Vercel account, and its teaching session lasts at most 30 minutes.</li>
+          <li><span class="badge badge--gap">gap</span> Draft tasks are not published tools. An earlier local capture check passed, but a production recording and successful reading test are still needed. Earlier captures are unavailable.</li>
           <li><span class="badge badge--gap">gap</span> Your agent cannot do the workspace actions, including app deletion, yet, so the workspace does not meet the rule of <a href="index.html#agent-access">equal controls for agents</a>.</li>
-          <li><span class="badge badge--gap">gap</span> The hosted browser is not connected. Earlier Berkeley-only diagnostics are dormant, and the production app cannot record yet.</li>
+          <li><span class="badge badge--gap">gap</span> The hosted browser and recorder need your first production demonstration. Earlier Berkeley-only diagnostics are dormant. Ending a hosted session deletes its captures.</li>
           <li><span class="badge badge--gap">gap</span> After the first test, we added the observed verification steps to the sign-in test, but we have not repeated the complete automatic flow from a fresh start.</li>
         </ul>
       </section>

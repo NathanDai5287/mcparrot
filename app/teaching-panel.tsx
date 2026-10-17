@@ -15,16 +15,19 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [courseId, setCourseId] = useState("");
+  const [testFailed, setTestFailed] = useState(false);
   const supported = new URL(websiteUrl).origin === "https://bcourses.berkeley.edu";
 
   async function operate(name: string, input?: object) {
     setBusy(true);
     setError("");
+    if (name === "test_saved_request") setTestFailed(true);
     try {
       const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, arguments: input }) });
       const next = await response.json();
       if (!response.ok) throw new Error(next.error ?? "The teaching action failed.");
       setState(next);
+      if (name === "test_saved_request") setTestFailed(false);
       if (!next.candidates.some((candidate: Candidate) => candidate.id === selectedId)) {
         setSelectedId(next.candidates[0]?.id ?? "");
         setCourseId(next.candidates[0]?.courseId ?? "");
@@ -69,7 +72,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
           {state.candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label} · course {candidate.courseId}</option>)}
         </select>
         <div className="pilot-controls"><button className="button primary" disabled={busy || !selected} onClick={() => operate("test_saved_request", { requestId: selectedId, courseId })}>{busy ? "Testing request…" : "Test reading request"}</button></div>
-        {state.lastTest?.requestId === selectedId && <p className="pilot-status" role="status">Reading test passed{state.lastTest.resultCount !== null ? `: ${state.lastTest.resultCount} results` : ": syllabus page received"}. {state.lastTest.changedInput ? "Changed course input tested." : "The original course was tested."}</p>}
+        {!testFailed && !busy && state.lastTest?.requestId === selectedId && state.lastTest.courseId === courseId && <p className="pilot-status" role="status">Reading test passed{state.lastTest.resultCount !== null ? `: ${state.lastTest.resultCount} results` : ": syllabus page received"}. {state.lastTest.changedInput ? "Changed course input tested." : "The original course was tested."}</p>}
       </div>}
       {state.liveUrl && <iframe className="teaching-browser" src={state.liveUrl} title="Your hosted Canvas teaching browser" allow="autoplay; clipboard-read; clipboard-write" referrerPolicy="no-referrer" />}
       <details className="teaching-details"><summary>Session details</summary>
@@ -79,6 +82,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
         <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace recording</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
       </details>
     </>}
+    {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The browser connection ended. Close this session before opening another.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
   </section>;
 }

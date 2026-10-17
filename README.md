@@ -207,10 +207,10 @@ Next.js serves the guides as public static files from `public/`, so they must ne
 The dashboard saves app names, website addresses, and draft task metadata in this browser’s local storage.
 This supports refresh and direct app links without a database or paid model.
 It does not save credentials, request captures, website content, or teaching results there.
-The task backend, MCP endpoints, authentication service, database, and browser worker are aspirational.
+The authenticated hosted teaching pilot uses short server requests and a private Vercel Sandbox recorder, as described below. Durable task storage and remote MCP access remain aspirational.
 Short server operations can share the Next.js deployment.
 Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
-A persistent headless browser needs a separate worker host, such as Railway, or Browser Use Cloud.
+Browser Use Cloud hosts website browsers, while a private Vercel Sandbox keeps request recording active between server requests.
 Vercel requests must not own a browser session that waits for user verification.
 
 The following table describes the complete product; the [status page](STATUS.md) records which parts exist:
@@ -327,3 +327,31 @@ Each task uses your Browser Use account credits.
 Keep your API key private.
 Run `npm run check` to check syntax without starting a task.
 See the [Browser Use quick start](https://docs.browser-use.com/cloud/quickstart) for setup instructions.
+
+## Hosted teaching pilot
+
+The production-only pilot connects a draft task to a Browser Use Cloud browser through `/api/teaching`.
+Vercel Authentication protects all deployments, including the production domain, before the app can spend browser credits.
+Nathan must sign in with his Vercel account to enter the private pilot.
+The server reads `BROWSER_USE_API_KEY` and `MCPARROT_SESSION_SECRET` from Sensitive production environment variables.
+Neither value is sent to the browser, stored in the repository, or included in request diagnostics.
+
+A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
+The browser's interactive view appears inside the teaching screen; no local service, installation, or connection popup is involved.
+The user signs in there and completes Duo, then starts recording and browses course reading pages.
+The recorder observes only supported same-origin Canvas GET requests and syllabus navigation; it excludes authentication traffic and request bodies.
+The pilot returns request labels and numeric course inputs, not raw headers, cookies, or course content.
+Each task has one named hosted recorder; repeated connection attempts reuse the task session instead of creating another paid browser.
+
+Secure signed HTTP-only cookies identify that draft's session after navigation or refresh in the same browser.
+Captures and test summaries remain in hosted memory until the 30-minute limit, explicit session deletion, or worker failure.
+They are not published tools or durable database records.
+Ending a session stops the Browser Use browser and deletes its recorder; merely stopping recording keeps review and testing available.
+A test obtains matching cookies privately and sends the observed GET request without navigating the teaching browser.
+It reports a result count or a syllabus-page check without storing the returned course data.
+The user can change the numeric course input for a second reading test.
+
+The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, and `end_teaching_session`.
+The UI calls those operations; authenticated remote MCP exposure remains a parity gap and must use the same operations.
+This pilot does not infer unvisited actions, publish suggested tasks, store credentials, or support another school automatically.
+Cloud school sign-in, live capture, and direct replay require Nathan's production demonstration before their gaps can close; see the [status page](STATUS.md).
