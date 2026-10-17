@@ -77,8 +77,8 @@ Decide when to merge your own pull requests, and merge them yourself after the c
 Nathan does not need to approve merges.
 After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
 
-Automatic deployment is planned, but it is not yet connected or verified in this repository.
-In the planned setup, every push to `main` deploys to the hosted website on Vercel, and each branch or pull request gets a Vercel preview link.
-Nathan will then review changes on the live website or a preview link instead of running the app locally.
+Automatic deployment is connected to the GitHub repository and verified on Vercel.
+Every push to `main` deploys to [the production website](https://mcp-anything.vercel.app), and each branch or pull request gets a Vercel preview link.
+Nathan can review changes on the live website or a preview link instead of running the app locally.
 After each deploy, check the live site and report its link, and fix or revert a broken deploy immediately.
 The HTML guides under `docs/` and `prototypes/` are not part of the deployed Next.js app.

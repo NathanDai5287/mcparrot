@@ -42,7 +42,7 @@
       <header>
         <h1>Teach a website.<br>Use it from your assistant.</h1>
         <p class="lead">This guide describes what MCP Anything does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
-        <span class="status">Local workspace available · teaching and assistant use planned</span>
+        <span class="status">Hosted workspace available · teaching and assistant use planned</span>
       </header>
 
       <div class="table-wrap">
@@ -66,8 +66,8 @@
 
       <section id="today">
         <h2>What exists today</h2>
-        <p>When the local workspace is running, you can <a href="http://localhost:4317">open the local workspace</a> in your browser. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
-        <p>The finished product will run website browsers in the background, without opening a separate browser window. You enter sign-in details and verification codes in our app for supported websites. We still need to choose how you demonstrate tasks. The hosted product remains planned.</p>
+        <p>You can <a href="https://mcp-anything.vercel.app">open the hosted workspace</a> in your browser. A <a href="http://localhost:4317">local workspace</a> also remains available when it is running. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
+        <p>The finished product will run website browsers in the background, without opening a separate browser window. You enter sign-in details and verification codes in our app for supported websites. We still need to choose how you demonstrate tasks. The dashboard is hosted; teaching and assistant access remain planned.</p>
         <p>You can <a href="http://127.0.0.1:4321">open the local sign-in test</a> while it is running. It uses a hidden browser on your computer, without Cloud credits or an AI model. Your password and code pass directly to that browser; this test does not save them. The browser keeps its signed-in session.</p>
         <p>The Berkeley test completed school sign-in, SMS verification, and Canvas access. Access remained available after a page refresh. We then added the observed verification steps to the test flow, but have not repeated the complete automatic flow from a fresh session. This school-specific test does not record tasks, repeat website requests, or provide an assistant connection.</p>
         <p>You can also <a href="../prototypes/index.html">compare the three earlier designs</a>, which use sample data.</p>
@@ -75,14 +75,14 @@
 
       <section id="deployment">
         <h2>Where the app runs</h2>
-        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. We still need to check the first published version.</p>
+        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. The first automatic deployment passed its checks on October 17, 2026. You can <a href="https://mcp-anything.vercel.app">open the production website</a>.</p>
         <p>Today, the website is a dashboard preview. It does not need a database, because changes disappear when you refresh. The school sign-in test stays on your computer. The public dashboard cannot control that test or access its saved sign-in.</p>
         <div class="table-wrap">
           <table>
             <caption>The complete product needs these parts</caption>
             <thead><tr><th scope="col">Part</th><th scope="col">Where it runs</th><th scope="col">Current state</th></tr></thead>
             <tbody>
-              <tr><th scope="row">Website and short server work</th><td>Vercel</td><td>Dashboard ready for its first deployment; task execution and assistant access are planned</td></tr>
+              <tr><th scope="row">Website and short server work</th><td>Vercel</td><td>Dashboard deployed; task execution and assistant access are planned</td></tr>
               <tr><th scope="row">Saved apps, tasks, and progress</th><td>A hosted PostgreSQL database, such as Supabase or Neon</td><td>Not connected; needed when we save real data</td></tr>
               <tr><th scope="row">Hidden website browsers</th><td>A separate worker host, such as Railway, or Browser Use Cloud</td><td>The test currently runs only on your computer</td></tr>
             </tbody>

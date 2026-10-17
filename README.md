@@ -185,7 +185,9 @@ The Vercel project `mcp-anything` is linked to the public GitHub repository on t
 Its production branch is `main`.
 Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
-The initial production deployment still needs verification.
+The production dashboard is available at [mcp-anything.vercel.app](https://mcp-anything.vercel.app).
+The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
+The dashboard and JavaScript assets returned successfully; local sign-in and private-state paths returned 404.
 
 Only the Next.js workspace is deployed as a website.
 The local sign-in diagnostic is not a public route or hosted sign-in service.
@@ -253,13 +255,13 @@ For how the demo must present Browser Use and Sentry to judges, see [hackathon j
 ## Current implementation status
 
 The first frontend uses the Calm workspace design, with light surfaces, teal actions, and a simple website list.
-It runs locally and lets users create website apps and draft tasks, and it shows a teaching placeholder for early feedback.
+It runs locally and on Vercel and lets users create website apps and draft tasks, and it shows a teaching placeholder for early feedback.
 Draft tasks are not verified tools and cannot perform website actions.
 The frontend is not connected to real browsers, authentication, recording, API execution, MCP, persistent storage, or Sentry.
 Earlier clickable prototypes remain as comparison references; see the [prototype gallery notes](prototypes/README.md).
 
 The local Browser Use task runner exists, but it is separate from the frontend.
-The hosted product is still planned.
+The dashboard is hosted; the task and assistant services are still planned.
 The separate local diagnostic verified Berkeley sign-in and session reuse after a reload.
 Request capture, token transfer, and automatic reconnection remain unverified.
 A syntax check does not prove that a live browser task works.
