@@ -42,7 +42,7 @@
     <main id="content">
       <header>
         <h1>Teach a website.<br>Use it from your assistant.</h1>
-        <p class="lead">This guide describes what MCParrot does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
+        <p class="lead">This guide describes what MCParrot does for you. You browse website pages once, review suggested tasks, then ask your assistant to repeat tested tasks with new inputs.</p>
         <span class="status">Workspace shipped · teaching and assistant use aspirational</span>
       </header>
 
@@ -89,15 +89,15 @@
 
       <section id="idea">
         <h2>How the product works</h2>
-        <p>You create an app for one website, then teach that app several tasks. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each task you teach becomes one of those tools. Canvas, the course website of your school, is our first example, but the product is intended for many websites.</p>
-        <p>During teaching, also called parroting, a visible browser window opens so you can sign in and click through the task yourself. During later assistant use, no visible website browser opens. The app uses saved website requests where supported and a hidden browser for steps that need one. You enter any supported sign-in recovery details or verification codes inside our app. The teaching window’s hosting method still needs proof.</p>
+        <p>You create an app for one website, browse its pages, and review several suggested tasks from that session. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each task you test and enable becomes one of those tools. Canvas, the course website of your school, is our first example, but the product is intended for many websites.</p>
+        <p>During teaching, also called parroting, a visible browser window opens so you can sign in and browse the pages yourself. During later assistant use, no visible website browser opens. The app uses saved website requests where supported and a hidden browser for steps that need one. You enter any supported sign-in recovery details or verification codes inside our app. The teaching window’s hosting method still needs proof.</p>
         <div class="table-wrap">
           <table>
             <caption>One website, several tasks</caption>
             <thead><tr><th scope="col">Your app</th><th scope="col">Tasks you could teach</th><th scope="col">Inputs you could change</th></tr></thead>
             <tbody>
               <tr><th scope="row">Canvas</th><td>List assignments, read announcements, find course materials</td><td>Course, date range</td></tr>
-              <tr><th scope="row">Another website</th><td>Tasks you demonstrate on that website</td><td>The values needed for each task</td></tr>
+              <tr><th scope="row">Another website</th><td>Tasks suggested from the pages you browse</td><td>The values needed for each task</td></tr>
             </tbody>
           </table>
         </div>
@@ -108,16 +108,16 @@
         <p>This teaching experience is <span class="badge badge--aspirational">aspirational</span>. Today, the workspace shows only a preview of it.</p>
         <ol class="flow">
           <li><h3>Create your app</h3><p>Visit our website, select <strong>Create app</strong>, and enter the website address. For example, name the app “Canvas.”</p></li>
-          <li><h3>Create your task</h3><p>Select <strong>Create task</strong> and name the task. A visible teaching browser window opens for you to use.</p></li>
+          <li><h3>Explore the website</h3><p>Select <strong>Explore website</strong>. A visible teaching browser window opens for you to use.</p></li>
           <li><h3>Sign in yourself</h3><p>Sign in to your school account in that window. Complete Duo or any other verification that the school requires.</p></li>
-          <li><h3>Start recording</h3><p>Start recording, then click through the task yourself. The app records your clicks and the messages that the website sends and receives behind the page.</p></li>
-          <li><h3>Review what can change</h3><p>Stop recording when you reach the result. Review the task and select the inputs that can change, such as a course or date range.</p></li>
-          <li><h3>Test and enable the tool</h3><p>Test the task with different inputs and check the result. The app tries to repeat the website messages without clicking through the pages. Enable the tool after that test succeeds.</p></li>
-          <li><h3>Add more tasks</h3><p>Teach other tasks inside the same app. You keep one website connection with several enabled tools.</p></li>
+          <li><h3>Browse while recording</h3><p>Start recording, then browse the pages you want the app to understand. For Canvas, you could visit assignments, announcements, and course materials in one session.</p></li>
+          <li><h3>Review suggested tasks</h3><p>Stop recording and review the suggested task cards. Confirm each name, description, inputs that can change, and expected result.</p></li>
+          <li><h3>Test and enable tools</h3><p>Test each task with different inputs and compare its result with the website. Enable only the tools whose tests pass.</p></li>
+          <li><h3>Explore more when needed</h3><p>One session can suggest several tasks without repeating the same navigation. Record another session when you need features that were not discovered and tested.</p></li>
         </ol>
         <aside class="note">
           <strong class="note-label">You are the teacher</strong>
-          <p>By default, you demonstrate each task yourself. Browser Use gives the browser access, and later it will also help you sign in again. We also intend to let an agent that you authorize use the same teaching session.</p>
+          <p>You browse pages once, then choose which suggested tasks to keep. Browser Use gives the browser access and can later help with sign-in. Suggestions are not usable tools until their tests pass. The first milestone only reads information. The app must not explore actions that change website data automatically.</p>
         </aside>
       </section>
 
@@ -129,7 +129,7 @@
           <li><h3>Ask for a result</h3><p class="example">“Find my assignments due this week.”</p><p>Your assistant chooses an enabled tool and supplies its inputs.</p></li>
           <li><h3>Get the result</h3><p>The app repeats the saved website messages with your active login. Your assistant receives the result, and nobody needs to click through the website pages again.</p></li>
         </ol>
-        <p>Your assistant can combine the tools you taught to answer new requests. In the first version, an action that you have never taught needs another demonstration. Some actions may still need a hidden browser, and we must test those steps before we enable their tools. Assistant use must never open a visible website browser window.</p>
+        <p>Your assistant can combine enabled tools to answer new requests. One browsing session can suggest several tools, but it cannot prove support for every website feature. An unsupported action needs more discovery and testing. Some actions may still need a hidden browser, and we must test those steps before we enable their tools. Assistant use must never open a visible website browser window.</p>
       </section>
 
       <section id="connections">
@@ -182,7 +182,9 @@
       <section id="limits">
         <h2>Questions that need proof</h2>
         <ul>
-          <li>A recording must contain enough information to repeat the task with different inputs.</li>
+          <li>Suggested tasks must pass a test with different inputs before your assistant can use them.</li>
+          <li>Pages you never visited remain unsupported unless discovered and tested separately.</li>
+          <li>Some pages return a whole document instead of separate data messages, so their tasks need another tested method.</li>
           <li>Some website messages may work only inside the original browser.</li>
           <li>A changed website may need another recording.</li>
           <li>We must measure speed before we say the product is faster.</li>
@@ -192,7 +194,7 @@
 
       <section id="next">
         <h2>Our first build milestone</h2>
-        <p>First, we teach one reading task, repeat it with different inputs, and check the result against the website. The <a href="status.html#order">order of remaining work</a> lists every later stage and how we know each one is finished.</p>
+        <p>First, you browse a reading page, review one suggested task, and test it with different inputs against the website. The <a href="status.html#order">order of remaining work</a> lists every later stage and how we know each one is finished.</p>
         <aside class="note">
           <strong class="note-label">Make failures useful</strong>
           <p>Sentry is a service that reports errors and slow steps in an app. We intend to use its error reports, Tracing, and Logs to find failed or slow tasks. The demonstration should show a real problem that these tools helped us fix.</p>

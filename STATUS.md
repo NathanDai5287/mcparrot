@@ -9,7 +9,7 @@ Update both pages in the same change whenever a capability's status changes.
 Today, MCParrot is a hosted dashboard preview plus a separate local sign-in diagnostic.
 The dashboard runs on Vercel and lets users create website apps and draft tasks, but it keeps them only in page memory and does not connect to real websites.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
-Hosted browsers, request recording, request replay, MCP access, persistent storage, and Sentry are aspirational.
+Hosted browsers, request recording, task discovery, request replay, MCP access, persistent storage, and Sentry are aspirational.
 
 ## Status word meanings
 
@@ -35,7 +35,9 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
 | Hosted browser sessions | aspirational | Prove a visible teaching window and hidden browser execution and recovery |
-| Request recording | aspirational | Capture network requests during one manual reading-task demonstration |
+| Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
+| Suggested task discovery | aspirational | Group observed requests into task cards for user review; do not enable untested suggestions |
+| Task review and publication | aspirational | Let the user confirm names, descriptions, inputs, and results, then test changed inputs before publication |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic |
 | Recorded request replay | aspirational | Run the recorded API request with valid authentication and check the result |
 | MCP server per website app | aspirational | Expose one saved task through an authenticated remote MCP address |
@@ -77,17 +79,18 @@ These gaps exist inside shipped work and stay open until a change closes them:
 ## Aspirational work order
 
 The product work happens in these stages, and each stage ends when its completion check passes in a demonstration.
-The first stage starts with one manually taught reading task, such as listing Canvas assignments.
+The first stage starts with one reading task found during a recorded browsing session, such as listing Canvas assignments.
+The broader discovery experience must suggest several tasks from one session and keep untested suggestions unavailable.
 It must show that authenticated API requests can be reused, not only that a browser can navigate the website.
 Interface polish and broad task support come after this proof.
 For how the demo must present Browser Use and Sentry to judges, see [hackathon judging and prizes](HACKATHON.md).
 
 | Stage | Work | Completion check |
 | --- | --- | --- |
-| 1. Prove teaching and API execution | Sign in, manually demonstrate one reading task, capture requests, and derive its inputs | Run the recorded API request with valid authentication and check the result |
+| 1. Prove discovery and API execution | Sign in, browse a reading page, capture requests, and review one suggested task | Run the recorded API request with valid authentication and check the result |
 | 2. Prove MCP use | Expose that saved task through an authenticated remote MCP server | Request the task from an assistant with changed inputs |
 | 3. Add Sentry | Add error monitoring, Tracing, and Logs across the complete path | Diagnose and fix a real problem using captured evidence |
-| 4. Build teaching management | Add website apps, recordings, task review, and saved tools | Teach and reuse multiple tasks on one website |
+| 4. Build discovery management | Add browsing sessions, suggested task cards, review, changed-input tests, and publication | Discover several tasks in one session and reuse each enabled task |
 | 5. Prove reconnection | Preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
 | 6. Prove general use | Teach a task on a second website | Reuse the same product flow without a website-specific architecture |
 | 7. Prepare the demo | Show teaching, assistant use, and the Sentry-backed improvement | Complete the demonstrated flow and explain its limits |

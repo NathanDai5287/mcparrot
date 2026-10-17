@@ -1,7 +1,7 @@
 # MCParrot
 
-MCParrot turns tasks you demonstrate on a website into tools your assistant can use.
-You teach a task once in our app, and an assistant such as ChatGPT can then run it for you.
+MCParrot turns the website pages you explore into proposed tools your assistant can use.
+You browse once, review suggested tasks, and test them before an assistant such as ChatGPT can run them.
 One website app can contain many saved tasks.
 Canvas is a useful example, not a product limit.
 
@@ -31,7 +31,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 
 ## What the product does
 
-Users teach website tasks once, then request them through an assistant.
+Users explore website pages once, review suggested tasks, then request tested tasks through an assistant.
 After that, they do not need to navigate the website for each request.
 The product has two separate phases: teaching a task, and using the saved task later.
 
@@ -90,41 +90,50 @@ The product supplies each address and setup instructions, and users add and auth
 Do not promise automatic connector installation or identical support across assistant clients.
 
 Management through MCP must also start teaching sessions, return secure browser links, report status, and resume supported work.
-By default the user still demonstrates each task, although an authorized agent could use the same browser session where supported.
+By default the user browses the website while recording, although an authorized agent could use the same browser session where supported.
 An agent cannot replace required personal verification.
 For example, Duo is a sign-in check that asks the user to approve a request on their phone, and only the user can approve it.
 Keep passwords and verification codes in the secure browser or verification flow, never in assistant messages.
 
 ## Teaching website tasks
 
+The agreed discovery experience is aspirational; the [status page](STATUS.md) records the evidence and gaps.
+One recording session can suggest several tasks, rather than requiring a separate demonstration for each task.
+
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Select **Create task** and name the task.
-4. Open the visible teaching browser window that the task creates.
-5. Sign in there and complete any required verification, such as Duo.
-6. Perform the task yourself while our recorder captures browser actions and network requests.
-7. Review the proposed inputs and result, then test the task with different inputs.
-8. Save the verified task and add other tasks to the same website app.
-9. Connect the supplied authenticated MCP address to a compatible assistant.
+3. Select **Explore website** to open a visible teaching browser window.
+4. Sign in there and complete any required verification, such as Duo.
+5. Start recording and browse the pages you want the app to understand.
+6. Stop recording and review the suggested task cards from that session.
+7. Confirm each task's name, description, variable inputs, and expected result.
+8. Test each task with changed inputs and compare its result with the website.
+9. Publish only the tasks whose tests pass, then connect the supplied authenticated MCP address to a compatible assistant.
 
-Browser Use is a service that runs and controls web browsers for software.
-For example, a Canvas app could contain tasks for reading assignments, checking grades, and finding course materials.
+For example, browsing Canvas assignments, announcements, and course materials could suggest several reading tasks in one session.
 A task that lists assignments could accept a course and a date range as inputs.
-Changing these inputs must not require teaching the task again.
+The user should not need to record the same navigation again for each proposed task.
+Changing a supported input must not require another recording after the changed-input test passes.
+Canvas is an example; the same discovery flow applies to other websites.
 
-By default, the user demonstrates the task, and Browser Use does not perform the first demonstration.
-MCP management access, which is aspirational, must support the same teaching steps without changing this default.
-Our application must find the necessary requests and their order in the recording.
-It must separate task inputs from authentication data and unrelated page traffic.
-It must then produce and verify a reusable request sequence before it enables the tool.
+Browser Use provides browser access; it does not convert recordings into reusable API requests.
+The user browses by default, and Browser Use does not perform the first exploration automatically.
+The application must group observed requests into candidate tasks and separate useful requests from unrelated traffic and authentication data.
+Each candidate must show the user what it reads, which inputs may change, and what result to expect.
+The application must verify a reusable request sequence before it enables the task as a tool.
+MCP management access must support starting discovery, reviewing candidates, testing, and publishing through the same operations as the UI.
 
-Browser Use does not convert recordings into API requests, so our application must do this work.
-We must prove request capture and reuse on a real authenticated website before we promise broad support.
+A recorded visit does not establish support for every feature on a website.
+Unvisited pages and actions remain unavailable unless separately discovered and tested.
+Public website documentation may inform suggestions, but a documented or inferred request is not proof that it works for this user.
+Some pages return HTML or use browser state rather than a separate JSON response; those tasks still need a tested execution path.
+The first milestone supports reading only, and discovery must not automatically submit changes to website data.
+We must prove capture and reuse on a real authenticated website before we promise broad support.
 
 ## Browser visibility by phase
 
 During teaching, also called parroting, the product must open a visible browser window that the user can click through.
-The user signs in there, completes personal verification, and demonstrates the task while recording.
+The user signs in there, completes personal verification, and browses the selected pages while recording.
 The exact hosting and recording mechanism remains aspirational; this agreement does not require a particular browser delivery method.
 
 During MCP use, the product must never open a visible website browser window.
@@ -148,8 +157,8 @@ Measure speed against browser execution before you claim an improvement.
 
 Assistants can combine taught tasks in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
-In the first version, a website action that was never taught needs another teaching session.
-The first version does not discover or complete such actions automatically.
+One discovery session may produce several proposed tasks, but only separately tested and enabled tools are available to an assistant.
+An unsupported action needs further discovery and testing; a successful example does not establish support for all related actions.
 
 Some requests depend on browser state or short-lived tokens, and some websites block request reuse outside their browser session.
 These tasks need a tested browser path, or they must stay unavailable.
