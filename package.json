@@ -14,6 +14,7 @@
     "browser:teach": "node teaching-worker.mjs"
   },
   "dependencies": {
+    "@vercel/sandbox": "^3.8.0",
     "browser-use-sdk": "^3.12.1",
     "next": "^16.4.2",
     "react": "^19.3.1",
