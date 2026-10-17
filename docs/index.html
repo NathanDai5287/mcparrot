@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="The planned user experience for teaching websites to your assistant.">
-  <title>The product · MCP Anything</title>
+  <title>The product · MCParrot</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
   <link rel="stylesheet" href="assets/docs.css">
 </head>
@@ -12,7 +12,7 @@
   <a class="skip" href="#content">Skip to content</a>
   <div class="shell">
     <aside class="sidebar">
-      <a class="brand" href="index.html">MCP Anything</a>
+      <a class="brand" href="index.html">MCParrot</a>
       <p>A guide for Nathan</p>
       <nav aria-label="Guide pages">
         <p class="nav-label">The guide</p>
@@ -41,7 +41,7 @@
     <main id="content">
       <header>
         <h1>Teach a website.<br>Use it from your assistant.</h1>
-        <p class="lead">This guide describes what MCP Anything does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
+        <p class="lead">This guide describes what MCParrot does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
         <span class="status">Hosted workspace available · teaching and assistant use planned</span>
       </header>
 
@@ -66,7 +66,7 @@
 
       <section id="today">
         <h2>What exists today</h2>
-        <p>You can <a href="https://mcp-anything.vercel.app">open the hosted workspace</a> in your browser. A <a href="http://localhost:4317">local workspace</a> also remains available when it is running. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
+        <p>You can <a href="https://mcparrot.vercel.app">open the hosted workspace</a> in your browser. A <a href="http://localhost:4317">local workspace</a> also remains available when it is running. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
         <p>The finished product will run website browsers in the background, without opening a separate browser window. You enter sign-in details and verification codes in our app for supported websites. We still need to choose how you demonstrate tasks. The dashboard is hosted; teaching and assistant access remain planned.</p>
         <p>You can <a href="http://127.0.0.1:4321">open the local sign-in test</a> while it is running. It uses a hidden browser on your computer, without Cloud credits or an AI model. Your password and code pass directly to that browser; this test does not save them. The browser keeps its signed-in session.</p>
         <p>The Berkeley test completed school sign-in, SMS verification, and Canvas access. Access remained available after a page refresh. We then added the observed verification steps to the test flow, but have not repeated the complete automatic flow from a fresh session. This school-specific test does not record tasks, repeat website requests, or provide an assistant connection.</p>
@@ -75,7 +75,7 @@
 
       <section id="deployment">
         <h2>Where the app runs</h2>
-        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. The first automatic deployment passed its checks on October 17, 2026. You can <a href="https://mcp-anything.vercel.app">open the production website</a>.</p>
+        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. The first automatic deployment passed its checks on October 17, 2026. You can <a href="https://mcparrot.vercel.app">open the production website</a>.</p>
         <p>Today, the website is a dashboard preview. It does not need a database, because changes disappear when you refresh. The school sign-in test stays on your computer. The public dashboard cannot control that test or access its saved sign-in.</p>
         <div class="table-wrap">
           <table>
@@ -136,21 +136,21 @@
 
       <section id="connections">
         <h2>Two kinds of connections</h2>
-        <p>Each website app will get its own connection, and MCP Anything will get a separate management connection. Neither kind is available yet.</p>
+        <p>Each website app will get its own connection, and MCParrot will get a separate management connection. Neither kind is available yet.</p>
         <div class="table-wrap">
           <table>
             <caption>Choose what your assistant can access</caption>
             <thead><tr><th scope="col">Connection</th><th scope="col">What you can ask your assistant to do</th></tr></thead>
             <tbody>
-              <tr><th scope="row">MCP Anything</th><td>Create website apps, manage tasks, start teaching, check progress, and request sign-in recovery.</td></tr>
+              <tr><th scope="row">MCParrot</th><td>Create website apps, manage tasks, start teaching, check progress, and request sign-in recovery.</td></tr>
               <tr><th scope="row">Canvas</th><td>Run the verified tasks you taught inside your Canvas app.</td></tr>
               <tr><th scope="row">YouTube</th><td>Run the verified tasks you taught inside your YouTube app.</td></tr>
             </tbody>
           </table>
         </div>
-        <p>For example, a Canvas app and a YouTube app give you two website connections, and the management connection makes three in total. Each website connection includes all the enabled tasks of that app, so you do not connect each task separately. You need the management connection only if you want your assistant to manage MCP Anything for you. All connections come from our one hosted website.</p>
+        <p>For example, a Canvas app and a YouTube app give you two website connections, and the management connection makes three in total. Each website connection includes all the enabled tasks of that app, so you do not connect each task separately. You need the management connection only if you want your assistant to manage MCParrot for you. All connections come from our one hosted website.</p>
         <ol class="flow">
-          <li><h3>Choose a connection</h3><p>Open the connection details of the website app, or choose MCP Anything management.</p></li>
+          <li><h3>Choose a connection</h3><p>Open the connection details of the website app, or choose MCParrot management.</p></li>
           <li><h3>Add it to your assistant</h3><p>Copy its address and follow the setup instructions for your compatible assistant.</p></li>
           <li><h3>Authorize access</h3><p>Sign in and approve access to your own apps and tasks. The available connection options depend on your assistant.</p></li>
         </ol>
@@ -158,7 +158,7 @@
 
       <section id="agent-access">
         <h2>Equal controls for agents</h2>
-        <p>Your agent is your assistant when it acts for you. Everything you can do in MCP Anything must also be possible through your agent. For example, you can create a Canvas app yourself, or you can ask your agent to create it with the same details. Both paths must give the same information and respect the same permissions. This rule covers actions and information, not the screen layout or moving between tabs.</p>
+        <p>Your agent is your assistant when it acts for you. Everything you can do in MCParrot must also be possible through your agent. For example, you can create a Canvas app yourself, or you can ask your agent to create it with the same details. Both paths must give the same information and respect the same permissions. This rule covers actions and information, not the screen layout or moving between tabs.</p>
         <p>The rule applies to app management, task teaching, testing, connections, progress, and recovery as those features become available. We check both paths before we call a feature complete. Today, the local workspace has no agent connection, so its current actions still need their matching agent controls.</p>
         <aside class="note">
           <strong class="note-label">You still control personal verification</strong>

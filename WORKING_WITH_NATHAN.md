@@ -1,6 +1,6 @@
 # Working with Nathan
 
-This document tells coding agents how to work with Nathan when they plan or change MCP Anything.
+This document tells coding agents how to work with Nathan when they plan or change MCParrot.
 Nathan explains his mental model first.
 The agent and Nathan then test their understanding until they describe the same product behavior.
 Code does not replace this step when the two accounts differ.
@@ -59,7 +59,7 @@ Report the result, the remaining limits, and the related PRs or MRs.
 
 ## Commit and merge changes
 
-Commit and push checked changes directly to the `main` branch of the [MCP Anything GitHub repository](https://github.com/NathanDai5287/mcp-anything).
+Commit and push checked changes directly to the `main` branch of the [MCParrot GitHub repository](https://github.com/NathanDai5287/mcparrot).
 Do not ask Nathan before you commit or push.
 A change is checked when you have verified it against its actual risk, and for code changes `npm run check` and `npm run build` also pass before you push.
 Make small commits with clear messages that describe the result users see.
@@ -78,7 +78,7 @@ Nathan does not need to approve merges.
 After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
 
 Automatic deployment is connected to the GitHub repository and verified on Vercel.
-Every push to `main` deploys to [the production website](https://mcp-anything.vercel.app), and each branch or pull request gets a Vercel preview link.
+Every push to `main` deploys to [the production website](https://mcparrot.vercel.app), and each branch or pull request gets a Vercel preview link.
 Nathan can review changes on the live website or a preview link instead of running the app locally.
 After each deploy, check the live site and report its link, and fix or revert a broken deploy immediately.
 The HTML guides under `docs/` and `prototypes/` are not part of the deployed Next.js app.

@@ -1,6 +1,6 @@
 # LA Hacks hackathon context
 
-This document gives agents the event facts for AI Hackathon 2026 by LA Hacks, where the team will submit MCP Anything.
+This document gives agents the event facts for AI Hackathon 2026 by LA Hacks, where the team will submit MCParrot.
 Use it to choose demo scope, submission assets, and sponsor integrations.
 It covers judging criteria, tracks, target prizes, and submission requirements, but it does not change product behavior.
 The [product specification](README.md) defines what the product does, and the [LA Hacks guide](docs/hackathon.html) is Nathan's version of this document.
@@ -42,9 +42,9 @@ Judges score each project on four criteria, so the demo and documents should add
 ## Devpost event tracks
 
 Each submission picks one primary track and must name it in the Devpost description.
-Applied Intelligence is the primary track for MCP Anything, and Agentverse is a secondary fit.
+Applied Intelligence is the primary track for MCParrot, and Agentverse is a secondary fit.
 
-| Track | Fit for MCP Anything |
+| Track | Fit for MCParrot |
 | --- | --- |
 | Applied Intelligence | Strong primary fit, because it rewards practical AI that improves everyday work: teach a task once, then use it from an assistant |
 | Agentverse (Fetch.ai) | Strong secondary fit, because saved MCP tools can act as agents that turn a request into a result |

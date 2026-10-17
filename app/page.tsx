@@ -95,9 +95,9 @@ export default function Workspace() {
   return (
     <div className="workspace-shell">
       <aside className="sidebar">
-        <button className="wordmark" onClick={() => setScreen({ view: "apps" })} aria-label="MCP Anything home">
+        <button className="wordmark" onClick={() => setScreen({ view: "apps" })} aria-label="MCParrot home">
           <svg width="29" height="29" viewBox="0 0 29 29" fill="none" aria-hidden="true"><rect x="1" y="1" width="27" height="27" rx="8" /><path d="M8 18V10l6.5 6 6.5-6v8" /></svg>
-          <span>MCP Anything</span>
+          <span>MCParrot</span>
         </button>
         <p className="workspace-label">Personal workspace</p>
         <nav aria-label="Workspace"><button className="nav-item" onClick={() => setScreen({ view: "apps" })}><Icon name="apps" />Apps</button></nav>

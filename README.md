@@ -1,6 +1,6 @@
-# MCP Anything
+# MCParrot
 
-MCP Anything turns tasks you demonstrate on a website into tools your assistant can use.
+MCParrot turns tasks you demonstrate on a website into tools your assistant can use.
 You teach a task once in our app, and an assistant such as ChatGPT can then run it for you.
 One website app can contain many saved tasks.
 Canvas is a useful example, not a product limit.
@@ -43,13 +43,13 @@ The assistant can combine saved tools to answer a new request.
 
 ## UI and MCP parity
 
-Every user capability in the MCP Anything app must have an equivalent MCP operation.
+Every user capability in the MCParrot app must have an equivalent MCP operation.
 The mapping is one-to-one at the level of product operations, including reading information and managing state.
 Navigation, layout, hover effects, and decorative controls do not need separate tools.
 The UI and MCP must call the same underlying operations with matching inputs, permissions, results, and status.
 Neither interface may bypass the other's authorization or user verification requirements.
 
-This rule covers both managing MCP Anything and running taught website tasks.
+This rule covers both managing MCParrot and running taught website tasks.
 The current frontend has no MCP access, so it does not meet this rule yet.
 The table maps each current frontend capability to its planned MCP equivalent.
 
@@ -76,7 +76,7 @@ This design is agreed, but it is not implemented yet.
 
 | Connection | Scope | Intended use |
 | --- | --- | --- |
-| MCP Anything management | The signed-in user's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
+| MCParrot management | The signed-in user's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
 | One connection per website app | Only that app's verified, enabled taught tools | Execute saved website tasks |
 
 For example, Canvas and YouTube would each have their own connection.
@@ -181,11 +181,11 @@ Reconnection cannot guarantee access to every website.
 
 ## Production deployment setup
 
-The Vercel project `mcp-anything` is linked to the public GitHub repository on the existing Hobby plan.
+The Vercel project `mcparrot` is linked to the public GitHub repository on the existing Hobby plan.
 Its production branch is `main`.
 Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
-The production dashboard is available at [mcp-anything.vercel.app](https://mcp-anything.vercel.app).
+The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
 The dashboard and JavaScript assets returned successfully; local sign-in and private-state paths returned 404.
 

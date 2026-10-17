@@ -1,6 +1,6 @@
 # Static dashboard design prototypes
 
-This folder holds static HTML prototypes of three visual directions for the MCP Anything dashboard.
+This folder holds static HTML prototypes of three visual directions for the MCParrot dashboard.
 The local frontend uses the Calm workspace design, and the other two directions remain comparison references.
 Open [the prototype gallery](index.html) directly from the file system, or serve this repository with a local HTTP server.
 No packages, build process, or account setup are needed.
@@ -18,7 +18,7 @@ Each page links back to the gallery through **Compare designs**.
 
 ## Paper draft boards
 
-The Paper file [MCP Anything dashboard options](https://app.paper.design/file/01M55WYB3QFM5TWPNEFXSG8MXQ) contains three editable draft boards, one for each direction.
+The Paper file [MCParrot dashboard options](https://app.paper.design/file/01M55WYB3QFM5TWPNEFXSG8MXQ) contains three editable draft boards, one for each direction.
 Their layout differs from the HTML prototypes, and nobody has verified them as a design source.
 The Calm HTML prototype governs the frontend design.
 

@@ -50,7 +50,7 @@ export async function runBrowserCode(code, payload = {}) {
       env: {
         ...process.env,
         BU_CDP_URL: endpoint,
-        BU_NAME: "mcp-anything-headless",
+        BU_NAME: "mcparrot-headless",
         BH_RECORD: "0",
         BH_TAB_MARKER: "0",
         BH_TELEMETRY: "0",
