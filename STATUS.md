@@ -6,8 +6,8 @@ The [product specification](README.md) describes how each capability behaves, an
 Nathan reads the same facts in plain language in the [status guide](public/docs/status.html).
 Update both pages in the same change whenever a capability's status changes.
 
-Today, MCParrot is a hosted dashboard preview plus a separate local sign-in diagnostic.
-The dashboard runs on Vercel and lets users create website apps and draft tasks, but it keeps them only in page memory and does not connect to real websites.
+Today, MCParrot is a hosted dashboard with a local teaching connection and a separate local sign-in diagnostic.
+The dashboard runs on Vercel and lets users create website apps and draft tasks, but it keeps them only in page memory. Its Berkeley teaching screen can pair with a local browser worker.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
 Hosted browsers, request recording, task discovery, request replay, MCP access, persistent storage, and Sentry are aspirational.
 
@@ -34,6 +34,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
+| Local teaching connection controls | shipped | A real browser paired localhost dashboard 4319 with loopback worker 4323 and exercised recording start/stop with zero captures; production pairing still needs its deployment check |
+| Local request candidate capture and tests | gap | Code observes course-reading GET requests and syllabus navigation, selects candidates, and shares operations with local MCP; a live user recording and replay have not run |
 | Hosted browser sessions | aspirational | Prove a visible teaching window and hidden browser execution and recovery |
 | Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
 | Suggested task discovery | aspirational | Group observed requests into task cards for user review; do not enable untested suggestions |
@@ -72,7 +74,8 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - The dashboard has no MCP access, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
 - Dashboard changes live only in page memory, start from sample data, and reset when the page refreshes.
 - Draft tasks are not verified tools and cannot perform website actions.
-- The dashboard is not connected to real browsers, authentication, recording, request replay, storage, or Sentry.
+- The teaching pilot requires the local worker on the same computer; it has no hosted browser, durable captures, or remote assistant connection.
+- Live candidate capture and direct replay await Nathan's recorded browsing session; control checks alone do not prove task execution.
 - The automatic Duo steps in the diagnostic have not had a full clean rerun.
 - The diagnostic works only for the Berkeley sign-in page and only on Nathan's computer.
 

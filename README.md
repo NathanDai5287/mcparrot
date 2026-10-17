@@ -241,6 +241,26 @@ Send task status, duration, and sanitized errors to Sentry.
 Do not send credentials, verification codes, request bodies with private data, or student content.
 Do not assume that a Browser Use profile alone gives a secure way to transfer tokens.
 
+## Local teaching pilot
+
+The Berkeley pilot connects the hosted teaching screen to a visible browser on the same computer.
+Install local Chrome and Browser Use as described below, then run `npm run browser:teach` from this checkout.
+The worker uses the dedicated `.local/headless-profile/` profile, preserving an existing session where available.
+Set `MCPARROT_BROWSER_PROFILE` to use another dedicated project profile; do not use a personal Chrome profile.
+Open a Berkeley Canvas task in the dashboard and select **Connect teaching browser**.
+Approve the separate loopback connection window and keep it open while teaching.
+Select **Start recording**, browse course pages, then select **Stop recording**.
+The pilot lists observed course-reading GET requests and syllabus-page navigation as candidates.
+Select a candidate and test it before treating it as reusable; live capture and replay still need Nathan's demonstration.
+Only request counts, normalized route labels, and test summaries reach the dashboard.
+Credentials, session cookies, recorded URLs, and response content remain on the local worker.
+The worker keeps captures and the selected request in memory until it stops.
+Its loopback pairing grants expire after one hour and restrict messages to the exact authorized dashboard window.
+The local UI operations share their executor with bearer-protected MCP tools at `http://127.0.0.1:4323/mcp`.
+The MCP test calls that HTTP endpoint internally; a remote assistant connection and complete workspace parity remain gaps.
+This local pilot is not the hosted browser architecture, semantic task discovery, or durable task publishing.
+See the [status page](STATUS.md) for the checks that have run.
+
 ## Local sign-in test
 
 The Berkeley-specific diagnostic uses open-source Browser Use with a separate headless local Chrome profile.
@@ -283,7 +303,7 @@ npm run dev -- --port 4317
 
 Open [http://localhost:4317](http://localhost:4317) when the development server starts.
 Open [http://localhost:4317/docs](http://localhost:4317/docs) to read Nathan's HTML guides.
-Use this frontend to review navigation; it does not connect to live websites.
+Use this frontend to review navigation and connect to the Berkeley local teaching pilot.
 
 ## Running the task runner
 

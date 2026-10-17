@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import { TeachingPanel } from "./teaching-panel";
 
 type Task = { id: string; name: string; description: string };
 type Website = { id: string; name: string; url: string; sample?: boolean; tasks: Task[] };
@@ -12,7 +13,7 @@ type Screen =
   | { view: "teach"; app: Website; task: Task };
 
 const sampleApps: Website[] = [
-  { id: "canvas", name: "Canvas", url: "https://school.example/canvas", sample: true, tasks: [] },
+  { id: "canvas", name: "Canvas", url: "https://bcourses.berkeley.edu", sample: true, tasks: [] },
   { id: "youtube", name: "YouTube", url: "https://www.youtube.com", sample: true, tasks: [] },
 ];
 
@@ -48,7 +49,7 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
       <input id="app-name" name="name" placeholder="For example, Canvas" required maxLength={80} pattern=".*\S.*" autoFocus />
       <label htmlFor="website-url">Website address</label>
       <input id="website-url" name="url" type="url" placeholder="https://your-website.com" required aria-describedby="url-help" />
-      <p className="field-help" id="url-help">Use the address you normally visit. This preview will not open or connect to it.</p>
+      <p className="field-help" id="url-help">Use the address you normally visit. The local teaching pilot supports Berkeley Canvas.</p>
       <div className="form-actions"><button className="button primary" type="submit">Create app</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
     </form>
   );
@@ -136,8 +137,8 @@ export default function Workspace() {
           {screen.view === "teach" && <>
             <BackButton onClick={() => setScreen({ view: "app", app: screen.app })}>{screen.app.name}</BackButton>
             <PageHeader title={screen.task.name} description={screen.task.description} />
-            <section className="browser-preview"><div className="browser-bar"><Icon name="browser" /><span>{screen.app.url}</span><span className="badge">Not connected</span></div><div className="browser-placeholder"><Icon name="browser" /><h2>Your teaching browser will open here</h2><p>You will sign in and perform the task yourself.<br />The app will record your steps and requests.</p><span className="unavailable-note">Browser recording is not connected in this preview.</span></div></section>
-            <div className="teaching-actions"><p>This draft is not recorded, tested, or available to an assistant.</p><button className="button primary" onClick={() => saveDraft(screen.app, screen.task)}>Save draft</button></div>
+            <TeachingPanel key={screen.task.id} websiteUrl={screen.app.url} />
+            <div className="teaching-actions"><p>Saving this draft does not publish the local recording or connect an assistant.</p><button className="button primary" onClick={() => saveDraft(screen.app, screen.task)}>Save draft</button></div>
           </>}
         </main>
       </div>

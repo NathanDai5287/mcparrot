@@ -9,8 +9,9 @@
     "start": "next start --hostname 127.0.0.1",
     "browser": "node --env-file-if-exists=.env browser.mjs",
     "browser:local": "node browser-local.mjs",
-    "check": "node --check browser.mjs && node --check browser-local.mjs && node --check local-auth-server.mjs && next typegen && tsc --noEmit",
-    "browser:signin": "node local-auth-server.mjs"
+    "check": "node --check browser.mjs && node --check browser-local.mjs && node --check local-auth-server.mjs && node --check teaching-worker.mjs && next typegen && tsc --noEmit",
+    "browser:signin": "node local-auth-server.mjs",
+    "browser:teach": "node teaching-worker.mjs"
   },
   "dependencies": {
     "browser-use-sdk": "^3.12.1",

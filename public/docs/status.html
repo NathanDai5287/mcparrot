@@ -59,7 +59,7 @@
 
       <section id="capabilities">
         <h2>What you can do</h2>
-        <p>Today you can open the workspace, create website apps with draft tasks, and look at a preview of teaching. A separate test on your computer can sign in to your school account in a hidden browser. Teaching real tasks and using them from your assistant are still aspirational. The table lists each feature from your point of view, with the proof that it works or the next step that builds it.</p>
+        <p>Today you can open the workspace, create website apps with draft tasks, and connect a local teaching browser. A separate test on your computer can sign in to your school account in a hidden browser. Teaching real tasks and using them from your assistant are still aspirational. The table lists each feature from your point of view, with the proof that it works or the next step that builds it.</p>
         <div class="table-wrap">
           <table>
             <caption>Features and their status</caption>
@@ -68,10 +68,12 @@
               <tr><th scope="row">Open the workspace in your browser</th><td><span class="badge badge--shipped">shipped</span></td><td>The first automatic publication of the <a href="https://mcparrot.vercel.app">hosted workspace</a> passed its build and page checks on October 17, 2026. The same workspace also runs as a <a href="http://localhost:4317">local workspace</a> on your computer.</td></tr>
               <tr><th scope="row">Read these guides in the workspace website</th><td><span class="badge badge--shipped">shipped</span></td><td>The local workspace and the <a href="https://mcparrot.vercel.app/docs">hosted website</a> both opened these guides on October 17, 2026.</td></tr>
               <tr><th scope="row">Create a website app and add draft tasks</th><td><span class="badge badge--shipped">shipped</span></td><td>You can do this in the hosted workspace today. Your changes disappear when you refresh the page, which is a known gap.</td></tr>
-              <tr><th scope="row">Look at a preview of teaching</th><td><span class="badge badge--shipped">shipped</span></td><td>The workspace shows the teaching screens for a draft task. The preview does not open the real website or record your actions.</td></tr>
+              <tr><th scope="row">Look at a preview of teaching</th><td><span class="badge badge--shipped">shipped</span></td><td>The workspace shows the teaching screens for a draft task. The Berkeley teaching screen can connect to a separate local browser worker.</td></tr>
               <tr><th scope="row">See each update published automatically</th><td><span class="badge badge--shipped">shipped</span></td><td>Each update to the main copy publishes to the production website, and the first automatic publication passed its checks on October 17, 2026.</td></tr>
               <tr><th scope="row">Sign in to your school account from a hidden browser</th><td><span class="badge badge--shipped">shipped</span></td><td>The <a href="http://127.0.0.1:4321">local sign-in test</a> completed Berkeley sign-in, SMS verification, and Canvas access. You stayed signed in after a page refresh. It uses no Cloud credits or AI model, and it does not save your password or code.</td></tr>
               <tr><th scope="row">Send one written task to a hosted browser</th><td><span class="badge badge--dormant">dormant</span></td><td>A small tool sends one task to Browser Use, but the workspace does not use it. Only a basic error check has run, and that does not prove a live task works.</td></tr>
+              <tr><th scope="row">Connect the local teaching browser</th><td><span class="badge badge--shipped">shipped</span></td><td>A real browser connected the local workspace to the teaching worker and checked Start recording and Stop recording. The hosted connection still needs its publication check.</td></tr>
+              <tr><th scope="row">Capture and test observed reading requests</th><td><span class="badge badge--gap">gap</span></td><td>The local pilot has these controls, but we still need your browsing demonstration and successful request test. Page content and your school session stay on your computer.</td></tr>
               <tr><th scope="row">Record pages you browse</th><td><span class="badge badge--aspirational">aspirational</span></td><td>A visible browser records the pages you choose to visit. The first stage proves one reading task from that session.</td></tr>
               <tr><th scope="row">Review several suggested tasks</th><td><span class="badge badge--aspirational">aspirational</span></td><td>One browsing session suggests task cards. You confirm each name, description, inputs, and result, then test changed inputs before enabling it.</td></tr>
               <tr><th scope="row">Repeat a task with new inputs</th><td><span class="badge badge--aspirational">aspirational</span></td><td>The first stage repeats the recorded website messages and checks the result against the website.</td></tr>
@@ -93,9 +95,9 @@
         <p>Some shipped features have known missing pieces. These gaps do not stop you from trying the features, but they limit what each feature proves. We close each gap through the stage of work that needs it. The list below names every gap we know about.</p>
         <ul>
           <li><span class="badge badge--gap">gap</span> The workspace starts from sample data and does not save your website apps or draft tasks, so they disappear when you refresh the page.</li>
-          <li><span class="badge badge--gap">gap</span> Draft tasks cannot run, and the teaching preview does not open the real website or record your actions.</li>
+          <li><span class="badge badge--gap">gap</span> Draft tasks are not published tools. The local pilot still needs a real browsing recording and request test.</li>
           <li><span class="badge badge--gap">gap</span> Your agent cannot do the workspace actions yet, so the workspace does not meet the rule of <a href="index.html#agent-access">equal controls for agents</a>.</li>
-          <li><span class="badge badge--gap">gap</span> The sign-in test works only for Berkeley and only on your computer, and the hosted workspace cannot reach it or its saved sign-in.</li>
+          <li><span class="badge badge--gap">gap</span> The sign-in test works only for Berkeley and only on your computer, and teaching requires the local worker to run on the same computer.</li>
           <li><span class="badge badge--gap">gap</span> After the first test, we added the observed verification steps to the sign-in test, but we have not repeated the complete automatic flow from a fresh start.</li>
         </ul>
       </section>
