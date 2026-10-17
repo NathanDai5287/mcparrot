@@ -126,3 +126,14 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
   .browser-bar .badge { font-size: 9px; }
   .browser-placeholder { min-height: 300px; }
 }
+
+.teaching-pilot { padding: 28px; border: 1px solid var(--border, #dbe4e0); border-radius: 12px; background: #fff; }
+.teaching-pilot p { line-height: 1.6; }
+.pilot-steps { padding-left: 22px; line-height: 1.9; }
+.pilot-controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
+.pilot-status { min-height: 24px; color: #32695e; overflow-wrap: anywhere; }
+.pilot-candidates { display: grid; gap: 10px; margin-top: 24px; }
+.candidate-button { justify-content: flex-start; text-align: left; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+.pilot-review { border-top: 1px solid #dbe4e0; margin-top: 24px; padding-top: 20px; }
+.pilot-review label { display: grid; gap: 8px; max-width: 280px; }
+.pilot-review input { padding: 12px; border: 1px solid #cbd8d1; border-radius: 8px; font: inherit; }
