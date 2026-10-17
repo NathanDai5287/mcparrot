@@ -158,3 +158,11 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
   .teaching-progress { gap: 20px; }
   .candidate-button { flex-direction: column; gap: 4px; }
 }
+
+.app-settings { margin-top: 30px; border-top: 1px solid var(--line); padding-top: 22px; }
+.app-settings h2 { font-size: 15px; font-weight: 600; }
+.app-settings p { margin-top: 8px; color: var(--muted); max-width: 65ch; font-size: 12px; }
+.app-settings .form-actions { margin-top: 18px; }
+.delete-link { border: 0; padding: 4px 0; color: #9d3f36; background: transparent; font-size: 12px; }
+.button.danger { color: #9d3f36; border-color: #cfa9a5; }
+.workspace-warning { margin-bottom: 24px; color: #9d3f36; }

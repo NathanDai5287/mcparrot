@@ -6,8 +6,8 @@ The [product specification](README.md) describes how each capability behaves, an
 Nathan reads the same facts in plain language in the [status guide](public/docs/status.html).
 Update both pages in the same change whenever a capability's status changes.
 
-Today, MCParrot is a hosted dashboard with a local teaching connection and a separate local sign-in diagnostic.
-The dashboard runs on Vercel and lets users create website apps and draft tasks, but it keeps them only in page memory. Its Berkeley teaching screen can pair with a local browser worker.
+Today, MCParrot is a hosted dashboard; local teaching and sign-in diagnostics are dormant.
+The dashboard runs on Vercel and lets users create website apps and draft tasks, and keeps their metadata in this browser’s local storage. Its task screen explains that a hosted teaching browser is not connected.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
 The local pilot captured two reading requests from Nathan’s browsing, including a syllabus visit. Hosted browsers, broader task discovery, request replay, remote MCP access, persistent storage, and Sentry are aspirational.
 
@@ -26,20 +26,23 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 
 | Capability | Status | Evidence or next step |
 | --- | --- | --- |
-| Workspace dashboard | shipped | `app/page.tsx` creates website apps, saves draft tasks, and shows a teaching preview; the production check returned it |
+| Workspace dashboard | shipped | `app/page.tsx` creates website apps and draft tasks; automatic type and production build checks pass |
+| App and task addresses | shipped | Stable app and task addresses use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
+| Local app deletion | shipped | Inline confirmation removes an app and its drafts from browser storage; automatic type and production build checks pass; management MCP parity remains a gap |
+| Browser draft metadata | shipped | App and task metadata uses local storage after refresh; automatic type and production build checks pass; captures and sign-in data are excluded |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
-| Local Berkeley sign-in diagnostic | shipped | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
-| Local headless browser launcher | shipped | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
+| Local Berkeley sign-in diagnostic | dormant | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
+| Local headless browser launcher | dormant | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
-| Local teaching connection controls | shipped | Nathan used the production teaching controls; the worker reported recording stopped, two captures, and a selected request |
-| Local reading request capture | shipped | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
-| Guided teaching controls | shipped | `app/teaching-panel.tsx` shows Connect, Teach, and Review with one main action and extra controls under Details; type and production build checks pass; Nathan tests the live flow |
-| Reopen task teaching details | shipped | Panels keep page-session state and suspend hidden polling; automatic type and production build checks pass; Nathan tests the deployed navigation |
+| Local teaching connection controls | dormant | Earlier local pairing code remains outside the product UI; the production-only workflow must not launch a local helper |
+| Local reading request capture | dormant | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
+| Hosted teaching controls | gap | `app/teaching-panel.tsx` shows an unavailable message until an authenticated hosted browser is connected; no loopback popup is offered |
+| Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; teaching recording remains unavailable |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
-| Hosted browser sessions | aspirational | Prove a visible teaching window and hidden browser execution and recovery |
+| Hosted browser sessions | gap | The production-only workflow needs configured hosted browser access, owner authorization, and request capture before recording is available |
 | Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
 | Suggested task discovery | aspirational | Group observed requests into task cards for user review; do not enable untested suggestions |
 | Task review and publication | aspirational | Let the user confirm names, descriptions, inputs, and results, then test changed inputs before publication |
@@ -74,12 +77,12 @@ The diagnostic is not reachable from the hosted dashboard and does not expose MC
 
 These gaps exist inside shipped work and stay open until a change closes them:
 
-- The dashboard has no MCP access, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
-- Dashboard changes live only in page memory, start from sample data, and reset when the page refreshes.
+- The dashboard has no MCP access, including the new `delete_app` operation, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
+- App and draft metadata stays in one browser only, without owner authentication or a hosted database. Teaching connections and results reset on refresh.
 - Draft tasks are not verified tools and cannot perform website actions.
-- The teaching pilot requires the local worker on the same computer; it has no hosted browser, durable captures, or remote assistant connection.
+- Production teaching has no hosted browser connection, durable captures, or remote assistant connection. Local helper controls have been removed from the dashboard.
 - Capture passed its narrow live check; direct replay still needs a successful test and result review.
-- The worker holds one capture. Starting another recording replaces it; earlier task summaries cannot execute that replaced capture.
+- The worker holds one capture in memory. Restarting the helper loses it, and starting another recording replaces it; earlier task summaries cannot execute that replaced capture.
 - The automatic Duo steps in the diagnostic have not had a full clean rerun.
 - The diagnostic works only for the Berkeley sign-in page and only on Nathan's computer.
 

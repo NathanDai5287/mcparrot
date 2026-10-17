@@ -60,10 +60,11 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Browse or open draft tasks | `list_tasks`, `get_task` |
 | Enter a task and open teaching preview | `create_task` |
 | Save a task draft | `save_draft` |
+| Delete an app and its drafts | `delete_app` |
 
 These operation names are examples.
 Teaching, testing, publishing, connection, and recovery controls are aspirational and must follow the same rule.
-Editing and deleting are aspirational capabilities, not frontend actions.
+Editing remains aspirational. Deletion is available in the UI, but its matching management operation remains a parity gap.
 Keep an operation inventory that maps each user capability to its MCP equivalent.
 For each new capability, check matching inputs, results, status, owner access, and required user actions through both interfaces.
 A capability is shipped only after these parity checks pass; do not accept capabilities that only one interface offers.
@@ -203,7 +204,9 @@ The local sign-in diagnostic is not a public route or hosted sign-in service.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets or private website content.
 
-The dashboard needs no database or paid model, because its changes exist only in page memory.
+The dashboard saves app names, website addresses, and draft task metadata in this browser’s local storage.
+This supports refresh and direct app links without a database or paid model.
+It does not save credentials, request captures, website content, or teaching results there.
 The task backend, MCP endpoints, authentication service, database, and browser worker are aspirational.
 Short server operations can share the Next.js deployment.
 Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
@@ -241,37 +244,28 @@ Send task status, duration, and sanitized errors to Sentry.
 Do not send credentials, verification codes, request bodies with private data, or student content.
 Do not assume that a Browser Use profile alone gives a secure way to transfer tokens.
 
-## Local teaching pilot
+## Workspace navigation behavior
 
-The Berkeley pilot connects the hosted teaching screen to a visible browser on the same computer.
-Install local Chrome and Browser Use as described below, then run `npm run browser:teach` from this checkout.
-The worker uses the dedicated `.local/headless-profile/` profile, preserving an existing session where available.
-Set `MCPARROT_BROWSER_PROFILE` to use another dedicated project profile; do not use a personal Chrome profile.
-Open a Berkeley Canvas task in the dashboard and select **Connect Canvas**.
-Approve the separate loopback connection helper and keep it open in the background while teaching.
-Return to MCParrot and select **Start teaching**; the existing Canvas window comes forward for browsing.
-Return to MCParrot and select **Finish teaching**, then select an observed reading request and **Test selected request**.
-The screen guides users through Connect, Teach, and Review with one main action at each stage.
-Connection settings, the course ID, the local MCP test, and capture replacement stay under **Connection and test details**.
-Select **Return to tasks** to leave the screen; this keeps the draft in the current page session without publishing it.
-The pilot lists observed course-reading GET requests and syllabus-page navigation as candidates.
-Select a candidate and test it before treating it as reusable; the [status page](STATUS.md) records the capture evidence and remaining replay gap.
-Only request counts, normalized route labels, and test summaries reach the dashboard.
-Credentials, session cookies, recorded URLs, and response content remain on the local worker.
-Returning to a draft keeps its connection, observed request list, selection, and test summary during the same page session.
-Task drafts enter the workspace when teaching starts, so using Back does not discard them.
-Refreshing the page still loses workspace drafts; reconnecting the first task can recover the worker’s current capture without starting another recording.
-The worker holds only one capture at a time; starting another recording replaces it.
-Earlier task summaries remain visible, but their review and test controls stay unavailable after another task takes the capture.
-The worker keeps captures and the selected request in memory until it stops or another recording starts.
-Its loopback pairing grants expire after one hour and restrict messages to the exact authorized dashboard window.
-The local UI operations share their executor with bearer-protected MCP tools at `http://127.0.0.1:4323/mcp`.
-The MCP test calls that HTTP endpoint internally; a remote assistant connection and complete workspace parity remain gaps.
-This local pilot is not the hosted browser architecture, semantic task discovery, or durable task publishing.
-See the [status page](STATUS.md) for the checks that have run.
+App and task pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/tasks/<task-id>`.
+Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores local draft metadata.
+These addresses do not transfer a browser’s saved apps to another user or device.
+Select **Delete app** inside an app, then confirm inline to remove that app and its drafts from this browser.
+Deletion does not remove the website account or a browser profile.
+An old link to a deleted app shows an unavailable page with a return to the app list.
+
+## Hosted teaching requirement
+
+Teaching and testing must run through the production app without a local worker, local browser helper, or loopback popup.
+The dashboard keeps draft metadata but shows that recording is unavailable until a hosted browser is connected.
+The local teaching worker is dormant and is not linked from the product UI.
+Its earlier request captures were memory-only and are unavailable after that worker stopped.
+The earlier local diagnostic evidence does not establish hosted teaching or replay support.
+Browser Use Cloud needs configuration and an authenticated owner-scoped session before production teaching can run.
+See the [status page](STATUS.md) for the hosted browser gap.
 
 ## Local sign-in test
 
+This diagnostic is dormant; do not start local services for the current production-only workflow.
 The Berkeley-specific diagnostic uses open-source Browser Use with a separate headless local Chrome profile.
 It does not use Browser Use Cloud credits or an AI model.
 The main frontend remains separate from this diagnostic, which does not expose MCP operations.
