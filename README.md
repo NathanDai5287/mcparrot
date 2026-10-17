@@ -251,10 +251,15 @@ Open a Berkeley Canvas task in the dashboard and select **Connect teaching brows
 Approve the separate loopback connection window and keep it open while teaching.
 Select **Start recording**, browse course pages, then select **Stop recording**.
 The pilot lists observed course-reading GET requests and syllabus-page navigation as candidates.
-Select a candidate and test it before treating it as reusable; live capture and replay still need Nathan's demonstration.
+Select a candidate and test it before treating it as reusable; the [status page](STATUS.md) records the capture evidence and remaining replay gap.
 Only request counts, normalized route labels, and test summaries reach the dashboard.
 Credentials, session cookies, recorded URLs, and response content remain on the local worker.
-The worker keeps captures and the selected request in memory until it stops.
+Returning to a draft keeps its connection, observed request list, selection, and test summary during the same page session.
+Task drafts enter the workspace when teaching starts, so using Back does not discard them.
+Refreshing the page still loses workspace drafts; reconnecting the first task can recover the worker’s current capture without starting another recording.
+The worker holds only one capture at a time; starting another recording replaces it.
+Earlier task summaries remain visible, but their review and test controls stay unavailable after another task takes the capture.
+The worker keeps captures and the selected request in memory until it stops or another recording starts.
 Its loopback pairing grants expire after one hour and restrict messages to the exact authorized dashboard window.
 The local UI operations share their executor with bearer-protected MCP tools at `http://127.0.0.1:4323/mcp`.
 The MCP test calls that HTTP endpoint internally; a remote assistant connection and complete workspace parity remain gaps.

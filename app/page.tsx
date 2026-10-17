@@ -76,6 +76,7 @@ function TaskForm({ app, onSave, onCancel }: { app: Website; onSave: (task: Task
 
 export default function Workspace() {
   const [apps, setApps] = useState(sampleApps);
+  const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>({ view: "apps" });
 
   function createApp(name: string, url: string) {
@@ -132,14 +133,19 @@ export default function Workspace() {
           {screen.view === "create-task" && <>
             <BackButton onClick={() => setScreen({ view: "app", app: screen.app })}>{screen.app.name}</BackButton>
             <PageHeader title="Create a task" description={`What would you like to do on ${screen.app.name}?`} />
-            <TaskForm app={screen.app} onSave={(task) => setScreen({ view: "teach", app: screen.app, task })} onCancel={() => setScreen({ view: "app", app: screen.app })} />
+            <TaskForm app={screen.app} onSave={(task) => {
+              const app = { ...screen.app, tasks: [...screen.app.tasks, task] };
+              setApps(apps.map((savedApp) => savedApp.id === app.id ? app : savedApp));
+              setScreen({ view: "teach", app, task });
+            }} onCancel={() => setScreen({ view: "app", app: screen.app })} />
           </>}
-          {screen.view === "teach" && <>
-            <BackButton onClick={() => setScreen({ view: "app", app: screen.app })}>{screen.app.name}</BackButton>
-            <PageHeader title={screen.task.name} description={screen.task.description} />
-            <TeachingPanel key={screen.task.id} websiteUrl={screen.app.url} />
-            <div className="teaching-actions"><p>Saving this draft does not publish the local recording or connect an assistant.</p><button className="button primary" onClick={() => saveDraft(screen.app, screen.task)}>Save draft</button></div>
-          </>}
+          {apps.flatMap((app) => app.tasks.map((task) => <div key={task.id} hidden={screen.view !== "teach" || screen.task.id !== task.id}>
+            <BackButton onClick={() => setScreen({ view: "app", app })}>{app.name}</BackButton>
+            <PageHeader title={task.name} description={task.description} />
+            <TeachingPanel websiteUrl={app.url} active={screen.view === "teach" && screen.task.id === task.id} ownsRecording={recordingTaskId === task.id} canRecoverRecording={recordingTaskId === null} onClaimRecording={() => setRecordingTaskId(task.id)} />
+            <div className="teaching-actions"><p>Recording details stay here when you return. Refreshing loses draft tasks; saving does not publish a tool.</p><button className="button primary" onClick={() => saveDraft(app, task)}>Save draft</button></div>
+          </div>))}
+
         </main>
       </div>
     </div>
