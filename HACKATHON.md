@@ -93,8 +93,8 @@ This path addresses technical depth and execution better than a polished interfa
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.
 Canvas is an example of that user's website, not the only one.
 
-Show clearly which parts work and which are planned, because judges penalize polish that hides parts that do not work.
-Match the demo claims to the [current status](README.md#current-implementation-status) in the product specification.
+Match every demo claim to [the status page](STATUS.md), and label each part as shipped, dormant, aspirational, or a gap.
+Judges penalize polish that hides parts that do not work, so never present an aspirational part in the present tense.
 Plan the Devpost text, a clean public repository, and a video that shows the same flow that judges see live.
 To claim the Sentry prize, show evidence from Tracing, Logs, Replay, or another allowed product, not only caught errors.
 To claim the Browser Use prize, show a working web agent and the people it serves.

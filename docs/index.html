@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The planned user experience for teaching websites to your assistant.">
+  <meta name="description" content="The user experience for teaching websites to your assistant.">
   <title>The product · MCParrot</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
   <link rel="stylesheet" href="assets/docs.css">
@@ -18,6 +18,7 @@
         <p class="nav-label">The guide</p>
         <ul>
           <li><a href="index.html" aria-current="page">The product</a></li>
+          <li><a href="status.html">What works today</a></li>
           <li><a href="hackathon.html">LA Hacks 2026</a></li>
           <li><a href="working-together.html">How we work together</a></li>
         </ul>
@@ -42,7 +43,7 @@
       <header>
         <h1>Teach a website.<br>Use it from your assistant.</h1>
         <p class="lead">This guide describes what MCParrot does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
-        <span class="status">Hosted workspace available · teaching and assistant use planned</span>
+        <span class="status">Workspace shipped · teaching and assistant use aspirational</span>
       </header>
 
       <div class="table-wrap">
@@ -50,8 +51,8 @@
           <caption>Contents</caption>
           <thead><tr><th scope="col">Section</th><th scope="col">What you find there</th></tr></thead>
           <tbody>
-            <tr><th scope="row"><a href="#today">What exists today</a></th><td>What you can try now and what is still planned</td></tr>
-            <tr><th scope="row"><a href="#deployment">Where the app runs</a></th><td>Automatic publishing and the services we need</td></tr>
+            <tr><th scope="row"><a href="#today">What exists today</a></th><td>Where to find what works now</td></tr>
+            <tr><th scope="row"><a href="#deployment">Where the app runs</a></th><td>Automatic publishing and the services the product needs</td></tr>
             <tr><th scope="row"><a href="#idea">How the product works</a></th><td>Website apps, tasks, and your assistant</td></tr>
             <tr><th scope="row"><a href="#teach">Teaching a website task</a></th><td>How you show a task to the app</td></tr>
             <tr><th scope="row"><a href="#use">Using your assistant</a></th><td>How your assistant repeats a task for you</td></tr>
@@ -66,25 +67,20 @@
 
       <section id="today">
         <h2>What exists today</h2>
-        <p>You can <a href="https://mcparrot.vercel.app">open the hosted workspace</a> in your browser. A <a href="http://localhost:4317">local workspace</a> also remains available when it is running. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
-        <p>The finished product will run website browsers in the background, without opening a separate browser window. You enter sign-in details and verification codes in our app for supported websites. We still need to choose how you demonstrate tasks. The dashboard is hosted; teaching and assistant access remain planned.</p>
-        <p>You can <a href="http://127.0.0.1:4321">open the local sign-in test</a> while it is running. It uses a hidden browser on your computer, without Cloud credits or an AI model. Your password and code pass directly to that browser; this test does not save them. The browser keeps its signed-in session.</p>
-        <p>The Berkeley test completed school sign-in, SMS verification, and Canvas access. Access remained available after a page refresh. We then added the observed verification steps to the test flow, but have not repeated the complete automatic flow from a fresh session. This school-specific test does not record tasks, repeat website requests, or provide an assistant connection.</p>
-        <p>You can also <a href="../prototypes/index.html">compare the three earlier designs</a>, which use sample data.</p>
+        <p>You can <a href="https://mcparrot.vercel.app">open the hosted workspace</a> today and create website apps with draft tasks, which is <span class="badge badge--shipped">shipped</span>. Teaching real tasks and using them from your assistant are <span class="badge badge--aspirational">aspirational</span>, so the rest of this guide describes the finished experience. The <a href="status.html">status page</a> lists every feature with its status, the known gaps, and the order of the remaining work.</p>
       </section>
 
       <section id="deployment">
         <h2>Where the app runs</h2>
-        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. The first automatic deployment passed its checks on October 17, 2026. You can <a href="https://mcparrot.vercel.app">open the production website</a>.</p>
-        <p>Today, the website is a dashboard preview. It does not need a database, because changes disappear when you refresh. The school sign-in test stays on your computer. The public dashboard cannot control that test or access its saved sign-in.</p>
+        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version publish to the <a href="https://mcparrot.vercel.app">production website</a>, and other branches receive preview links. The <a href="status.html">status page</a> records which of the parts below run today.</p>
         <div class="table-wrap">
           <table>
             <caption>The complete product needs these parts</caption>
-            <thead><tr><th scope="col">Part</th><th scope="col">Where it runs</th><th scope="col">Current state</th></tr></thead>
+            <thead><tr><th scope="col">Part</th><th scope="col">Where it runs</th></tr></thead>
             <tbody>
-              <tr><th scope="row">Website and short server work</th><td>Vercel</td><td>Dashboard deployed; task execution and assistant access are planned</td></tr>
-              <tr><th scope="row">Saved apps, tasks, and progress</th><td>A hosted PostgreSQL database, such as Supabase or Neon</td><td>Not connected; needed when we save real data</td></tr>
-              <tr><th scope="row">Hidden website browsers</th><td>A separate worker host, such as Railway, or Browser Use Cloud</td><td>The test currently runs only on your computer</td></tr>
+              <tr><th scope="row">Website and short server work</th><td>Vercel</td></tr>
+              <tr><th scope="row">Saved apps, tasks, and progress</th><td>A hosted PostgreSQL database, such as Supabase or Neon</td></tr>
+              <tr><th scope="row">Hidden website browsers</th><td>A separate worker host, such as Railway, or Browser Use Cloud</td></tr>
             </tbody>
           </table>
         </div>
@@ -94,6 +90,7 @@
       <section id="idea">
         <h2>How the product works</h2>
         <p>You create an app for one website, then teach that app several tasks. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each task you teach becomes one of those tools. Canvas, the course website of your school, is our first example, but the product is intended for many websites.</p>
+        <p>The product runs website browsers in the background, without opening a separate browser window on your computer. For supported websites, you enter sign-in details and verification codes in forms inside our app. We have not yet chosen how you demonstrate a task, and a browser view inside our app is still one option.</p>
         <div class="table-wrap">
           <table>
             <caption>One website, several tasks</caption>
@@ -108,7 +105,7 @@
 
       <section id="teach">
         <h2>Teaching a website task</h2>
-        <p>This is the planned teaching experience. Today, the workspace shows only a preview of it.</p>
+        <p>This teaching experience is <span class="badge badge--aspirational">aspirational</span>. Today, the workspace shows only a preview of it.</p>
         <ol class="flow">
           <li><h3>Create your app</h3><p>Visit our website, select <strong>Create app</strong>, and enter the website address. For example, name the app “Canvas.”</p></li>
           <li><h3>Sign in yourself</h3><p>Open the browser view and sign in to your school account. Complete Duo or any other verification that the school requires.</p></li>
@@ -119,13 +116,13 @@
         </ol>
         <aside class="note">
           <strong class="note-label">You are the teacher</strong>
-          <p>By default, you demonstrate each task yourself. Browser Use gives the browser access, and later it will also help you sign in again. We also plan to let an agent that you authorize use the same teaching session.</p>
+          <p>By default, you demonstrate each task yourself. Browser Use gives the browser access, and later it will also help you sign in again. We also intend to let an agent that you authorize use the same teaching session.</p>
         </aside>
       </section>
 
       <section id="use">
         <h2>Using your assistant</h2>
-        <p>This is the planned experience after you teach a task.</p>
+        <p>This experience after you teach a task is <span class="badge badge--aspirational">aspirational</span>.</p>
         <ol class="flow">
           <li><h3>Connect once</h3><p>Add the MCP address of your app to a compatible assistant, such as ChatGPT where it is supported.</p></li>
           <li><h3>Ask for a result</h3><p class="example">“Find my assignments due this week.”</p><p>Your assistant chooses an enabled tool and supplies its inputs.</p></li>
@@ -136,7 +133,7 @@
 
       <section id="connections">
         <h2>Two kinds of connections</h2>
-        <p>Each website app will get its own connection, and MCParrot will get a separate management connection. Neither kind is available yet.</p>
+        <p>Each website app will get its own connection, and MCParrot will get a separate management connection. Both kinds are <span class="badge badge--aspirational">aspirational</span>.</p>
         <div class="table-wrap">
           <table>
             <caption>Choose what your assistant can access</caption>
@@ -159,7 +156,7 @@
       <section id="agent-access">
         <h2>Equal controls for agents</h2>
         <p>Your agent is your assistant when it acts for you. Everything you can do in MCParrot must also be possible through your agent. For example, you can create a Canvas app yourself, or you can ask your agent to create it with the same details. Both paths must give the same information and respect the same permissions. This rule covers actions and information, not the screen layout or moving between tabs.</p>
-        <p>The rule applies to app management, task teaching, testing, connections, progress, and recovery as those features become available. We check both paths before we call a feature complete. Today, the local workspace has no agent connection, so its current actions still need their matching agent controls.</p>
+        <p>The rule applies to app management, task teaching, testing, connections, progress, and recovery as those features become available. We check both paths before we mark a feature shipped. Today, the workspace has no agent connection, which is a <span class="badge badge--gap">gap</span> listed on the <a href="status.html#gaps">status page</a>.</p>
         <aside class="note">
           <strong class="note-label">You still control personal verification</strong>
           <p>Your agent could start a teaching session and give you a secure browser link. You could demonstrate the task there, or let an authorized agent operate the same session where this is supported. You still approve Duo on your phone and complete any other personal verification. After that, your agent checks progress and continues the supported work. Keep passwords and verification codes out of assistant messages.</p>
@@ -168,7 +165,7 @@
 
       <section id="reconnect">
         <h2>Recovering an expired sign-in</h2>
-        <p>A saved login can expire, and your task then needs a new sign-in. This is the planned recovery experience.</p>
+        <p>A saved login can expire, and your task then needs a new sign-in. This recovery experience is <span class="badge badge--aspirational">aspirational</span>.</p>
         <ol class="flow">
           <li><h3>The browser attempts sign-in</h3><p>If you chose to save your sign-in details securely, Browser Use enters them and continues as far as possible. If not, you sign in through a secure browser link.</p></li>
           <li><h3>Your assistant shows a verification request</h3><p>The tool gives a <strong>Verification required</strong> status and a link that your assistant can show you.</p></li>
@@ -194,14 +191,14 @@
 
       <section id="next">
         <h2>Our first build milestone</h2>
-        <p>First, we teach one reading task, repeat it with different inputs, and check the result against the website. Then we run that tool from an assistant and repeat the same process on a second website.</p>
+        <p>First, we teach one reading task, repeat it with different inputs, and check the result against the website. The <a href="status.html#order">order of remaining work</a> lists every later stage and how we know each one is finished.</p>
         <aside class="note">
           <strong class="note-label">Make failures useful</strong>
-          <p>Sentry is a service that reports errors and slow steps in an app. We plan to use its error reports, Tracing, and Logs to find failed or slow tasks. The demonstration should show a real problem that these tools helped us fix.</p>
+          <p>Sentry is a service that reports errors and slow steps in an app. We intend to use its error reports, Tracing, and Logs to find failed or slow tasks. The demonstration should show a real problem that these tools helped us fix.</p>
         </aside>
       </section>
       <footer>
-        <p><a href="hackathon.html">LA Hacks 2026 (judging and prizes)</a> · <a href="working-together.html">How we work together →</a></p>
+        <p><a href="status.html">What works today →</a></p>
         <p>Product plan · Updated October 17, 2026</p>
       </footer>
     </main>

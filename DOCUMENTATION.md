@@ -44,22 +44,34 @@ Record final conclusions and the current agreed state.
 Leave out deliberation, intermediate decisions, superseded versions, and the path taken to reach the result.
 Replace outdated guidance when an agreed conclusion changes.
 
+## Use Status Vocabulary
+
+Describe the status of a capability with only four words: shipped, dormant, aspirational, and gap.
+Shipped means that the capability exists and runs today; if you cannot point to its code and to a check that ran and passed, it is not shipped.
+Dormant means that the code exists but nothing uses it yet, and the document must say so.
+Aspirational means that the capability is designed or agreed but not built, so never describe it in the present tense as if it exists.
+A gap is a known missing foundation or defect inside something shipped, and the document must state it honestly instead of hiding it.
+
+Do not use other status words, such as planned, implemented, done, completed, in progress, WIP, or coming soon.
+Do not use verified as a status either, although you may still use it to describe evidence, as in "the deployment check passed and verified the dashboard."
+Describe how a shipped capability works in its subject document, mark designed but unbuilt behavior as aspirational, and list missing foundations as gaps.
+The [status page](STATUS.md) and the [status guide](docs/status.html) are the single home for the status of every capability.
+Other documents may tag a sentence with a status word, but they must not keep their own status lists, and they must link to the status page instead.
+When a capability ships or otherwise changes status, update the status page in the same change.
+
 ## Match Documents to Readers
 
 This repository has two kinds of readers, and each one gets its own format.
 Coding agents read Markdown files, and Nathan reads HTML guides under `docs/`.
 Write the HTML guides in plain language for a reader with no technical context.
 Some subjects need both forms, so they live in mirror pairs.
-The [product specification](README.md) mirrors the [product guide](docs/index.html), the [hackathon facts](HACKATHON.md) mirror the [hackathon guide](docs/hackathon.html), and the [collaboration process](WORKING_WITH_NATHAN.md) mirrors the [working together guide](docs/working-together.html).
+The [product specification](README.md) mirrors the [product guide](docs/index.html), the [hackathon facts](HACKATHON.md) mirror the [hackathon guide](docs/hackathon.html), the [collaboration process](WORKING_WITH_NATHAN.md) mirrors the [working together guide](docs/working-together.html), and the [status page](STATUS.md) mirrors the [status guide](docs/status.html).
 
 When agreed behavior changes, update both documents of a pair in the same change.
 Keep examples, defaults, failure states, and limitations the same in both forms.
 Build the HTML guides with the ICP-docs visual language and the local stylesheet in `docs/assets/`.
 Do not depend on a generator from another repository.
 When you add, rename, or remove a document, update the document table in the [agent entry point](AGENTS.md) in the same change.
-
-Label planned behavior and implemented behavior clearly.
-Never describe a feature that does not exist yet as complete.
 Keep secrets and private website content out of all documentation.
 
 ## Document Documentation

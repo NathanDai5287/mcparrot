@@ -1,10 +1,11 @@
 # Static dashboard design prototypes
 
-This folder holds static HTML prototypes of three visual directions for the MCParrot dashboard.
+This folder holds static HTML simulations of three visual directions for the MCParrot dashboard.
 The local frontend uses the Calm workspace design, and the other two directions remain comparison references.
 Open [the prototype gallery](index.html) directly from the file system, or serve this repository with a local HTTP server.
 No packages, build process, or account setup are needed.
-The prototypes show sample flows only; the [current status](../README.md#current-implementation-status) describes what the product actually does.
+The prototypes simulate sample flows only and say nothing about product status.
+[The status page](../STATUS.md) records what the product does today.
 
 ## Three design directions
 

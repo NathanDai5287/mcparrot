@@ -9,12 +9,14 @@ Read the product specification and the collaboration process before material wor
 
 | Document | Reader | What it covers |
 | --- | --- | --- |
-| [Product specification](README.md) | Agents | Product behavior, UI and MCP parity, technical assumptions, and work order |
+| [Product specification](README.md) | Agents | Product behavior, UI and MCP parity, technical assumptions, and local setup |
+| [Status page](STATUS.md) | Agents | What is shipped, dormant, aspirational, and known gaps |
 | [Documentation guide](DOCUMENTATION.md) | Agents | How to write and organize every document in this repository |
 | [Collaboration process](WORKING_WITH_NATHAN.md) | Agents | How to reach a shared understanding with Nathan and record the agreement |
 | [Hackathon facts](HACKATHON.md) | Agents | Event rules, judging, sponsors, demo scope, and submission assets |
 | [Prototype notes](prototypes/README.md) | Agents | The static dashboard prototypes in `prototypes/` and the selected direction |
 | [Product guide](docs/index.html) | Nathan | Plain-language mirror of the product specification |
+| [Status guide](docs/status.html) | Nathan | Plain-language mirror of the status page |
 | [Hackathon guide](docs/hackathon.html) | Nathan | Plain-language mirror of the hackathon facts |
 | [Working together guide](docs/working-together.html) | Nathan | Plain-language mirror of the collaboration process |
 
@@ -22,4 +24,5 @@ Read the product specification and the collaboration process before material wor
 
 Follow the [documentation guide](DOCUMENTATION.md) whenever you add or change a document.
 Give every user capability an equal path through the UI and through MCP, as the [UI and MCP parity section](README.md#ui-and-mcp-parity) describes.
+Use only the status words in the [documentation guide](DOCUMENTATION.md#use-status-vocabulary), and update the [status page](STATUS.md) when a capability's status changes.
 Keep secrets and private website content out of prompts, logs, traces, documentation, and source control.

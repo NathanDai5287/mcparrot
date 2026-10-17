@@ -5,8 +5,9 @@ You teach a task once in our app, and an assistant such as ChatGPT can then run 
 One website app can contain many saved tasks.
 Canvas is a useful example, not a product limit.
 
-This document is the single home for product behavior, architecture, current status, and local setup.
-It is written for coding agents.
+This document is the single home for product behavior, architecture, and local setup.
+It describes the intended product and is written for coding agents.
+The [status page](STATUS.md) records which parts are shipped, dormant, aspirational, or known gaps.
 Nathan reads matching HTML guides for the [product flow](docs/index.html), the [LA Hacks 2026 hackathon](docs/hackathon.html), and [working together](docs/working-together.html).
 Follow the [documentation rules](DOCUMENTATION.md) when you change any document.
 See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging and prizes](HACKATHON.md) for those subjects.
@@ -22,11 +23,9 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Headless browser experience](#headless-browser-experience) | How website browsers must run inside the product |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
-| [Production deployment setup](#production-deployment-setup) | Automatic publishing, current hosting, and future services |
+| [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, and the target service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, secrets, recordings, and diagnostics data |
-| [Product work stages](#product-work-stages) | The ordered stages and their completion checks |
-| [Current implementation status](#current-implementation-status) | What exists today and what is not yet connected or verified |
-| [Local sign-in test](#local-sign-in-test) | The local Browser Use diagnostic and its test results |
+| [Local sign-in test](#local-sign-in-test) | How to run the local Browser Use sign-in diagnostic and how it handles secrets |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
 | [Running the task runner](#running-the-task-runner) | How to start the separate Browser Use Cloud task runner |
 
@@ -50,29 +49,29 @@ The UI and MCP must call the same underlying operations with matching inputs, pe
 Neither interface may bypass the other's authorization or user verification requirements.
 
 This rule covers both managing MCParrot and running taught website tasks.
-The current frontend has no MCP access, so it does not meet this rule yet.
-The table maps each current frontend capability to its planned MCP equivalent.
+The frontend has no MCP access, which the [status page](STATUS.md) lists as a gap.
+The table maps each frontend capability to its aspirational management MCP equivalent.
 
-| Current frontend capability | Planned management MCP equivalent | Current limit |
-| --- | --- | --- |
-| Browse website apps | `list_apps` | Local sample and in-memory data only |
-| Open a website app | `get_app` | Local state only |
-| Create a website app | `create_app` | Not persisted |
-| Browse or open draft tasks | `list_tasks`, `get_task` | Local drafts only |
-| Enter a task and open teaching preview | `create_task` | Preview only; no recording |
-| Save a task draft | `save_draft` | Local memory only |
+| Frontend capability | Aspirational management MCP equivalent |
+| --- | --- |
+| Browse website apps | `list_apps` |
+| Open a website app | `get_app` |
+| Create a website app | `create_app` |
+| Browse or open draft tasks | `list_tasks`, `get_task` |
+| Enter a task and open teaching preview | `create_task` |
+| Save a task draft | `save_draft` |
 
-These operation names are examples; no MCP operations exist yet.
-Future teaching, testing, publishing, connection, and recovery controls must follow the same rule when they are added.
-Editing and deleting are future capabilities, not current frontend actions.
+These operation names are examples.
+Teaching, testing, publishing, connection, and recovery controls are aspirational and must follow the same rule.
+Editing and deleting are aspirational capabilities, not frontend actions.
 Keep an operation inventory that maps each user capability to its MCP equivalent.
 For each new capability, check matching inputs, results, status, owner access, and required user actions through both interfaces.
-A capability is complete only after these parity checks pass; do not accept capabilities that only one interface offers.
+A capability is shipped only after these parity checks pass; do not accept capabilities that only one interface offers.
 
 ## Assistant connection architecture
 
 The target design has one management connection plus one logical connection for each website app.
-This design is agreed, but it is not implemented yet.
+This design is agreed and aspirational.
 
 | Connection | Scope | Intended use |
 | --- | --- | --- |
@@ -85,7 +84,7 @@ Management MCP support is required by the parity rule.
 Users who manage apps only through the UI do not need to add the management connection, but users who manage apps through an assistant do.
 
 These connections are separate access scopes within one hosted service, not separately deployed servers.
-Example addresses are `/mcp/management` and `/mcp/apps/<app-id>`; the exact routes are not decided or implemented.
+Example addresses are `/mcp/management` and `/mcp/apps/<app-id>`; the exact routes are not decided.
 Authenticate each connection, and restrict it to the owner's authorized apps and operations.
 The product supplies each address and setup instructions, and users add and authorize the connections in their compatible assistant.
 Do not promise automatic connector installation or identical support across assistant clients.
@@ -100,7 +99,7 @@ Keep passwords and verification codes in the secure browser or verification flow
 
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Start its headless website browser session, planned through Browser Use Cloud.
+3. Start its headless website browser session through Browser Use Cloud.
 4. Sign in and complete any required verification, such as Duo.
 5. Select **Create task** and name the task.
 6. Perform the task yourself while our recorder captures browser actions and network requests.
@@ -114,7 +113,7 @@ A task that lists assignments could accept a course and a date range as inputs.
 Changing these inputs must not require teaching the task again.
 
 By default, the user demonstrates the task, and Browser Use does not perform the first demonstration.
-Planned MCP management access must support the same teaching steps without changing this default.
+MCP management access, which is aspirational, must support the same teaching steps without changing this default.
 Our application must find the necessary requests and their order in the recording.
 It must separate task inputs from authentication data and unrelated page traffic.
 It must then produce and verify a reusable request sequence before it enables the tool.
@@ -186,23 +185,20 @@ Its production branch is `main`.
 Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
-The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
-The dashboard and JavaScript assets returned successfully; local sign-in and private-state paths returned 404.
 
 Only the Next.js workspace is deployed as a website.
 The local sign-in diagnostic is not a public route or hosted sign-in service.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 The HTML guides and design prototypes remain repository documents, outside the deployed app.
 
-The dashboard needs no database or paid model to run today, because its changes exist only in page memory.
-There is no deployed task backend, MCP endpoint, authentication service, database, or browser worker yet.
-When these capabilities are built, short server operations can share the Next.js deployment.
+The dashboard needs no database or paid model, because its changes exist only in page memory.
+The task backend, MCP endpoints, authentication service, database, and browser worker are aspirational.
+Short server operations can share the Next.js deployment.
 Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
 A persistent headless browser needs a separate worker host, such as Railway, or Browser Use Cloud.
 Vercel requests must not own a browser session that waits for user verification.
-The current local Browser Use test remains on Nathan's computer and is not reachable from the deployed dashboard.
 
-The following table describes the planned complete product, not services already running:
+The following table describes the complete product; the [status page](STATUS.md) records which parts exist:
 
 | Part | Choice | Purpose |
 | --- | --- | --- |
@@ -213,7 +209,7 @@ The following table describes the planned complete product, not services already
 | Persistent storage | Hosted PostgreSQL | Store user-owned connections, task definitions, and operation status |
 | Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
 
-In the planned product, the user visits a website and does not install a Chrome extension or other local software.
+In the complete product, the user visits a website and does not install a Chrome extension or other local software.
 Browser Use hosts the browser work, and our app shows progress and verification controls.
 A Vercel request must not wait for a whole browser session to finish.
 For work that takes longer than one request, store durable operation status and let clients check progress.
@@ -233,45 +229,12 @@ Send task status, duration, and sanitized errors to Sentry.
 Do not send credentials, verification codes, request bodies with private data, or student content.
 Do not assume that a Browser Use profile alone gives a secure way to transfer tokens.
 
-## Product work stages
-
-Each stage must end with a verified demonstration.
-
-| Stage | Work | Completion check |
-| --- | --- | --- |
-| 1. Prove teaching and API execution | Sign in, manually demonstrate one reading task, capture requests, and derive its inputs | Run the recorded API request with valid authentication and verify the result |
-| 2. Prove MCP use | Expose that saved task through an authenticated remote MCP server | Request the task from an assistant with changed inputs |
-| 3. Add Sentry | Add error monitoring, Tracing, and Logs across the complete path | Diagnose and fix a real problem using captured evidence |
-| 4. Build teaching management | Add website apps, recordings, task review, and saved tools | Teach and reuse multiple tasks on one website |
-| 5. Prove reconnection | Preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
-| 6. Prove general use | Teach a task on a second website | Reuse the same product flow without a website-specific architecture |
-| 7. Prepare the demo | Show teaching, assistant use, and the Sentry-backed improvement | Complete the demonstrated flow and explain its limits |
-
-Start with one manually taught reading task, such as listing Canvas assignments.
-The first stage proves that authenticated API requests can be reused, not only that a browser can navigate the website.
-Interface polish and broad task support come after this proof.
-For how the demo must present Browser Use and Sentry to judges, see [hackathon judging and prizes](HACKATHON.md).
-
-## Current implementation status
-
-The first frontend uses the Calm workspace design, with light surfaces, teal actions, and a simple website list.
-It runs locally and on Vercel and lets users create website apps and draft tasks, and it shows a teaching placeholder for early feedback.
-Draft tasks are not verified tools and cannot perform website actions.
-The frontend is not connected to real browsers, authentication, recording, API execution, MCP, persistent storage, or Sentry.
-Earlier clickable prototypes remain as comparison references; see the [prototype gallery notes](prototypes/README.md).
-
-The local Browser Use task runner exists, but it is separate from the frontend.
-The dashboard is hosted; the task and assistant services are still planned.
-The separate local diagnostic verified Berkeley sign-in and session reuse after a reload.
-Request capture, token transfer, and automatic reconnection remain unverified.
-A syntax check does not prove that a live browser task works.
-
 ## Local sign-in test
 
-The Berkeley-specific diagnostic uses open-source Browser Use 0.13.11 with a separate headless local Chrome profile.
+The Berkeley-specific diagnostic uses open-source Browser Use with a separate headless local Chrome profile.
 It does not use Browser Use Cloud credits or an AI model.
 The main frontend remains separate from this diagnostic, which does not expose MCP operations.
-This experiment does not complete the UI/MCP parity requirement or change the planned hosted architecture.
+This diagnostic does not satisfy the UI and MCP parity rule or change the target hosted architecture.
 
 Run the local test after installing Browser Use with Python 3.12 and pipx:
 
@@ -288,17 +251,11 @@ Passwords and codes are not placed in command arguments, AI prompts, logs, or ap
 Browser Use recordings and telemetry are disabled.
 The browser keeps its session in the ignored `.local/headless-profile/` directory; do not export cookies or inspect course content.
 
-The launcher now activates the hidden tab and sets a desktop viewport and focus.
-Duo otherwise left the headless page hidden with no verification controls.
+The launcher activates the hidden tab and sets a desktop viewport and focus, because Duo otherwise leaves the headless page hidden with no verification controls.
 The diagnostic checks actual Duo choices, selects the SMS option for the approved phone ending in 2199 once, and displays the code form.
 It skips optional persistent device trust through Duo's observed shared-device option.
 Rejected entries require user correction and another explicit submission; there is no automatic credential or code retry.
-
-The live test completed CalNet sign-in, SMS verification, and Canvas access.
-Authenticated navigation markers remained present after a page reload, which verified reuse of that browser session.
-The focus, SMS selection, and trust choice were first completed through operator commands and then added to the diagnostic.
-A full clean rerun of those automatic steps has not been tested.
-Request capture, API replay, expired-session recovery, MCP access, and Cloud compatibility remain unverified.
+The [status page](STATUS.md) records the test results.
 Keep the existing signed-in browser available; do not reset it merely to repeat this test.
 See the [official Browser Use local CLI guide](https://docs.browser-use.com/open-source/browser-use-cli) for details.
 
@@ -313,7 +270,7 @@ npm run dev -- --port 4317
 ```
 
 Open [http://localhost:4317](http://localhost:4317) when the development server starts.
-Use this frontend to review navigation before live website connections are added.
+Use this frontend to review navigation; it does not connect to live websites.
 
 ## Running the task runner
 

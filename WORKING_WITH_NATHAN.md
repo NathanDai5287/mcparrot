@@ -46,6 +46,7 @@ Existing permission stays valid until Nathan changes the scope.
 Record settled behavior and open questions as soon as the conversation settles them.
 Follow the [documentation rules](DOCUMENTATION.md) for where and how to write them.
 When Nathan corrects a premise, replace the old premise everywhere it affects the current plan.
+When a capability's status changes, update [the status page](STATUS.md) in the same change.
 Confirm shared understanding of important behavior before you implement it.
 Do not stop for another confirmation when the conversation already shows that agreement.
 
@@ -77,7 +78,7 @@ Decide when to merge your own pull requests, and merge them yourself after the c
 Nathan does not need to approve merges.
 After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
 
-Automatic deployment is connected to the GitHub repository and verified on Vercel.
+[The status page](STATUS.md) records the status of automatic deployment from GitHub to Vercel.
 Every push to `main` deploys to [the production website](https://mcparrot.vercel.app), and each branch or pull request gets a Vercel preview link.
 Nathan can review changes on the live website or a preview link instead of running the app locally.
 After each deploy, check the live site and report its link, and fix or revert a broken deploy immediately.

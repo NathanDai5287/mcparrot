@@ -40,6 +40,11 @@ h3 { font-size: 1.2rem; margin: 0 0 .4rem; }
 p { margin: .75rem 0; }
 .lead { font-size: 1.2rem; color: var(--muted); max-width: 45ch; }
 .status { display: inline-block; margin-top: .65rem; padding: .15rem .65rem; border: 1px solid #c7c0df; border-radius: 2rem; background: #ece9f7; color: #4c4385; font-size: .75rem; font-weight: 700; }
+.badge { display: inline-block; padding: 0 .5rem; border: 1px solid; border-radius: 2rem; font-family: var(--body); font-size: .75rem; font-weight: 700; line-height: 1.6; white-space: nowrap; vertical-align: .1em; }
+.badge--shipped { border-color: #b9d6c1; background: #e3efe6; color: #24603a; }
+.badge--dormant { border-color: var(--line); background: var(--paper); color: var(--muted); }
+.badge--aspirational { border-color: #c9d3e6; background: var(--wash); color: var(--accent); }
+.badge--gap { border-color: #e6c3b3; background: #f8e9e2; color: #8a3b1f; }
 .note { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; margin: 1.5rem 0; }
 .note-label { display: block; color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .note p:last-child { margin-bottom: 0; }
