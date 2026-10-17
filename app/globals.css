@@ -166,3 +166,6 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
 .delete-link { border: 0; padding: 4px 0; color: #9d3f36; background: transparent; font-size: 12px; }
 .button.danger { color: #9d3f36; border-color: #cfa9a5; }
 .workspace-warning { margin-bottom: 24px; color: #9d3f36; }
+.teaching-browser { width: 100%; height: min(75vh, 850px); min-height: 500px; border: 1px solid var(--line); border-radius: 8px; margin-top: 28px; background: var(--surface); }
+.pilot-candidates > label { display: block; font-size: 13px; font-weight: 550; margin-bottom: 10px; }
+.pilot-candidates > select { width: 100%; max-width: 600px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }

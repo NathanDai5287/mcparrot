@@ -7,9 +7,9 @@ Nathan reads the same facts in plain language in the [status guide](public/docs/
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard; local teaching and sign-in diagnostics are dormant.
-The dashboard runs on Vercel and lets users create website apps and draft tasks, and keeps their metadata in this browser’s local storage. Its task screen explains that a hosted teaching browser is not connected.
+The dashboard runs on Vercel and lets users create website apps and draft tasks, and keeps their metadata in this browser’s local storage. Its task screen offers a private Browser Use Cloud teaching connection; production sign-in, capture, and replay still need Nathan’s demonstration.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
-The local pilot captured two reading requests from Nathan’s browsing, including a syllabus visit. Hosted browsers, broader task discovery, request replay, remote MCP access, persistent storage, and Sentry are aspirational.
+The local pilot captured two reading requests from Nathan’s browsing, including a syllabus visit. Hosted recording and replay have a production proof gap; broader task discovery, remote MCP access, persistent storage, and Sentry remain aspirational.
 
 ## Status word meanings
 
@@ -39,10 +39,10 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
 | Local teaching connection controls | dormant | Earlier local pairing code remains outside the product UI; the production-only workflow must not launch a local helper |
 | Local reading request capture | dormant | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
-| Hosted teaching controls | gap | `app/teaching-panel.tsx` shows an unavailable message until an authenticated hosted browser is connected; no loopback popup is offered |
-| Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; teaching recording remains unavailable |
+| Hosted teaching controls | gap | Production Browser Use and Vercel Sandbox paths exist; automatic cloud checks and Nathan’s sign-in, capture, and replay demonstration must pass |
+| Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; hosted teaching still needs a live demonstration |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
-| Hosted browser sessions | gap | The production-only workflow needs configured hosted browser access, owner authorization, and request capture before recording is available |
+| Hosted browser sessions | gap | Production Vercel Authentication and secrets are configured; the first cloud browser launch and Berkeley sign-in need a live demonstration |
 | Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
 | Suggested task discovery | aspirational | Group observed requests into task cards for user review; do not enable untested suggestions |
 | Task review and publication | aspirational | Let the user confirm names, descriptions, inputs, and results, then test changed inputs before publication |
@@ -50,7 +50,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Recorded request replay | aspirational | Run the recorded API request with valid authentication and check the result |
 | MCP server per website app | aspirational | Expose one saved task through an authenticated remote MCP address |
 | Management MCP connection | aspirational | Add MCP operations that match each dashboard capability |
-| Owner authentication | aspirational | Require sign-in for the dashboard, MCP connections, and verification links |
+| Private pilot access | gap | Vercel Authentication protects all production and preview pages; production access and cloud session ownership need a live check |
+| Owner authentication | aspirational | Product accounts, MCP authorization, and multi-user ownership remain unavailable |
 | Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it |
 | Saved credentials | aspirational | Store optional sign-in credentials with encryption and controlled access |
 | Secure session transfer | aspirational | Prove how session tokens move to request replay without exposing them |
@@ -78,11 +79,11 @@ The diagnostic is not reachable from the hosted dashboard and does not expose MC
 These gaps exist inside shipped work and stay open until a change closes them:
 
 - The dashboard has no MCP access, including the new `delete_app` operation, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
-- App and draft metadata stays in one browser only, without owner authentication or a hosted database. Teaching connections and results reset on refresh.
+- App and draft metadata stays in one browser only, without product accounts or a hosted database. A signed private session cookie restores hosted teaching only during its 30-minute lifetime.
 - Draft tasks are not verified tools and cannot perform website actions.
-- Production teaching has no hosted browser connection, durable captures, or remote assistant connection. Local helper controls have been removed from the dashboard.
+- Production teaching has hosted connection and recorder source, but no live school proof, durable captures, or remote assistant connection. No local helper is used.
 - Capture passed its narrow live check; direct replay still needs a successful test and result review.
-- The worker holds one capture in memory. Restarting the helper loses it, and starting another recording replaces it; earlier task summaries cannot execute that replaced capture.
+- Hosted captures remain in a nonpersistent task session for at most 30 minutes. Worker failure or session deletion loses them; replacing a recording removes its earlier candidates.
 - The automatic Duo steps in the diagnostic have not had a full clean rerun.
 - The diagnostic works only for the Berkeley sign-in page and only on Nathan's computer.
 

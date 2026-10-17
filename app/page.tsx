@@ -83,7 +83,7 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
       <input id="app-name" name="name" placeholder="For example, Canvas" required maxLength={80} pattern=".*\S.*" autoFocus />
       <label htmlFor="website-url">Website address</label>
       <input id="website-url" name="url" type="url" placeholder="https://your-website.com" required aria-describedby="url-help" />
-      <p className="field-help" id="url-help">Use the address you normally visit. The local teaching pilot supports Berkeley Canvas.</p>
+      <p className="field-help" id="url-help">Use the address you normally visit. The first hosted teaching test supports Berkeley Canvas.</p>
       <div className="form-actions"><button className="button primary" type="submit">Create app</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
     </form>
   );
@@ -232,8 +232,8 @@ export default function Workspace() {
           {apps.flatMap((app) => app.tasks.map((task) => <div key={task.id} hidden={screen.view !== "teach" || screen.task.id !== task.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
             <PageHeader title={task.name} description={task.description} />
-            <TeachingPanel />
-            <div className="teaching-actions"><p>Draft names stay in this browser. Teaching is not connected yet. This is not an assistant tool.</p><button className="button" onClick={() => saveDraft(app, task)}>Return to tasks</button></div>
+            <TeachingPanel appId={app.id} taskId={task.id} websiteUrl={app.url} active={screen.view === "teach" && screen.task.id === task.id} />
+            <div className="teaching-actions"><p>Draft names stay in this browser. Hosted sessions last 30 minutes. This draft is not an assistant tool.</p><button className="button" onClick={() => saveDraft(app, task)}>Return to tasks</button></div>
           </div>))}
 
         </main>
