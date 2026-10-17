@@ -247,9 +247,13 @@ The Berkeley pilot connects the hosted teaching screen to a visible browser on t
 Install local Chrome and Browser Use as described below, then run `npm run browser:teach` from this checkout.
 The worker uses the dedicated `.local/headless-profile/` profile, preserving an existing session where available.
 Set `MCPARROT_BROWSER_PROFILE` to use another dedicated project profile; do not use a personal Chrome profile.
-Open a Berkeley Canvas task in the dashboard and select **Connect teaching browser**.
-Approve the separate loopback connection window and keep it open while teaching.
-Select **Start recording**, browse course pages, then select **Stop recording**.
+Open a Berkeley Canvas task in the dashboard and select **Connect Canvas**.
+Approve the separate loopback connection helper and keep it open in the background while teaching.
+Return to MCParrot and select **Start teaching**; the existing Canvas window comes forward for browsing.
+Return to MCParrot and select **Finish teaching**, then select an observed reading request and **Test selected request**.
+The screen guides users through Connect, Teach, and Review with one main action at each stage.
+Connection settings, the course ID, the local MCP test, and capture replacement stay under **Connection and test details**.
+Select **Return to tasks** to leave the screen; this keeps the draft in the current page session without publishing it.
 The pilot lists observed course-reading GET requests and syllabus-page navigation as candidates.
 Select a candidate and test it before treating it as reusable; the [status page](STATUS.md) records the capture evidence and remaining replay gap.
 Only request counts, normalized route labels, and test summaries reach the dashboard.

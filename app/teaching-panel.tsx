@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Candidate = { id: string; label: string; kind: string };
+
+function requestName(candidate: Candidate) {
+  if (candidate.kind === "syllabus") return "Syllabus";
+  const resource = candidate.label.split("/")[5];
+  if (!resource) return "Course information";
+  return resource.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
+}
 type TeachingState = { recording: boolean; capturedRequests: number; ready: boolean; saved: boolean; courseId: string; candidates: Candidate[]; success?: boolean; resultCount?: number | null };
 type WorkerReply = TeachingState & { error?: string };
 type PendingRequest = { resolve: (value: WorkerReply) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
@@ -36,7 +43,7 @@ export function TeachingPanel({ websiteUrl, active, ownsRecording, canRecoverRec
     const requests = pendingRequests.current;
     function receive(event: MessageEvent) {
       if (event.origin !== workerOrigin || event.source !== popup.current) return;
-      if (event.data?.type === "mcparrot-teaching-ready") { setConnected(true); setMessage("Connected. Your current recording is available below when this task owns it."); return; }
+      if (event.data?.type === "mcparrot-teaching-ready") { setConnected(true); setMessage(""); window.focus(); return; }
       if (event.data?.type !== "mcparrot-teaching-result") return;
       const pending = requests.get(event.data.id);
       if (!pending) return;
@@ -79,7 +86,7 @@ export function TeachingPanel({ websiteUrl, active, ownsRecording, canRecoverRec
     if (canRecoverRecording) onClaimRecording();
     setConnected(false);
     popup.current = window.open(`${workerOrigin}/pair?origin=${encodeURIComponent(window.location.origin)}`, "mcparrot-local-teaching", "popup,width=500,height=440");
-    setMessage(popup.current ? "Select Connect to MCParrot in the local connection window." : "Allow popups for this site, then select Connect again.");
+    setMessage(popup.current ? "Approve the connection in the small helper window, then return here. Keep that window open." : "Allow popups for this site, then select Connect again.");
   }
 
   async function run(name: string, inputs = {}) {
@@ -90,35 +97,66 @@ export function TeachingPanel({ websiteUrl, active, ownsRecording, canRecoverRec
       const result = await request(name, inputs);
       if (name === "start_recording") onClaimRecording();
       if (name === "start_recording" || name === "review_recording") setTestResult("");
-      if (result.success) setTestResult(name === "test_mcp_tool" ? "Local MCP test passed." : "Direct request test passed.");
+      if (result.success) setTestResult(name === "test_mcp_tool" ? "Local MCP test passed." : "Reading test passed.");
       setState(result);
       if (result.saved) setCourseId(result.courseId);
       if (result.success) setMessage("Test passed. The saved reading request ran without browser navigation.");
-      if (name === "start_recording") setMessage("Recording. Browse Canvas pages in the teaching window, then stop here.");
-      if (name === "stop_recording") setMessage("Recording stopped. Choose an observed request below to test.");
-      if (name === "review_recording") setMessage("Request selected. Check the course ID, then test it.");
+      if (name === "start_recording") {
+        setMessage("Recording. Browse Canvas, then return here to finish.");
+        await request("focus_teaching_browser");
+      }
+      if (name === "stop_recording") setMessage(result.capturedRequests ? "Recording finished. Select a captured request below." : "No supported requests were captured. Try teaching again and open Assignments or Syllabus.");
+      if (name === "review_recording") setMessage("Request selected. Test it to check whether we can read it again.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "The teaching action failed."); }
     finally { setBusy(false); }
   }
 
-  return <section className="teaching-pilot" aria-label="Local teaching pilot">
-    <div className="section-heading"><h2>Teach by browsing</h2><span className="badge">Local pilot</span></div>
-    <p>Browse several pages once. Review the reading requests we observe, then test each request before using it.</p>
-    <p className="field-help">This pilot connects to your computer. Your school session and page content stay there. It does not discover pages you have not visited.</p>
-    {!supported ? <p className="pilot-status">This pilot supports Berkeley Canvas. Create an app with https://bcourses.berkeley.edu to try it.</p> : <>
-      <ol className="pilot-steps"><li>Connect your local teaching browser.</li><li>Start recording, then open Canvas pages such as Assignments or Syllabus.</li><li>Stop recording and test the observed requests below.</li></ol>
-      <div className="pilot-controls"><button className="button primary" disabled={busy} onClick={connect}>{connected ? "Reconnect browser" : "Connect teaching browser"}</button>{connected && <button className="button" disabled={busy} onClick={() => run("focus_teaching_browser")}>Show Canvas</button>}</div>
-      {!connected && <p className="field-help">The local teaching worker must run on this computer. If the connection window cannot load, start it with <code>npm run browser:teach</code>.</p>}
-      {connected && <>
-        {!ownsRecording && <p className="field-help">This task has no current recording. Starting a new recording replaces the worker’s previous capture. Earlier task summaries remain visible, but cannot be tested again.</p>}
-        <div className="pilot-controls"><button className="button primary" disabled={busy || (ownsRecording && state?.recording)} onClick={() => run("start_recording")}>Start recording</button><button className="button" disabled={busy || (!ownsRecording || !state?.recording)} onClick={() => run("stop_recording")}>Stop recording</button></div>
-        <p className="pilot-status">{state?.recording && ownsRecording ? "Recording" : "Stopped"} · {state?.capturedRequests ?? 0} observed requests</p>
-      </>}
-      {state && <p className="pilot-status">Saved page-session summary: {state.capturedRequests} observed requests{state.saved ? " · request selected" : ""}.</p>}
-        {state && !state.recording && state.candidates.length > 0 && <div className="pilot-candidates"><h3>Observed reading requests</h3><p className="field-help">These are request candidates, not ready-made tasks. Names and task inputs still need review.</p>{state.candidates.map((candidate) => <button className="button candidate-button" key={candidate.id} disabled={busy || !connected || !ownsRecording} onClick={() => run("review_recording", { requestId: candidate.id })}>{candidate.kind === "syllabus" ? "Syllabus page" : candidate.label}</button>)}</div>}
-        {state?.saved && <div className="pilot-review"><h3>Selected request</h3><p>{testResult || "No test result is recorded in this page session."}</p><p className="field-help">Your selection stays available when you leave this task and return during this page session.</p>{state.courseId && <label>Course ID<input value={courseId} onChange={(event) => { setCourseId(event.target.value); setTestResult(""); }} inputMode="numeric" pattern="[0-9]+" /></label>}<div className="pilot-controls"><button className="button primary" disabled={busy || !connected || !ownsRecording} onClick={() => run("test_saved_request", { courseId })}>Test request</button><button className="button" disabled={busy || !connected || !ownsRecording} onClick={() => run("test_mcp_tool", { courseId })}>Test local MCP operation</button></div></div>}
+  const hasCapture = Boolean(state && state.capturedRequests > 0);
+  const recording = Boolean(ownsRecording && state?.recording);
+  const reviewing = hasCapture && !recording;
+  const stage = recording ? 1 : reviewing ? 2 : connected ? 1 : 0;
+  const canTest = connected && ownsRecording && !busy;
+  const loadingCapture = connected && ownsRecording && !state;
+
+  return <section className="teaching-pilot" aria-label="Teach this task" aria-busy={busy}>
+    <ol className="teaching-progress" aria-label="Teaching progress">
+      {["Connect", "Teach", "Review"].map((label, index) => <li key={label} aria-current={stage === index ? "step" : undefined}>{label}</li>)}
+    </ol>
+    {!supported ? <div className="teaching-step"><h2>This website needs support</h2><p>The first teaching test supports Berkeley Canvas. Use a Canvas app to try it.</p></div> : <>
+      <div className="teaching-step">
+        <h2>{loadingCapture ? "Checking your recording…" : recording ? "Show us what you do" : reviewing ? "Your recording" : connected ? "Ready to teach" : "Connect your Canvas browser"}</h2>
+        <p>{loadingCapture ? "Your existing recording will appear here. This does not start a new recording." : recording ? "Click through Canvas in its separate window. Return here when you finish." : reviewing ? `${state?.capturedRequests} reading requests captured. Select a request and test whether we can read it again.` : connected ? "Start teaching, then browse the pages you want us to learn in the Canvas window." : "Connect once, then teach by browsing Canvas. You control recording here in MCParrot."}</p>
+        {!connected && <>
+          <button className="button primary" disabled={busy} onClick={connect}>{hasCapture ? "Reconnect to test" : "Connect Canvas"}</button>
+          <p className="field-help">Approve the small connection window and leave it open in the background. Teach in the separate Canvas window.</p>
+        </>}
+        {connected && !ownsRecording && !canRecoverRecording && !hasCapture && <p className="field-help">Starting this task replaces the previous browser recording.</p>}
+        {connected && !recording && !hasCapture && !loadingCapture && <button className={ownsRecording ? "button primary" : "button"} disabled={busy} onClick={() => run("start_recording")}>{busy ? "Opening Canvas…" : ownsRecording ? "Start teaching" : "Replace previous recording"}</button>}
+        {recording && <div className="pilot-controls"><button className="button primary" disabled={busy} onClick={() => run("stop_recording")}>{busy ? "Finishing…" : "Finish teaching"}</button><button className="button" disabled={busy} onClick={() => run("focus_teaching_browser")}>Show Canvas</button><span className="recording-status">Recording · {state?.capturedRequests ?? 0} requests</span></div>}
+      </div>
+      {reviewing && <div className="pilot-candidates">
+        <h3>Reading requests</h3>
+        {state?.candidates.map((candidate) => <button className="candidate-button" key={candidate.id} disabled={!canTest} onClick={() => run("review_recording", { requestId: candidate.id })}><span>{requestName(candidate)}</span><span className="candidate-action">Select request</span></button>)}
+        {state?.saved && <div className="pilot-review">
+          <h3>{testResult ? "Test result" : "Request selected"}</h3>
+          <p>{testResult || "Test this request before using it again."}</p>
+          {state.resultCount != null && testResult && <p className="field-help">{state.resultCount} results returned. This does not publish an assistant tool.</p>}
+          {connected && ownsRecording && <button className="button primary" disabled={busy} onClick={() => run("test_saved_request", { courseId })}>{busy ? "Testing…" : testResult ? "Test again" : "Test selected request"}</button>}
+        </div>}
+        {!ownsRecording && connected && <p className="field-help">This summary belongs to an earlier recording. Its capture has been replaced, so it cannot run another test.</p>}
+      </div>}
+      {message && <p className="pilot-status" role="status" aria-live="polite">{message}</p>}
+      <details className="teaching-details"><summary>Connection and test details</summary>
+        <p>{connected ? "Connected to the browser on this computer." : "The teaching helper must run on this computer. Start it with npm run browser:teach if the connection window cannot load."}</p>
+        <p>Your school session stays on this computer. Only pages you visit can appear in this recording.</p>
+        {connected && <div className="pilot-controls"><button className="button" disabled={busy} onClick={connect}>Reconnect</button>{!recording && hasCapture && <button className="button" disabled={busy} onClick={() => run("focus_teaching_browser")}>Show Canvas</button>}</div>}
+        {state?.saved && <>
+          {state.courseId && <label>Course ID<input value={courseId} onChange={(event) => { setCourseId(event.target.value); setTestResult(""); }} inputMode="numeric" pattern="[0-9]+" /></label>}
+          <button className="button" disabled={!canTest} onClick={() => run("test_mcp_tool", { courseId })}>Test local MCP operation</button>
+        </>}
+        {connected && !recording && hasCapture && <div className="teaching-restart"><p>A new recording replaces the current capture. Earlier task summaries stay visible but cannot run tests.</p><button className="button" disabled={busy} onClick={() => run("start_recording")}>Replace recording</button></div>}
+        <p>Drafts and results stay here until you refresh. The browser helper keeps one capture until it stops or you replace it. Remote assistant connections and lasting task storage are not connected.</p>
+      </details>
     </>}
-    <p className="pilot-status" role="status" aria-live="polite">{message}</p>
-    <p className="field-help">Task details stay visible while this page remains open. Refreshing loses draft tasks. Captures stay in worker memory until another recording starts or the worker stops. Hosted task storage and remote assistant connections are not connected.</p>
   </section>;
 }

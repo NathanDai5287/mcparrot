@@ -127,13 +127,34 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
   .browser-placeholder { min-height: 300px; }
 }
 
-.teaching-pilot { padding: 28px; border: 1px solid var(--border, #dbe4e0); border-radius: 12px; background: #fff; }
-.teaching-pilot p { line-height: 1.6; }
-.pilot-steps { padding-left: 22px; line-height: 1.9; }
-.pilot-controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
-.pilot-status { min-height: 24px; color: #32695e; overflow-wrap: anywhere; }
-.pilot-candidates { display: grid; gap: 10px; margin-top: 24px; }
-.candidate-button { justify-content: flex-start; text-align: left; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
-.pilot-review { border-top: 1px solid #dbe4e0; margin-top: 24px; padding-top: 20px; }
-.pilot-review label { display: grid; gap: 8px; max-width: 280px; }
-.pilot-review input { padding: 12px; border: 1px solid #cbd8d1; border-radius: 8px; font: inherit; }
+.teaching-pilot { padding: 30px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.teaching-pilot p { max-width: 65ch; line-height: 1.6; }
+.teaching-progress { display: flex; gap: 28px; padding: 0 0 22px; margin: 0 0 28px; list-style-position: inside; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.teaching-progress li[aria-current] { color: var(--accent); font-weight: 600; }
+.teaching-step h2 { font-size: 22px; letter-spacing: -0.025em; font-weight: 550; }
+.teaching-step > p { margin-top: 10px; color: var(--muted); }
+.teaching-step > .button { margin-top: 24px; }
+.teaching-step > .field-help { margin-top: 12px; }
+.pilot-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 22px 0 0; }
+.recording-status { color: var(--accent); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pilot-status { margin-top: 22px; color: var(--accent); overflow-wrap: anywhere; }
+.pilot-candidates { margin-top: 28px; }
+.pilot-candidates h3, .pilot-review h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.candidate-button { display: flex; justify-content: space-between; gap: 20px; width: 100%; padding: 16px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; overflow-wrap: anywhere; }
+.candidate-button:hover:enabled { color: var(--accent); background: var(--soft); }
+.candidate-action { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.pilot-review { margin-top: 28px; }
+.pilot-review > .button { margin-top: 18px; }
+.teaching-details { border-top: 1px solid var(--line); margin-top: 30px; padding-top: 20px; color: var(--muted); font-size: 12px; }
+.teaching-details summary { width: fit-content; cursor: pointer; padding: 5px 0; color: var(--ink); }
+.teaching-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.teaching-details p, .teaching-details > .button { margin-top: 16px; }
+.teaching-details label { display: grid; gap: 8px; max-width: 280px; margin-top: 20px; color: var(--ink); }
+.teaching-details input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); }
+.teaching-restart { margin-top: 24px; }
+.teaching-restart .button { margin-top: 12px; }
+@media (max-width: 700px) {
+  .teaching-pilot { padding: 22px 18px; }
+  .teaching-progress { gap: 20px; }
+  .candidate-button { flex-direction: column; gap: 4px; }
+}

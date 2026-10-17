@@ -36,6 +36,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
 | Local teaching connection controls | shipped | Nathan used the production teaching controls; the worker reported recording stopped, two captures, and a selected request |
 | Local reading request capture | shipped | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
+| Guided teaching controls | shipped | `app/teaching-panel.tsx` shows Connect, Teach, and Review with one main action and extra controls under Details; type and production build checks pass; Nathan tests the live flow |
 | Reopen task teaching details | shipped | Panels keep page-session state and suspend hidden polling; automatic type and production build checks pass; Nathan tests the deployed navigation |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
 | Hosted browser sessions | aspirational | Prove a visible teaching window and hidden browser execution and recovery |

@@ -143,7 +143,7 @@ export default function Workspace() {
             <BackButton onClick={() => setScreen({ view: "app", app })}>{app.name}</BackButton>
             <PageHeader title={task.name} description={task.description} />
             <TeachingPanel websiteUrl={app.url} active={screen.view === "teach" && screen.task.id === task.id} ownsRecording={recordingTaskId === task.id} canRecoverRecording={recordingTaskId === null} onClaimRecording={() => setRecordingTaskId(task.id)} />
-            <div className="teaching-actions"><p>Recording details stay here when you return. Refreshing loses draft tasks; saving does not publish a tool.</p><button className="button primary" onClick={() => saveDraft(app, task)}>Save draft</button></div>
+            <div className="teaching-actions"><p>Details stay with this task until you refresh. This is a draft, not an assistant tool.</p><button className="button" onClick={() => saveDraft(app, task)}>Return to tasks</button></div>
           </div>))}
 
         </main>
