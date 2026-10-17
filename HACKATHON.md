@@ -3,7 +3,7 @@
 This document gives agents the event facts for AI Hackathon 2026 by LA Hacks, where the team will submit MCParrot.
 Use it to choose demo scope, submission assets, and sponsor integrations.
 It covers judging criteria, tracks, target prizes, and submission requirements, but it does not change product behavior.
-The [product specification](README.md) defines what the product does, and the [LA Hacks guide](docs/hackathon.html) is Nathan's version of this document.
+The [product specification](README.md) defines what the product does, and the [LA Hacks guide](public/docs/hackathon.html) is Nathan's version of this document.
 The event site is [ai.lahacks.com](https://ai.lahacks.com), and submissions go through [Devpost](https://devpost.com).
 
 ## LA Hacks event basics
@@ -72,7 +72,7 @@ Pursue these only if the demo supports them.
 
 | Sponsor | Challenge | Notes |
 | --- | --- | --- |
-| Paper | Best Designed Hack | Judges design fundamentals and craft; the Calm workspace design is the entry, and the prototypes are references only |
+| Paper | Best Designed Hack | Judges design fundamentals and craft; the Calm workspace design is the entry |
 | Creao AI | AI-first disruptor, one-person company, or team empowerment | Fits the story that an agent does the work; choose categories when you submit, as the event site describes |
 | Base44 | Build Something People Want | Needs a real user, a problem-first approach, and a usable product rather than a demo shell |
 | Cognition | Best Use of Devin | Applies only if Devin built a meaningful part of the project |

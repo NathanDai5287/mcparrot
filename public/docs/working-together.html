@@ -87,17 +87,17 @@
           <li>The change is something you can see on screen, and you should see it before it reaches the main copy. Its pull request shows pictures from before and after the change.</li>
           <li>The work happens in the final hours before the Devpost submission or during in-person judging, when the main copy must not change unexpectedly. The <a href="hackathon.html">LA Hacks 2026 guide</a> has the deadline and event details.</li>
         </ul>
-        <p>Agents decide when to merge their own pull requests into the main copy. They merge after the automatic checks pass and they have confirmed that the result works, so you do not need to approve. After each change, the agent gives you a link to the saved change or its pull request.</p>
+        <p>Agents merge their own pull requests into the main copy as soon as the automatic checks pass and they have confirmed that the result works, so you do not need to approve. They never collect finished work or leave it waiting on a branch, because a forgotten branch slowly falls out of step with the main copy. Right after a merge, the agent deletes the branch, both on its computer and on GitHub, and GitHub also deletes it automatically. If an experiment fails or we drop it, the agent deletes its branch immediately. An agent never finishes a task with a branch it made still open. The one exception is work held back while the main copy stays frozen for the Devpost submission and judging, and the agent merges that work as soon as the freeze ends. After each change, the agent gives you a link to the saved change or its pull request.</p>
         <aside class="note">
           <strong class="note-label">Automatic publishing is connected</strong>
-          <p>Each update to the main copy automatically publishes to <a href="https://mcparrot.vercel.app">the production website</a>. Each branch also receives a preview link, which is a separate web address that shows that version of the app. You can review changes there without starting the app on your computer. After each update, the agent checks the live website, sends you its link, and fixes or undoes a broken update immediately. These guides remain separate from the hosted website.</p>
+          <p>Each update to the main copy automatically publishes to <a href="https://mcparrot.vercel.app">the production website</a>. Each branch also receives a preview link, which is a separate web address that shows that version of the app. You can review changes there without starting the app on your computer. After each update, the agent checks the live website, sends you its link, and fixes or undoes a broken update immediately. These guides are also part of the website, at <a href="https://mcparrot.vercel.app/docs">mcparrot.vercel.app/docs</a>.</p>
         </aside>
       </section>
 
       <section id="docs">
         <h2>Guides and their readers</h2>
         <p>The project has two kinds of documents that describe the same decisions. You read these web guides, which explain the experience, decisions, current status, and open questions in plain language. The <a href="index.html">product guide</a> covers what MCParrot does, the <a href="hackathon.html">LA Hacks 2026 guide</a> covers judging and prizes, and this page covers how we work together. The <a href="status.html">status page</a> is the one place that shows what is shipped, dormant, aspirational, or a gap. The coding agents read separate text documents with the same facts plus working rules, requirements, technical details, and checks. When a decision changes, the agent updates both kinds, and every document marks a feature as aspirational until a passing check makes it shipped.</p>
-        <p>The <a href="../DOCUMENTATION.md">documentation rules</a> say how all of these documents are written.</p>
+        <p>The <a href="https://github.com/NathanDai5287/mcparrot/blob/main/DOCUMENTATION.md">documentation rules</a> say how all of these documents are written.</p>
       </section>
       <footer>
         <p><a href="index.html">← Back to the product guide</a></p>

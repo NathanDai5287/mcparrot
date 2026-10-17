@@ -14,11 +14,10 @@ Read the product specification and the collaboration process before material wor
 | [Documentation guide](DOCUMENTATION.md) | Agents | How to write and organize every document in this repository |
 | [Collaboration process](WORKING_WITH_NATHAN.md) | Agents | How to reach a shared understanding with Nathan and record the agreement |
 | [Hackathon facts](HACKATHON.md) | Agents | Event rules, judging, sponsors, demo scope, and submission assets |
-| [Prototype notes](prototypes/README.md) | Agents | The static dashboard prototypes in `prototypes/` and the selected direction |
-| [Product guide](docs/index.html) | Nathan | Plain-language mirror of the product specification |
-| [Status guide](docs/status.html) | Nathan | Plain-language mirror of the status page |
-| [Hackathon guide](docs/hackathon.html) | Nathan | Plain-language mirror of the hackathon facts |
-| [Working together guide](docs/working-together.html) | Nathan | Plain-language mirror of the collaboration process |
+| [Product guide](public/docs/index.html) | Nathan | Plain-language mirror of the product specification |
+| [Status guide](public/docs/status.html) | Nathan | Plain-language mirror of the status page |
+| [Hackathon guide](public/docs/hackathon.html) | Nathan | Plain-language mirror of the hackathon facts |
+| [Working together guide](public/docs/working-together.html) | Nathan | Plain-language mirror of the collaboration process |
 
 ## Repository-Wide Rules
 

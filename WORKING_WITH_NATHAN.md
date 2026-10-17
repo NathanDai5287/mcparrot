@@ -5,7 +5,7 @@ Nathan explains his mental model first.
 The agent and Nathan then test their understanding until they describe the same product behavior.
 Code does not replace this step when the two accounts differ.
 The last section explains how agents commit, branch, and merge their changes.
-The [product specification](README.md) holds the agreed behavior, and [Working together](docs/working-together.html) is Nathan's version of this guide.
+The [product specification](README.md) holds the agreed behavior, and [Working together](public/docs/working-together.html) is Nathan's version of this guide.
 
 ## Start with user experience
 
@@ -74,12 +74,17 @@ Use a separate branch and a GitHub pull request instead of pushing to `main` in 
 - The change is visible in the UI, and Nathan should see it before it reaches `main`. Include before and after screenshots in the pull request.
 - The work happens in the final hours before the Devpost submission or during in-person judging, when `main` must not change unexpectedly. See the [hackathon facts](HACKATHON.md) for the deadline and event details.
 
-Decide when to merge your own pull requests, and merge them yourself after the checks pass and you have verified the result.
-Nathan does not need to approve merges.
+Merge your own pull requests as soon as the checks pass and you have verified the result, because Nathan does not need to approve merges.
+Never batch finished work or park it on a branch, because every open branch can drift from `main` and be forgotten.
+Right after a merge, delete the branch locally and on GitHub, and remove its git worktree.
+GitHub deletes a pull request's branch automatically when it merges, because the repository setting `deleteBranchOnMerge` is on, so check that the remote branch is gone.
+When an experiment fails or you abandon it, delete its branch immediately instead of leaving it open.
+Do not end your task with an open branch that you created.
+The one exception is work held during the Devpost submission and judging freeze, which you merge as soon as the freeze ends.
 After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
 
 [The status page](STATUS.md) records the status of automatic deployment from GitHub to Vercel.
 Every push to `main` deploys to [the production website](https://mcparrot.vercel.app), and each branch or pull request gets a Vercel preview link.
 Nathan can review changes on the live website or a preview link instead of running the app locally.
 After each deploy, check the live site and report its link, and fix or revert a broken deploy immediately.
-The HTML guides under `docs/` and `prototypes/` are not part of the deployed Next.js app.
+The deployed app also serves the HTML guides in `public/docs/` at [/docs](https://mcparrot.vercel.app/docs).

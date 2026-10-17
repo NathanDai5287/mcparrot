@@ -3,7 +3,7 @@
 This page is the single home for the status of every MCParrot capability.
 It tells coding agents what is shipped, what is dormant, what is aspirational, and which gaps are known.
 The [product specification](README.md) describes how each capability behaves, and this page only records whether it exists and what proves it.
-Nathan reads the same facts in plain language in the [status guide](docs/status.html).
+Nathan reads the same facts in plain language in the [status guide](public/docs/status.html).
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard preview plus a separate local sign-in diagnostic.
@@ -28,12 +28,13 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | --- | --- | --- |
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, saves draft tasks, and shows a teaching preview; the production check returned it |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
+| HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server on October 17, 2026; the production check follows the next deployment |
 | Local Berkeley sign-in diagnostic | shipped | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
 | Local headless browser launcher | shipped | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
-| Hosted headless browser sessions | aspirational | Prove Browser Use Cloud sessions for teaching, execution, and recovery |
+| Hosted browser sessions | aspirational | Prove a visible teaching window and hidden browser execution and recovery |
 | Request recording | aspirational | Capture network requests during one manual reading-task demonstration |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic |
 | Recorded request replay | aspirational | Run the recorded API request with valid authentication and check the result |
@@ -55,7 +56,6 @@ The dashboard uses the Calm workspace design, with light surfaces, teal actions,
 It runs locally and at [mcparrot.vercel.app](https://mcparrot.vercel.app), where Vercel publishes each push to `main`.
 The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
 In that check, the dashboard and its JavaScript assets returned successfully, and the local sign-in and private-state paths returned 404.
-Earlier clickable prototypes remain as comparison references, as the [prototype notes](prototypes/README.md) describe.
 
 The local sign-in diagnostic uses open-source Browser Use 0.13.11 with a separate headless local Chrome profile on Nathan's computer.
 Its live test completed CalNet sign-in, SMS verification, and Canvas access.

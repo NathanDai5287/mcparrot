@@ -55,21 +55,22 @@ A gap is a known missing foundation or defect inside something shipped, and the 
 Do not use other status words, such as planned, implemented, done, completed, in progress, WIP, or coming soon.
 Do not use verified as a status either, although you may still use it to describe evidence, as in "the deployment check passed and verified the dashboard."
 Describe how a shipped capability works in its subject document, mark designed but unbuilt behavior as aspirational, and list missing foundations as gaps.
-The [status page](STATUS.md) and the [status guide](docs/status.html) are the single home for the status of every capability.
+The [status page](STATUS.md) and the [status guide](public/docs/status.html) are the single home for the status of every capability.
 Other documents may tag a sentence with a status word, but they must not keep their own status lists, and they must link to the status page instead.
 When a capability ships or otherwise changes status, update the status page in the same change.
 
 ## Match Documents to Readers
 
 This repository has two kinds of readers, and each one gets its own format.
-Coding agents read Markdown files, and Nathan reads HTML guides under `docs/`.
+Coding agents read Markdown files, and Nathan reads HTML guides under `public/docs/`.
+The app serves those guides at [http://localhost:4317/docs](http://localhost:4317/docs) and [https://mcparrot.vercel.app/docs](https://mcparrot.vercel.app/docs).
 Write the HTML guides in plain language for a reader with no technical context.
 Some subjects need both forms, so they live in mirror pairs.
-The [product specification](README.md) mirrors the [product guide](docs/index.html), the [hackathon facts](HACKATHON.md) mirror the [hackathon guide](docs/hackathon.html), the [collaboration process](WORKING_WITH_NATHAN.md) mirrors the [working together guide](docs/working-together.html), and the [status page](STATUS.md) mirrors the [status guide](docs/status.html).
+The [product specification](README.md) mirrors the [product guide](public/docs/index.html), the [hackathon facts](HACKATHON.md) mirror the [hackathon guide](public/docs/hackathon.html), the [collaboration process](WORKING_WITH_NATHAN.md) mirrors the [working together guide](public/docs/working-together.html), and the [status page](STATUS.md) mirrors the [status guide](public/docs/status.html).
 
 When agreed behavior changes, update both documents of a pair in the same change.
 Keep examples, defaults, failure states, and limitations the same in both forms.
-Build the HTML guides with the ICP-docs visual language and the local stylesheet in `docs/assets/`.
+Build the HTML guides with the ICP-docs visual language and the local stylesheet in `public/docs/assets/`.
 Do not depend on a generator from another repository.
 When you add, rename, or remove a document, update the document table in the [agent entry point](AGENTS.md) in the same change.
 Keep secrets and private website content out of all documentation.

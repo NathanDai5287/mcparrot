@@ -8,7 +8,7 @@ Canvas is a useful example, not a product limit.
 This document is the single home for product behavior, architecture, and local setup.
 It describes the intended product and is written for coding agents.
 The [status page](STATUS.md) records which parts are shipped, dormant, aspirational, or known gaps.
-Nathan reads matching HTML guides for the [product flow](docs/index.html), the [LA Hacks 2026 hackathon](docs/hackathon.html), and [working together](docs/working-together.html).
+Nathan reads matching HTML guides for the [product flow](public/docs/index.html), the [LA Hacks 2026 hackathon](public/docs/hackathon.html), and [working together](public/docs/working-together.html).
 Follow the [documentation rules](DOCUMENTATION.md) when you change any document.
 See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging and prizes](HACKATHON.md) for those subjects.
 
@@ -20,7 +20,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | The management connection and one connection per website app |
 | [Teaching website tasks](#teaching-website-tasks) | How a user creates an app and teaches it a task |
-| [Headless browser experience](#headless-browser-experience) | How website browsers must run inside the product |
+| [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
 | [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, and the target service architecture |
@@ -99,9 +99,9 @@ Keep passwords and verification codes in the secure browser or verification flow
 
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Start its headless website browser session through Browser Use Cloud.
-4. Sign in and complete any required verification, such as Duo.
-5. Select **Create task** and name the task.
+3. Select **Create task** and name the task.
+4. Open the visible teaching browser window that the task creates.
+5. Sign in there and complete any required verification, such as Duo.
 6. Perform the task yourself while our recorder captures browser actions and network requests.
 7. Review the proposed inputs and result, then test the task with different inputs.
 8. Save the verified task and add other tasks to the same website app.
@@ -121,15 +121,18 @@ It must then produce and verify a reusable request sequence before it enables th
 Browser Use does not convert recordings into API requests, so our application must do this work.
 We must prove request capture and reuse on a real authenticated website before we promise broad support.
 
-## Headless browser experience
+## Browser visibility by phase
 
-The product must always run website browsers headlessly, which means without a separate browser window on the user's computer.
-This rule applies to teaching, task execution, and sign-in recovery.
-Sign-in and verification use forms inside our app for supported website flows.
+During teaching, also called parroting, the product must open a visible browser window that the user can click through.
+The user signs in there, completes personal verification, and demonstrates the task while recording.
+The exact hosting and recording mechanism remains aspirational; this agreement does not require a particular browser delivery method.
+
+During MCP use, the product must never open a visible website browser window.
+It runs direct API requests where supported and uses a hidden browser only for steps that require browser state or sign-in recovery.
+For supported recovery flows, sign-in and verification use secure forms inside our app.
 Browser Use enters those values into the hidden website browser without sending them to an AI model.
-The teaching interaction remains unresolved; an embedded browser view is still an option.
-Do not assume that forms alone can support every website or task demonstration.
 Required personal verification stays in place in both UI and MCP flows.
+Unsupported recovery must return a clear failure instead of opening a visible browser during MCP use.
 
 ## Using saved tasks
 
@@ -163,7 +166,7 @@ When a session expires, the product follows these steps:
 2. Start Browser Use with the website's browser profile.
 3. Continue sign-in with securely supplied credentials, if the user enabled this option.
 4. Return a verification-required result when the website needs user action.
-5. Show an authenticated link through the assistant for entering a code or completing browser steps.
+5. Show an authenticated link through the assistant for entering credentials or a verification code inside our app.
 6. Wait for the user to submit the code or approve Duo on their phone.
 7. Finish sign-in, refresh session data, and resume the pending operation.
 
@@ -175,7 +178,7 @@ The client may need to check status or request the result again.
 When an interrupted operation resumes, do not repeat a write that already finished.
 
 School rules, device checks, and Duo settings can prevent automated sign-in.
-In that case, offer manual browser control where supported, and show a clear failure when connection is not possible.
+In that case, use supported in-app verification without opening a visible website browser, or show a clear failure.
 Reconnection cannot guarantee access to every website.
 
 ## Production deployment setup
@@ -186,10 +189,10 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-Only the Next.js workspace is deployed as a website.
+The Next.js app deploys the workspace, and the HTML guides at `/docs`.
 The local sign-in diagnostic is not a public route or hosted sign-in service.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
-The HTML guides and design prototypes remain repository documents, outside the deployed app.
+Next.js serves the guides as public static files from `public/`, so they must never contain secrets or private website content.
 
 The dashboard needs no database or paid model, because its changes exist only in page memory.
 The task backend, MCP endpoints, authentication service, database, and browser worker are aspirational.
@@ -270,6 +273,7 @@ npm run dev -- --port 4317
 ```
 
 Open [http://localhost:4317](http://localhost:4317) when the development server starts.
+Open [http://localhost:4317/docs](http://localhost:4317/docs) to read Nathan's HTML guides.
 Use this frontend to review navigation; it does not connect to live websites.
 
 ## Running the task runner
