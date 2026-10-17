@@ -55,14 +55,22 @@ Do not stop for another confirmation when the conversation already shows that ag
 Choose the simplest complete solution for the agreed behavior, and keep changes inside the requested scope.
 Use background agents for large edits, as Nathan's global instructions require.
 If a technical experiment is necessary, state the assumption it tests and report the result.
-Verify the changed behavior with checks that address the actual risk.
 Report the result, the remaining limits, and the related PRs or MRs.
+
+## Let Nathan test on the live site
+
+We move fast, so Nathan tests changes on the deployed site instead of agents testing them locally.
+Do not test changes on a local server.
+Do not click through the app in an agent browser or review screenshots to verify a change.
+Merge, deploy, and then ask Nathan to test the live site.
+Tell Nathan the link and the exact steps to test.
+Run only the fast automatic checks before you push.
 
 ## Commit and merge changes
 
 Commit and push checked changes directly to the `main` branch of the [MCParrot GitHub repository](https://github.com/NathanDai5287/mcparrot).
 Do not ask Nathan before you commit or push.
-A change is checked when you have verified it against its actual risk, and for code changes `npm run check` and `npm run build` also pass before you push.
+A code change is checked when `npm run check` and `npm run build` pass.
 Make small commits with clear messages that describe the result users see.
 Never commit secrets, `.env` files, browser profiles, or private website content.
 
@@ -71,10 +79,9 @@ Use a separate branch and a GitHub pull request instead of pushing to `main` in 
 
 - Several agents work in parallel on overlapping files or the same area. Give each agent its own branch, and preferably its own git worktree. Parallel agents that change clearly separate files can commit to `main`.
 - The work is an experiment that you may discard, such as proving request recording and replay.
-- The change is visible in the UI, and Nathan should see it before it reaches `main`. Include before and after screenshots in the pull request.
 - The work happens in the final hours before the Devpost submission or during in-person judging, when `main` must not change unexpectedly. See the [hackathon facts](HACKATHON.md) for the deadline and event details.
 
-Merge your own pull requests as soon as the checks pass and you have verified the result, because Nathan does not need to approve merges.
+Merge your own pull requests as soon as the checks pass, because Nathan does not need to approve merges.
 Never batch finished work or park it on a branch, because every open branch can drift from `main` and be forgotten.
 Right after a merge, delete the branch locally and on GitHub, and remove its git worktree.
 GitHub deletes a pull request's branch automatically when it merges, because the repository setting `deleteBranchOnMerge` is on, so check that the remote branch is gone.
@@ -85,6 +92,6 @@ After each change, report the commit or pull request link in the table of relate
 
 [The status page](STATUS.md) records the status of automatic deployment from GitHub to Vercel.
 Every push to `main` deploys to [the production website](https://mcparrot.vercel.app), and each branch or pull request gets a Vercel preview link.
-Nathan can review changes on the live website or a preview link instead of running the app locally.
-After each deploy, check the live site and report its link, and fix or revert a broken deploy immediately.
+During the submission and judging freeze, ask Nathan to test the branch's preview link instead of the live site.
+After each deploy, confirm that the deploy succeeded, and fix or revert a failed deploy immediately.
 The deployed app also serves the HTML guides in `public/docs/` at [/docs](https://mcparrot.vercel.app/docs).
