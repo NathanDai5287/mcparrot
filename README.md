@@ -22,7 +22,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Headless browser experience](#headless-browser-experience) | How website browsers must run inside the product |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
-| [Planned deployment stack](#planned-deployment-stack) | The planned services and how long work runs |
+| [Production deployment setup](#production-deployment-setup) | Automatic publishing, current hosting, and future services |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, secrets, recordings, and diagnostics data |
 | [Product work stages](#product-work-stages) | The ordered stages and their completion checks |
 | [Current implementation status](#current-implementation-status) | What exists today and what is not yet connected or verified |
@@ -179,7 +179,28 @@ School rules, device checks, and Duo settings can prevent automated sign-in.
 In that case, offer manual browser control where supported, and show a clear failure when connection is not possible.
 Reconnection cannot guarantee access to every website.
 
-## Planned deployment stack
+## Production deployment setup
+
+The Vercel project `mcp-anything` is linked to the public GitHub repository on the existing Hobby plan.
+Its production branch is `main`.
+Each push starts a deployment; other branches receive preview deployments.
+The production build runs `npm run check` and `npm run build` before publishing.
+The initial production deployment still needs verification.
+
+Only the Next.js workspace is deployed as a website.
+The local sign-in diagnostic is not a public route or hosted sign-in service.
+Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
+The HTML guides and design prototypes remain repository documents, outside the deployed app.
+
+The dashboard needs no database or paid model to run today, because its changes exist only in page memory.
+There is no deployed task backend, MCP endpoint, authentication service, database, or browser worker yet.
+When these capabilities are built, short server operations can share the Next.js deployment.
+Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
+A persistent headless browser needs a separate worker host, such as Railway, or Browser Use Cloud.
+Vercel requests must not own a browser session that waits for user verification.
+The current local Browser Use test remains on Nathan's computer and is not reachable from the deployed dashboard.
+
+The following table describes the planned complete product, not services already running:
 
 | Part | Choice | Purpose |
 | --- | --- | --- |

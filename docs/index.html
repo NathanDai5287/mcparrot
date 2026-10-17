@@ -26,6 +26,7 @@
         <p class="nav-label">On this page</p>
         <ul>
           <li><a href="#today">What exists today</a></li>
+          <li><a href="#deployment">Where the app runs</a></li>
           <li><a href="#idea">How the product works</a></li>
           <li><a href="#teach">Teaching a website task</a></li>
           <li><a href="#use">Using your assistant</a></li>
@@ -50,6 +51,7 @@
           <thead><tr><th scope="col">Section</th><th scope="col">What you find there</th></tr></thead>
           <tbody>
             <tr><th scope="row"><a href="#today">What exists today</a></th><td>What you can try now and what is still planned</td></tr>
+            <tr><th scope="row"><a href="#deployment">Where the app runs</a></th><td>Automatic publishing and the services we need</td></tr>
             <tr><th scope="row"><a href="#idea">How the product works</a></th><td>Website apps, tasks, and your assistant</td></tr>
             <tr><th scope="row"><a href="#teach">Teaching a website task</a></th><td>How you show a task to the app</td></tr>
             <tr><th scope="row"><a href="#use">Using your assistant</a></th><td>How your assistant repeats a task for you</td></tr>
@@ -69,6 +71,24 @@
         <p>You can <a href="http://127.0.0.1:4321">open the local sign-in test</a> while it is running. It uses a hidden browser on your computer, without Cloud credits or an AI model. Your password and code pass directly to that browser; this test does not save them. The browser keeps its signed-in session.</p>
         <p>The Berkeley test completed school sign-in, SMS verification, and Canvas access. Access remained available after a page refresh. We then added the observed verification steps to the test flow, but have not repeated the complete automatic flow from a fresh session. This school-specific test does not record tasks, repeat website requests, or provide an assistant connection.</p>
         <p>You can also <a href="../prototypes/index.html">compare the three earlier designs</a>, which use sample data.</p>
+      </section>
+
+      <section id="deployment">
+        <h2>Where the app runs</h2>
+        <p>The website has a Vercel project on the existing free Hobby plan. It is connected to our public GitHub repository. Updates to the main version start a production deployment. Other branches receive preview links. We still need to check the first published version.</p>
+        <p>Today, the website is a dashboard preview. It does not need a database, because changes disappear when you refresh. The school sign-in test stays on your computer. The public dashboard cannot control that test or access its saved sign-in.</p>
+        <div class="table-wrap">
+          <table>
+            <caption>The complete product needs these parts</caption>
+            <thead><tr><th scope="col">Part</th><th scope="col">Where it runs</th><th scope="col">Current state</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Website and short server work</th><td>Vercel</td><td>Dashboard ready for its first deployment; task execution and assistant access are planned</td></tr>
+              <tr><th scope="row">Saved apps, tasks, and progress</th><td>A hosted PostgreSQL database, such as Supabase or Neon</td><td>Not connected; needed when we save real data</td></tr>
+              <tr><th scope="row">Hidden website browsers</th><td>A separate worker host, such as Railway, or Browser Use Cloud</td><td>The test currently runs only on your computer</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A hidden browser must stay available while you complete phone verification. Vercel handles short requests, so that browser needs a separate host. Passwords, browser profiles, and private website content stay outside the public deployment. These HTML guides also remain separate from the website.</p>
       </section>
 
       <section id="idea">
