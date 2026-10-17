@@ -1,0 +1,13 @@
+{
+  "name": "mcp-anything",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "browser": "node --env-file-if-exists=.env browser.mjs",
+    "check": "node --check browser.mjs"
+  },
+  "dependencies": {
+    "browser-use-sdk": "^3.12.1"
+  }
+}
