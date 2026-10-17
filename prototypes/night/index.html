@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Night desk · MCP Anything</title>
+  <link rel="stylesheet" href="../assets/flow.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="../assets/flow.js" defer></script>
+</head>
+<body>
+  <aside class="rail" aria-label="Workspace navigation">
+    <a class="brand" href="../index.html" aria-label="MCP Anything design options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 15 8-8 8 8M4 9l8 8 8-8"/></svg></a>
+    <div class="rail-actions">
+      <button class="rail-button selected" data-action="home" title="Website apps" aria-label="Website apps"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></button>
+      <button class="rail-button" data-action="activity" title="Task activity" aria-label="Task activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5.3M4 4v5h5m3-2v5l3 2"/></svg></button>
+      <button class="rail-button" data-action="connect" title="Connect assistant" aria-label="Connect assistant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 14 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 1 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 0)"/></svg></button>
+    </div>
+    <a class="rail-footer" href="../index.html" title="Compare designs" aria-label="Compare designs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></a>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><a href="../index.html">MCP Anything</a><span class="preview-label"><span></span>Interactive preview · sample data</span></header>
+    <main id="view">
+      <div class="desk-heading"><div><h1>Your websites, ready to help.</h1><p>Teach a task once. Ask your assistant next time.</p></div><button class="flow-button primary" data-action="new-app"><span aria-hidden="true">+</span> New website app</button></div>
+      <div class="desk">
+        <section class="website-list" aria-label="Website apps">
+          <div class="list-heading"><h2>Website apps</h2><span>3 apps</span></div>
+          <button class="website current" data-action="open-app" data-app="canvas"><span class="website-mark canvas">C</span><span class="website-copy"><strong>Canvas</strong><small>2 saved tasks</small></span><span class="status-dot" aria-label="Sample connection"></span></button>
+          <button class="website" data-action="open-app" data-app="youtube"><span class="website-mark youtube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg></span><span class="website-copy"><strong>YouTube</strong><small>1 saved task</small></span><span class="status-dot" aria-label="Sample connection"></span></button>
+          <button class="website" data-action="open-app" data-app="notion"><span class="website-mark notion">N</span><span class="website-copy"><strong>Notion</strong><small>No saved tasks</small></span><span class="status-dot" aria-label="Sample connection"></span></button>
+          <div class="list-guide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8m-4-4v8"/><circle cx="12" cy="12" r="9"/></svg><p>One app per website.<br>As many tasks as you need.</p></div>
+        </section>
+        <section class="app-detail" aria-label="Canvas saved tasks">
+          <div class="app-heading"><div class="app-title"><span class="website-mark canvas large">C</span><div><h2>Canvas</h2><p>Your school workspace</p></div></div><span class="connected"><span></span>Sample connection</span></div>
+          <div class="task-heading"><div><h3>Saved tasks</h3><p>Your assistant can use these tasks.</p></div><button class="flow-button primary" data-action="teach" data-app="canvas">Teach a task</button></div>
+          <div class="task-list">
+            <button class="task" data-action="try-task" data-app="canvas" data-task="List upcoming assignments"><div><h4>List upcoming assignments</h4><p>Find due dates across your courses.</p><div class="inputs"><span>Course</span></div></div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+            <button class="task" data-action="try-task" data-app="canvas" data-task="Find course materials"><div><h4>Find course materials</h4><p>Find documents and readings for a course.</p><div class="inputs"><span>Course</span></div></div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+          </div>
+          <div class="assistant-bar"><div><h3>Take these tasks to your assistant</h3><p>Connect once, then ask in your own words.</p></div><button class="flow-button" data-action="connect">Connect assistant <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div>
+        </section>
+      </div>
+      <footer class="desk-footer"><span>Night desk</span><p>This preview does not connect to real websites.</p><a href="../index.html">Compare designs</a></footer>
+    </main>
+  </div>
+</body>
+</html>

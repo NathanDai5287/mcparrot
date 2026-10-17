@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Anything · Warm library</title>
+  <link rel="stylesheet" href="../assets/flow.css">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="../assets/flow.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" data-action="home"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M5 6h7v7H5zM16 6h7v7h-7zM5 17h7v7H5zM16 17h7v7h-7z"/></svg>MCP Anything</a>
+    <nav aria-label="Workspace"><button class="nav-current" data-action="home">My websites</button><button data-action="activity">Activity</button><button data-action="connect">Connect assistant</button></nav>
+    <a class="design-link" href="../index.html">All designs <span aria-hidden="true">↗</span></a>
+  </header>
+  <div class="prototype-label">Interactive prototype · sample data</div>
+  <main id="view">
+    <section class="library-heading"><div><h1>Your websites, within reach.</h1><p>Teach a task here. Ask your assistant to do it next time.</p></div><button class="flow-button primary" data-action="new-app"><span aria-hidden="true">+</span> Create app</button></section>
+    <div class="library-layout">
+      <section class="website-library" aria-labelledby="library-title">
+        <div class="section-label"><h2 id="library-title">My websites</h2><span>3 sample apps</span></div>
+        <article class="website-row">
+          <div class="website-identity"><div class="website-mark canvas-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="9"/><path d="M16 2v5m0 18v5M2 16h5m18 0h5M6 6l4 4m12 12 4 4M6 26l4-4M22 10l4-4"/></svg></div><div><button class="website-name" data-action="open-app" data-app="canvas">Canvas <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button><p>school.example/canvas</p></div><span class="connection-label">Sample connection</span></div>
+          <p class="website-description">Keep school work close, without the extra clicks.</p>
+          <div class="task-preview"><span>List upcoming assignments</span><span>Find course materials</span></div>
+          <div class="website-footer"><span>2 saved tasks</span><button data-action="open-app" data-app="canvas">Open app <span aria-hidden="true">→</span></button></div>
+        </article>
+        <article class="website-row">
+          <div class="website-identity"><div class="website-mark youtube-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><rect x="3" y="7" width="26" height="18" rx="5"/><path d="m13 12 8 4-8 4z"/></svg></div><div><button class="website-name" data-action="open-app" data-app="youtube">YouTube <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button><p>youtube.com</p></div><span class="connection-label">Sample connection</span></div>
+          <p class="website-description">Find a video and read what is behind it.</p>
+          <div class="task-preview"><span>Search videos and read descriptions</span></div>
+          <div class="website-footer"><span>1 saved task</span><button data-action="open-app" data-app="youtube">Open app <span aria-hidden="true">→</span></button></div>
+        </article>
+        <article class="website-row">
+          <div class="website-identity"><div class="website-mark notion-mark" aria-hidden="true">N</div><div><button class="website-name" data-action="open-app" data-app="notion">Notion <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button><p>notion.so</p></div><span class="connection-label">Sample connection</span></div>
+          <p class="website-description">Bring your notes into the conversation.</p>
+          <div class="task-preview"><span>Ready for your first task</span></div>
+          <div class="website-footer"><span>0 saved tasks</span><button data-action="open-app" data-app="notion">Open app <span aria-hidden="true">→</span></button></div>
+        </article>
+      </section>
+      <aside class="next-panel">
+        <section class="assistant-invitation"><svg class="line-illustration" viewBox="0 0 220 92" aria-hidden="true"><rect x="16" y="16" width="60" height="53" rx="7"/><path d="M16 29h60M27 22h2m5 0h2M29 42h31M29 51h23M88 43h41m-7-6 7 6-7 6"/><path d="M146 23h51a8 8 0 0 1 8 8v24a8 8 0 0 1-8 8h-31l-12 10V63h-8a8 8 0 0 1-8-8V31a8 8 0 0 1 8-8Z"/><path d="M151 38h40m-40 10h27"/></svg><h2>Teach once.<br>Use in your assistant.</h2><p>Your saved tasks become tools your assistant can use, with the details you choose.</p><button class="flow-button" data-action="connect">Connect assistant <span aria-hidden="true">↗</span></button></section>
+        <section class="getting-started"><h2>A new task starts with you.</h2><p>Open a website app, then show the steps in its browser.</p><button data-action="teach" data-app="canvas">Try teaching a task <span aria-hidden="true">→</span></button></section>
+        <section class="reconnect-demo"><h2>What if a login expires?</h2><p>See how you return to a task after verification.</p><button data-action="reconnect" data-app="canvas">Try verification <span aria-hidden="true">→</span></button></section>
+      </aside>
+    </div>
+  </main>
+  <footer class="site-footer"><span>Warm library</span><span>Proposed experience · no real websites connected</span><a href="../../docs/index.html">Product guide ↗</a></footer>
+</body>
+</html>

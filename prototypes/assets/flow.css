@@ -1,0 +1,369 @@
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+button,
+input,
+select,
+textarea {
+  border-radius: var(--radius,10px);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+.flow-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 20px 0 32px;
+}
+
+.flow-header h1 {
+  font-size: 2rem;
+  letter-spacing: -.035em;
+  line-height: 1.15;
+  margin: 12px 0;
+}
+
+.flow-header p,
+.flow-panel p {
+  max-width: 65ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(240px,.42fr);
+  gap: 28px;
+}
+
+.flow-panel {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 20px;
+}
+
+.flow-panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 18px;
+  letter-spacing: -.02em;
+}
+
+.flow-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.flow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.flow-row:last-child {
+  border-bottom: 0;
+}
+
+.flow-row strong {
+  display: block;
+}
+
+.flow-row p {
+  margin: 6px 0 0;
+  font-size: .875rem;
+}
+
+.flow-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.flow-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .16s,color .16s;
+}
+
+.flow-button:hover {
+  background: var(--soft);
+}
+
+.flow-button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.flow-button.primary:hover {
+  filter: brightness(.92);
+}
+
+.flow-back {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+.flow-back:hover {
+  color: var(--ink);
+}
+
+.flow-note {
+  padding: 16px 18px;
+  background: var(--soft);
+  color: var(--muted);
+  line-height: 1.6;
+  border-radius: var(--radius);
+  font-size: .875rem;
+}
+
+.flow-badge {
+  display: inline-block;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: .75rem;
+  white-space: nowrap;
+}
+
+.flow-field {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 22px;
+  font-weight: 600;
+  font-size: .875rem;
+}
+
+.flow-field input,
+.flow-field select,
+.flow-field textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 400;
+}
+
+.flow-field small {
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.flow-field textarea {
+  min-height: 95px;
+  resize: vertical;
+}
+
+.flow-browser {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 20px 0;
+}
+
+.flow-browser-bar {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: .8rem;
+  color: var(--muted);
+  background: var(--soft);
+  overflow-wrap: anywhere;
+}
+
+.flow-browser-page {
+  padding: 30px;
+  min-height: 260px;
+  background: var(--surface);
+}
+
+.flow-browser-page h2 {
+  margin-top: 0;
+}
+
+.flow-browser-page p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.flow-result {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.flow-result:last-child {
+  border-bottom: 0;
+}
+
+.flow-result p {
+  margin: 7px 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.flow-steps {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0 0 24px;
+  list-style: none;
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+.flow-steps .current {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.flow-empty {
+  padding: 35px 0;
+  color: var(--muted);
+}
+
+.flow-copy {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.flow-copy .flow-field {
+  flex: 1;
+  margin: 0;
+}
+
+.flow-live {
+  min-height: 24px;
+  margin-top: 12px;
+  color: var(--accent);
+  font-size: .875rem;
+}
+
+.flow-preview {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.flow-task-title {
+  margin-bottom: 8px;
+}
+
+.flow-stack {
+  max-width: 750px;
+}
+
+.flow-code {
+  font-variant-numeric: tabular-nums;
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+
+.flow-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+@media(max-width:760px) {
+  .flow-grid {
+    grid-template-columns: 1fr;
+  }
+  .flow-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .flow-header h1 {
+    font-size: 1.65rem;
+  }
+  .flow-panel {
+    padding: 21px;
+  }
+  .flow-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .flow-copy {
+    display: block;
+  }
+  .flow-copy button {
+    margin-top: 12px;
+  }
+  .flow-browser-page {
+    padding: 22px;
+  }
+  .flow-actions .flow-button {
+    flex-grow: 1;
+  }
+}
+
+.flow-spaced-heading {
+  margin-top: 30px!important;
+}

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How Nathan and coding agents reach a shared understanding before building.">
+  <title>How we work together · MCP Anything</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">MCP Anything</a>
+      <p>A guide for Nathan</p>
+      <nav aria-label="Guide pages">
+        <p class="nav-label">The guide</p>
+        <ul>
+          <li><a href="index.html">The product</a></li>
+          <li><a href="hackathon.html">LA Hacks 2026</a></li>
+          <li><a href="working-together.html" aria-current="page">How we work together</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="On this page">
+        <p class="nav-label">On this page</p>
+        <ul>
+          <li><a href="#process">How a conversation works</a></li>
+          <li><a href="#example">An example conversation</a></li>
+          <li><a href="#agreement">Checks before we build</a></li>
+          <li><a href="#changes">Saving and sharing changes</a></li>
+          <li><a href="#docs">Guides and their readers</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main id="content">
+      <header>
+        <h1>Share the picture before we build.</h1>
+        <p class="lead">This page explains how you and the coding agents reach the same understanding of a change before anyone builds it. You explain what you expect, and we test that understanding together until we mean the same thing.</p>
+      </header>
+
+      <section id="process">
+        <h2>How a conversation works</h2>
+        <ol class="flow">
+          <li><h3>You describe your mental model</h3><p>Explain what you see, what you do, and what you expect to happen next. Start with a real situation, such as creating a Canvas tool.</p></li>
+          <li><h3>The agent explains its understanding</h3><p>The agent repeats the flow in plain language from your point of view. It keeps your decisions apart from its own assumptions and from things that need testing.</p></li>
+          <li><h3>We question the details</h3><p>Both sides challenge unclear steps, hidden assumptions, and failure cases. We use concrete examples to find where our expectations differ.</p></li>
+          <li><h3>We close the differences</h3><p>We revise the explanation until we share the same picture. An unknown technical limit stays marked as unknown until a test gives evidence.</p></li>
+          <li><h3>We record the agreement</h3><p>Before it builds the agreed change, the agent updates the product guide, the hackathon guide when it applies, and its own working instructions.</p></li>
+          <li><h3>We build and check the result</h3><p>We test the result against the agreed example. If new evidence changes the expected experience, it starts another focused discussion.</p></li>
+        </ol>
+      </section>
+
+      <section id="example">
+        <h2>An example conversation</h2>
+        <aside class="note">
+          <strong class="note-label">Example</strong>
+          <p><strong>You:</strong> “I perform the task, and the app records the requests.”</p>
+          <p><strong>Agent:</strong> “You demonstrate each task during teaching. Your assistant later repeats the saved requests.”</p>
+          <p><strong>Next question:</strong> “What happens when the login expires?”</p>
+        </aside>
+        <p>In this example, the last question makes us decide how sign-in recovery works before we build it. If we only agreed on the words “browser automation,” too much would stay unexplained.</p>
+      </section>
+
+      <section id="agreement">
+        <h2>Checks before we build</h2>
+        <ul>
+          <li>We can both explain the starting point, user actions, and expected result.</li>
+          <li>We know who does each step: you, the app, or your assistant.</li>
+          <li>We can explain the same action through the website and through your agent.</li>
+          <li>Both paths give the same results and respect the same permissions and personal verification.</li>
+          <li>We have named important interruptions, such as verification or a failed task.</li>
+          <li>We have kept agreed behavior apart from questions about what is possible.</li>
+          <li>We have recorded the smallest next step that can test the plan.</li>
+        </ul>
+        <p>The agent continues settled work without asking you to approve the same choice again. We check both website and agent access before we call a feature complete. If evidence changes the plan, the agent explains the effect and returns to the specific open question.</p>
+      </section>
+
+      <section id="changes">
+        <h2>Saving and sharing changes</h2>
+        <p>When an agent finishes a change and checks it, the agent saves it straight into the main copy of the project on GitHub, the website that stores the project and its history. The agent does not ask you first. Before it saves, it tests the change in a way that fits the risk, and it runs the project's automatic checks. Each saved step is small and has a short note that says what changed for the user. Agents never save passwords, keys, sign-in data, or private website content.</p>
+        <p>The main copy must always be ready for a demo, because judges can see it and the demo runs from it. For riskier work, an agent uses a branch, which is a separate copy where it can work without changing the main copy. When the work is ready, the agent opens a pull request, which is a request to move the branch's changes into the main copy after a review. Agents use a branch and a pull request in these cases:</p>
+        <ul>
+          <li>Several agents work at the same time on the same part of the project. Each agent gets its own branch, but agents that work on clearly separate parts can save to the main copy.</li>
+          <li>The work is an experiment that we may throw away, such as a first test of recording and repeating website requests.</li>
+          <li>The change is something you can see on screen, and you should see it before it reaches the main copy. Its pull request shows pictures from before and after the change.</li>
+          <li>The work happens in the final hours before the Devpost submission or during in-person judging, when the main copy must not change unexpectedly. The <a href="hackathon.html">LA Hacks 2026 guide</a> has the deadline and event details.</li>
+        </ul>
+        <p>Agents decide when to merge their own pull requests into the main copy. They merge after the automatic checks pass and they have confirmed that the result works, so you do not need to approve. After each change, the agent gives you a link to the saved change or its pull request.</p>
+        <aside class="note">
+          <strong class="note-label">Planned, not set up yet</strong>
+          <p>We plan to publish each change in the main copy to the hosted website automatically. Each branch would also get a preview link, which is a separate web address that shows that version of the app. You would then review changes on the live website or a preview link, without starting the app on your computer. After each update, the agent would check the live website, send you its link, and fix or undo a broken update immediately. This automatic publishing is not connected or tested yet, and these guides are not part of the hosted website.</p>
+        </aside>
+      </section>
+
+      <section id="docs">
+        <h2>Guides and their readers</h2>
+        <p>The project has two kinds of documents that describe the same decisions. You read these web guides, which explain the experience, decisions, current status, and open questions in plain language. The <a href="index.html">product guide</a> covers what MCP Anything does, the <a href="hackathon.html">LA Hacks 2026 guide</a> covers judging and prizes, and this page covers how we work together. The coding agents read separate text documents with the same facts plus working rules, requirements, technical details, and checks. When a decision changes, the agent updates both kinds, and every document marks a plan as planned until a working result proves it.</p>
+        <p>The <a href="../DOCUMENTATION.md">documentation rules</a> say how all of these documents are written.</p>
+      </section>
+      <footer>
+        <p><a href="index.html">← Back to the product guide</a></p>
+        <p>Working agreement · Updated October 17, 2026</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

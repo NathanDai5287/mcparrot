@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The planned user experience for teaching websites to your assistant.">
+  <title>The product · MCP Anything</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">MCP Anything</a>
+      <p>A guide for Nathan</p>
+      <nav aria-label="Guide pages">
+        <p class="nav-label">The guide</p>
+        <ul>
+          <li><a href="index.html" aria-current="page">The product</a></li>
+          <li><a href="hackathon.html">LA Hacks 2026</a></li>
+          <li><a href="working-together.html">How we work together</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="On this page">
+        <p class="nav-label">On this page</p>
+        <ul>
+          <li><a href="#today">What exists today</a></li>
+          <li><a href="#idea">How the product works</a></li>
+          <li><a href="#teach">Teaching a website task</a></li>
+          <li><a href="#use">Using your assistant</a></li>
+          <li><a href="#connections">Two kinds of connections</a></li>
+          <li><a href="#agent-access">Equal controls for agents</a></li>
+          <li><a href="#reconnect">Recovering an expired sign-in</a></li>
+          <li><a href="#limits">Questions that need proof</a></li>
+          <li><a href="#next">Our first build milestone</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main id="content">
+      <header>
+        <h1>Teach a website.<br>Use it from your assistant.</h1>
+        <p class="lead">This guide describes what MCP Anything does for you. You show a website task once, then ask your assistant to repeat it with new inputs.</p>
+        <span class="status">Local workspace available · teaching and assistant use planned</span>
+      </header>
+
+      <div class="table-wrap">
+        <table>
+          <caption>Contents</caption>
+          <thead><tr><th scope="col">Section</th><th scope="col">What you find there</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><a href="#today">What exists today</a></th><td>What you can try now and what is still planned</td></tr>
+            <tr><th scope="row"><a href="#idea">How the product works</a></th><td>Website apps, tasks, and your assistant</td></tr>
+            <tr><th scope="row"><a href="#teach">Teaching a website task</a></th><td>How you show a task to the app</td></tr>
+            <tr><th scope="row"><a href="#use">Using your assistant</a></th><td>How your assistant repeats a task for you</td></tr>
+            <tr><th scope="row"><a href="#connections">Two kinds of connections</a></th><td>How you connect your assistant to your apps</td></tr>
+            <tr><th scope="row"><a href="#agent-access">Equal controls for agents</a></th><td>Why your agent can do everything you can do</td></tr>
+            <tr><th scope="row"><a href="#reconnect">Recovering an expired sign-in</a></th><td>What happens when a website asks you to sign in again</td></tr>
+            <tr><th scope="row"><a href="#limits">Questions that need proof</a></th><td>Limits we must still test</td></tr>
+            <tr><th scope="row"><a href="#next">Our first build milestone</a></th><td>The first result we build and check</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section id="today">
+        <h2>What exists today</h2>
+        <p>When the local workspace is running, you can <a href="http://localhost:4317">open the local workspace</a> in your browser. The workspace uses the Calm design. In it, you can create a website app, add a draft task, and open the teaching preview of that task. Draft tasks cannot run yet, and the preview does not open the real website or record your actions. The main workspace does not yet support sign-in, task execution, assistant connections, or sign-in recovery.</p>
+        <p>The finished product will run website browsers in the background, without opening a separate browser window. You enter sign-in details and verification codes in our app for supported websites. We still need to choose how you demonstrate tasks. The hosted product remains planned.</p>
+        <p>You can <a href="http://127.0.0.1:4321">open the local sign-in test</a> while it is running. It uses a hidden browser on your computer, without Cloud credits or an AI model. Your password and code pass directly to that browser; this test does not save them. The browser keeps its signed-in session.</p>
+        <p>The Berkeley test completed school sign-in, SMS verification, and Canvas access. Access remained available after a page refresh. We then added the observed verification steps to the test flow, but have not repeated the complete automatic flow from a fresh session. This school-specific test does not record tasks, repeat website requests, or provide an assistant connection.</p>
+        <p>You can also <a href="../prototypes/index.html">compare the three earlier designs</a>, which use sample data.</p>
+      </section>
+
+      <section id="idea">
+        <h2>How the product works</h2>
+        <p>You create an app for one website, then teach that app several tasks. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each task you teach becomes one of those tools. Canvas, the course website of your school, is our first example, but the product is intended for many websites.</p>
+        <div class="table-wrap">
+          <table>
+            <caption>One website, several tasks</caption>
+            <thead><tr><th scope="col">Your app</th><th scope="col">Tasks you could teach</th><th scope="col">Inputs you could change</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Canvas</th><td>List assignments, read announcements, find course materials</td><td>Course, date range</td></tr>
+              <tr><th scope="row">Another website</th><td>Tasks you demonstrate on that website</td><td>The values needed for each task</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="teach">
+        <h2>Teaching a website task</h2>
+        <p>This is the planned teaching experience. Today, the workspace shows only a preview of it.</p>
+        <ol class="flow">
+          <li><h3>Create your app</h3><p>Visit our website, select <strong>Create app</strong>, and enter the website address. For example, name the app “Canvas.”</p></li>
+          <li><h3>Sign in yourself</h3><p>Open the browser view and sign in to your school account. Complete Duo or any other verification that the school requires.</p></li>
+          <li><h3>Start recording</h3><p>Select <strong>Create task</strong>, name the task, and start recording. Then do the task in the browser. The app records your clicks and the messages that the website sends and receives behind the page.</p></li>
+          <li><h3>Review what can change</h3><p>Stop recording when you reach the result. Review the task and select the inputs that can change, such as a course or date range.</p></li>
+          <li><h3>Test and enable the tool</h3><p>Test the task with different inputs and check the result. The app tries to repeat the website messages without clicking through the pages. Enable the tool after that test succeeds.</p></li>
+          <li><h3>Add more tasks</h3><p>Teach other tasks inside the same app. You keep one website connection with several enabled tools.</p></li>
+        </ol>
+        <aside class="note">
+          <strong class="note-label">You are the teacher</strong>
+          <p>By default, you demonstrate each task yourself. Browser Use gives the browser access, and later it will also help you sign in again. We also plan to let an agent that you authorize use the same teaching session.</p>
+        </aside>
+      </section>
+
+      <section id="use">
+        <h2>Using your assistant</h2>
+        <p>This is the planned experience after you teach a task.</p>
+        <ol class="flow">
+          <li><h3>Connect once</h3><p>Add the MCP address of your app to a compatible assistant, such as ChatGPT where it is supported.</p></li>
+          <li><h3>Ask for a result</h3><p class="example">“Find my assignments due this week.”</p><p>Your assistant chooses an enabled tool and supplies its inputs.</p></li>
+          <li><h3>Get the result</h3><p>The app repeats the saved website messages with your active login. Your assistant receives the result, and nobody needs to click through the website pages again.</p></li>
+        </ol>
+        <p>Your assistant can combine the tools you taught to answer new requests. In the first version, an action that you have never taught needs another demonstration. Some actions may still need browser steps, and we must test and support those steps before we enable their tools.</p>
+      </section>
+
+      <section id="connections">
+        <h2>Two kinds of connections</h2>
+        <p>Each website app will get its own connection, and MCP Anything will get a separate management connection. Neither kind is available yet.</p>
+        <div class="table-wrap">
+          <table>
+            <caption>Choose what your assistant can access</caption>
+            <thead><tr><th scope="col">Connection</th><th scope="col">What you can ask your assistant to do</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">MCP Anything</th><td>Create website apps, manage tasks, start teaching, check progress, and request sign-in recovery.</td></tr>
+              <tr><th scope="row">Canvas</th><td>Run the verified tasks you taught inside your Canvas app.</td></tr>
+              <tr><th scope="row">YouTube</th><td>Run the verified tasks you taught inside your YouTube app.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>For example, a Canvas app and a YouTube app give you two website connections, and the management connection makes three in total. Each website connection includes all the enabled tasks of that app, so you do not connect each task separately. You need the management connection only if you want your assistant to manage MCP Anything for you. All connections come from our one hosted website.</p>
+        <ol class="flow">
+          <li><h3>Choose a connection</h3><p>Open the connection details of the website app, or choose MCP Anything management.</p></li>
+          <li><h3>Add it to your assistant</h3><p>Copy its address and follow the setup instructions for your compatible assistant.</p></li>
+          <li><h3>Authorize access</h3><p>Sign in and approve access to your own apps and tasks. The available connection options depend on your assistant.</p></li>
+        </ol>
+      </section>
+
+      <section id="agent-access">
+        <h2>Equal controls for agents</h2>
+        <p>Your agent is your assistant when it acts for you. Everything you can do in MCP Anything must also be possible through your agent. For example, you can create a Canvas app yourself, or you can ask your agent to create it with the same details. Both paths must give the same information and respect the same permissions. This rule covers actions and information, not the screen layout or moving between tabs.</p>
+        <p>The rule applies to app management, task teaching, testing, connections, progress, and recovery as those features become available. We check both paths before we call a feature complete. Today, the local workspace has no agent connection, so its current actions still need their matching agent controls.</p>
+        <aside class="note">
+          <strong class="note-label">You still control personal verification</strong>
+          <p>Your agent could start a teaching session and give you a secure browser link. You could demonstrate the task there, or let an authorized agent operate the same session where this is supported. You still approve Duo on your phone and complete any other personal verification. After that, your agent checks progress and continues the supported work. Keep passwords and verification codes out of assistant messages.</p>
+        </aside>
+      </section>
+
+      <section id="reconnect">
+        <h2>Recovering an expired sign-in</h2>
+        <p>A saved login can expire, and your task then needs a new sign-in. This is the planned recovery experience.</p>
+        <ol class="flow">
+          <li><h3>The browser attempts sign-in</h3><p>If you chose to save your sign-in details securely, Browser Use enters them and continues as far as possible. If not, you sign in through a secure browser link.</p></li>
+          <li><h3>Your assistant shows a verification request</h3><p>The tool gives a <strong>Verification required</strong> status and a link that your assistant can show you.</p></li>
+          <li><h3>You complete verification</h3><p>Enter a verification code on the secure page, or approve Duo on your phone. Keep passwords and verification codes out of assistant messages.</p></li>
+          <li><h3>The task continues</h3><p>The browser finishes sign-in, and the app tries to continue the waiting task. Some assistants may need to check the task status before they show the result.</p></li>
+        </ol>
+        <aside class="note">
+          <strong class="note-label">Needs a real school test</strong>
+          <p>The sign-in rules of a school may prevent parts of this flow. We have not tested automatic sign-in or Duo recovery on the website of your school.</p>
+        </aside>
+      </section>
+
+      <section id="limits">
+        <h2>Questions that need proof</h2>
+        <ul>
+          <li>A recording must contain enough information to repeat the task with different inputs.</li>
+          <li>Some website messages may work only inside the original browser.</li>
+          <li>A changed website may need another recording.</li>
+          <li>We must measure speed before we say the product is faster.</li>
+          <li>The first milestone only reads information. Actions that change website data need a separate plan.</li>
+        </ul>
+      </section>
+
+      <section id="next">
+        <h2>Our first build milestone</h2>
+        <p>First, we teach one reading task, repeat it with different inputs, and check the result against the website. Then we run that tool from an assistant and repeat the same process on a second website.</p>
+        <aside class="note">
+          <strong class="note-label">Make failures useful</strong>
+          <p>Sentry is a service that reports errors and slow steps in an app. We plan to use its error reports, Tracing, and Logs to find failed or slow tasks. The demonstration should show a real problem that these tools helped us fix.</p>
+        </aside>
+      </section>
+      <footer>
+        <p><a href="hackathon.html">LA Hacks 2026 (judging and prizes)</a> · <a href="working-together.html">How we work together →</a></p>
+        <p>Product plan · Updated October 17, 2026</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

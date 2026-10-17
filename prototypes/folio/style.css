@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Fraunces:opsz,wght@9..144,400;9..144,450;9..144,500&display=swap');
+:root { --bg: #f8f6f0; --surface: #fffdf8; --ink: #322c26; --muted: #756c62; --line: #ded8ce; --accent: #ab402b; --accent-ink: #fffaf2; --soft: #f0ebe1; --radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); background: var(--bg); font-synthesis: none; }
+body { margin: 0; }
+a { color: inherit; text-underline-offset: 4px; }
+button { color: inherit; }
+button svg, a svg { pointer-events: none; }
+.site-header { min-height: 86px; margin: auto; padding: 0 4.8%; display: flex; align-items: center; gap: 55px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; font-size: 19px; font-weight: 600; letter-spacing: -.7px; }
+.brand svg { width: 25px; height: 25px; stroke: var(--accent); fill: none; stroke-width: 1.8; }
+nav { display: flex; align-self: stretch; gap: 28px; }
+nav button { position: relative; padding: 0; min-height: 44px; border: 0; background: transparent; font-size: 13px; color: var(--muted); border-radius: 0; }
+nav button:hover { color: var(--ink); }
+nav .nav-current { color: var(--ink); font-weight: 550; }
+nav .nav-current::after { position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--accent); content: ''; }
+.design-link { margin-left: auto; font-size: 12px; color: var(--muted); text-decoration: none; padding: 13px 0; white-space: nowrap; }
+.design-link:hover { color: var(--accent); }
+.design-link span { margin-left: 9px; }
+.prototype-label { text-align: center; padding: 10px 15px; font-size: 10px; color: #766956; background: #f0ebe0; letter-spacing: .3px; }
+main { max-width: 1450px; min-height: 650px; margin: auto; padding: 46px 5.1% 65px; }
+.library-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 40px; }
+h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 400; font-size: 35px; letter-spacing: -1.1px; margin: 0 0 12px; line-height: 1.2; }
+.library-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+.flow-button { font-size: 13px; min-height: 44px; padding: 11px 16px; gap: 10px; font-weight: 550; }
+.library-heading .flow-button span { font-size: 20px; font-weight: 400; line-height: 15px; }
+.library-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 54px; }
+.section-label { display: flex; align-items: center; justify-content: space-between; padding: 0 0 16px; border-bottom: 1px solid var(--line); }
+.section-label h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.section-label>span { font-size: 11px; color: var(--muted); }
+.website-row { padding: 24px 0 19px; border-bottom: 1px solid var(--line); }
+.website-identity { display: flex; gap: 12px; align-items: center; }
+.website-mark { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 9px; flex-shrink: 0; background: var(--surface); }
+.website-mark svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.canvas-mark { color: #b15338; }
+.youtube-mark { color: #a44837; }
+.notion-mark { font: 600 28px Georgia, serif; }
+.website-name { display: inline-flex; align-items: center; gap: 9px; padding: 0; min-height: 24px; border: none; background: transparent; font-weight: 600; font-size: 16px; letter-spacing: -.2px; }
+.website-name svg { width: 11px; height: 11px; stroke: var(--muted); fill: none; stroke-width: 1.5; }
+.website-name:hover { color: var(--accent); }
+.website-identity p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.connection-label { margin-left: auto; font-size: 10px; color: #736b5e; border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; white-space: nowrap; }
+.website-description { margin: 15px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.task-preview { display: flex; flex-wrap: wrap; gap: 7px; }
+.task-preview span { font-size: 11px; padding: 5px 8px; background: var(--soft); border-radius: 4px; }
+.website-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.website-footer>span { font-size: 10px; color: var(--muted); }
+.website-footer button,.getting-started button,.reconnect-demo button { min-height: 44px; border: 0; padding: 8px 0; background: transparent; font-size: 12px; font-weight: 550; }
+.website-footer button:hover,.getting-started button:hover,.reconnect-demo button:hover { color: var(--accent); }
+.website-footer button span,.getting-started button span,.reconnect-demo button span { margin-left: 9px; }
+.next-panel { padding-top: 2px; }
+.assistant-invitation { padding: 26px; background: #eee8dc; border-radius: 8px; }
+.line-illustration { width: 100%; height: 88px; margin-bottom: 14px; fill: none; stroke: #8a7057; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.assistant-invitation h2 { font-family: 'Fraunces', Georgia, serif; font-size: 25px; font-weight: 400; letter-spacing: -.6px; line-height: 1.3; margin: 0 0 15px; }
+.assistant-invitation p { color: #736551; font-size: 12px; line-height: 1.8; margin: 0 0 22px; }
+.assistant-invitation .flow-button { width: 100%; font-size: 11px; background: transparent; border-color: #c9bca8; }
+.assistant-invitation .flow-button:hover { background: #e4dbc9; }
+.getting-started,.reconnect-demo { padding: 27px 0 0; margin: 0 3px; }
+.getting-started h2,.reconnect-demo h2 { font-size: 13px; margin: 0 0 8px; font-weight: 550; }
+.getting-started p,.reconnect-demo p { font-size: 12px; line-height: 1.75; color: var(--muted); margin: 0; }
+.reconnect-demo { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 14px; }
+.site-footer { display: flex; gap: 20px; align-items: center; justify-content: space-between; padding: 19px 5.1% 26px; max-width: 1450px; margin: auto; font-size: 10px; color: var(--muted); }
+.site-footer a { text-decoration: none; }
+.flow-header h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 400; }
+.flow-panel h2 { font-weight: 550; }
+.flow-back { min-height: 44px; }
+.flow-panel { box-shadow: none; }
+.flow-button:active { transform: translateY(1px); }
+@media (min-width: 1500px) { .site-header { padding-left: max(5%, calc((100% - 1300px) / 2)); padding-right: max(5%, calc((100% - 1300px) / 2)); } }
+@media (max-width: 1000px) { .site-header { gap: 30px; } nav { gap: 20px; } .library-layout { gap: 30px; grid-template-columns: minmax(0, 1fr) 250px; } .assistant-invitation { padding: 21px; } .connection-label { display: none; } }
+@media (max-width: 760px) { .site-header { flex-wrap: wrap; gap: 0; min-height: 110px; padding-top: 20px; } .brand { font-size: 18px; } nav { order: 3; width: 100%; margin-top: 10px; min-height: 50px; justify-content: space-between; gap: 12px; } .design-link { margin-left: auto; } main { padding-top: 30px; } .library-heading { display: block; padding-bottom: 28px; } h1 { font-size: 29px; } .library-heading p { font-size: 13px; line-height: 1.7; } .library-heading .flow-button { margin-top: 20px; } .library-layout { grid-template-columns: 1fr; gap: 35px; } .connection-label { display: inline; } .assistant-invitation { padding: 25px; } .line-illustration { width: 200px; float: right; margin-left: 12px; } .assistant-invitation .flow-button { width: auto; } .site-footer { flex-wrap: wrap; gap: 12px; } .site-footer>span:nth-child(2) { order: 3; width: 100%; } }
+@media (max-width: 430px) { .line-illustration { float: none; display: block; margin: 0 0 20px; width: 190px; } .connection-label { display: none; } }
