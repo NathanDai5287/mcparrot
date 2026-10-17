@@ -28,7 +28,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | --- | --- | --- |
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, saves draft tasks, and shows a teaching preview; the production check returned it |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
-| HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server on October 17, 2026; the production check follows the next deployment |
+| HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
 | Local Berkeley sign-in diagnostic | shipped | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
 | Local headless browser launcher | shipped | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
