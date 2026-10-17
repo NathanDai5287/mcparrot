@@ -25,7 +25,10 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
     try {
       const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, arguments: input }) });
       const next = await response.json();
-      if (!response.ok) throw new Error(next.error ?? "The teaching action failed.");
+      if (!response.ok) {
+        if (next.hasSession) setState((previous) => ({ ...previous, expiresAt: next.expiresAt }));
+        throw new Error(next.error ?? "The teaching action failed.");
+      }
       setState(next);
       if (name === "test_saved_request") setTestFailed(false);
       if (!next.candidates.some((candidate: Candidate) => candidate.id === selectedId)) {
