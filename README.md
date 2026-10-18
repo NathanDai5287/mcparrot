@@ -26,7 +26,8 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
 | [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, storage, and the service architecture |
-| [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, recordings, and diagnostics data |
+| [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, and recordings |
+| [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
 | [Running the task runner](#running-the-task-runner) | How to start the dormant Browser Use Cloud task runner |
 
@@ -265,7 +266,7 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, and `/mcp/apps/<app-id>`, and the HTML guides at `/docs`.
+The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
 Vercel Authentication protects every deployment, including the production domain; only requests that carry the automation bypass secret skip it.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
@@ -289,7 +290,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests with the website's own cookies |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
 | Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, and Browser Use profile IDs |
-| Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
+| Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
 A sign-in browser runs for up to 15 minutes, but the Vercel request that starts it returns at once, and **Done signing in** stops it with a separate request.
@@ -318,9 +319,26 @@ Keep secrets out of prompts, public task definitions, logs, traces, documentatio
 Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in traffic.
 Define how long recordings are kept and how they are deleted before you store captures in production.
 
-Sentry is a service that collects errors, traces, and logs to help find problems.
-Send task status, duration, and sanitized errors to Sentry.
-Do not send credentials, cookies, tokens, or verification codes.
+## Diagnostics with Sentry
+
+Sentry is a service that collects errors, traces, logs, and session recordings to help find problems.
+MCParrot uses `@sentry/nextjs` in the browser and on the server, and it sends everything to the Sentry project `nathan-s4/mcparrot`.
+The SDK reads `NEXT_PUBLIC_SENTRY_DSN`, and the build uploads source maps with `SENTRY_AUTH_TOKEN`, so stack traces show the original code.
+Browser events go through the same-site route `/monitoring`, which forwards them to Sentry, so ad blockers do not drop them and Vercel Authentication lets them through.
+MCParrot keeps every trace and every session because it has one user, and it sends logs through the SDK instead of a Vercel Log Drain, which needs a paid Vercel plan.
+
+| Sentry product | What MCParrot sends |
+| --- | --- |
+| Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, and one `task.request` for each request a task runs |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, and each task run's outcome, including whether the website was signed out |
+| Session Replay | Recordings of dashboard sessions, with all text and inputs masked |
+| AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
+
+Spans carry only non-secret attributes, such as the app ID, task name, request count, response status, and response size.
+The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
+MCP spans record tool inputs but never tool results, because the results are website responses.
+Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
 ## Workspace navigation behavior
 
@@ -336,6 +354,7 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 Use Node.js 24 or later.
 The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
 That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
+Add `NEXT_PUBLIC_SENTRY_DSN` to send diagnostics and `SENTRY_AUTH_TOKEN` to upload source maps during `npm run build`; without them, Sentry stays off.
 The connection link appears only on Vercel, where `VERCEL_AUTOMATION_BYPASS_SECRET` exists.
 
 ```sh

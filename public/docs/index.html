@@ -219,7 +219,7 @@
         <p>First, you browse a reading page, save one suggested task, sign in once, and ask ChatGPT to run it with different inputs. The <a href="status.html#order">order of remaining work</a> lists every later stage and how we know each one is finished.</p>
         <aside class="note">
           <strong class="note-label">Make failures useful</strong>
-          <p>Sentry is a service that reports errors and slow steps in an app. We intend to use its error reports, Tracing, and Logs to find failed or slow tasks. The demonstration should show a real problem that these tools helped us fix.</p>
+          <p>Sentry is a service that reports errors and slow steps in an app. MCParrot sends it error reports, the timing of each step (Tracing), short log lines (Logs), screen recordings of the workspace with all text hidden (Session Replay), and the timing of each Cursor Composer and ChatGPT tool call (AI agent monitoring). Logs go through Sentry itself, because the Vercel log forwarding feature needs a paid plan. Sentry never receives passwords, cookies, website answers, or the private link secret. The demonstration should show a real problem that these tools helped us fix.</p>
         </aside>
       </section>
       <footer>
