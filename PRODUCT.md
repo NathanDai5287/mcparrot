@@ -41,7 +41,7 @@ Every capability needs an equal path through the dashboard and through MCP, as t
 Status words are limited to shipped, dormant, aspirational, and gap, as the [documentation guide](DOCUMENTATION.md#use-status-vocabulary) describes.
 Secrets, passwords, and payment details never appear in the interface, logs, or prompts.
 Ordering and payment are a gap until a live check passes, and they must always show the total and wait for the person's approval.
-A shared app marketplace is aspirational.
+Each user signs in with their own account, and only the owner can order; the shared app marketplace is a gap until checks on the deployed site pass.
 
 ## Brand Commitments
 
