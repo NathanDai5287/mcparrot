@@ -451,17 +451,18 @@ Deleting the app also deletes its saved login and any pending sign-in, but delet
 3. The agent receives the username and password as Browser Use secret bindings, which the Browser Use server types into the page; the agent's AI model never sees them.
 4. The agent submits the password once; when the website rejects it, MCParrot tells the user to replace the login and never submits that login again until the user replaces it.
 5. When the website asks for verification, the agent chooses the text-message option, opening "Other options" in Duo when needed, and stops when the page asks for the code.
-6. MCParrot keeps that browser running for 15 minutes and stores its session ID, browser ID, and CDP address in Redis as the app's pending sign-in, which expires with it.
+6. MCParrot keeps that browser running for 15 minutes and stores its session ID, browser ID, CDP address, and the name and inputs of the tool that started the sign-in in Redis as the app's pending sign-in, which expires with it.
 7. The tool result tells ChatGPT that a code was sent to the user's phone and to ask the user for it, then call `submit_verification_code`.
 8. That tool reads the page's host names over CDP and starts a follow-up agent run in the same browser, which receives the code as a secret binding for those hosts, submits it, and skips optional device trust.
 9. When sign-in finishes, MCParrot stops the browser so the profile saves the session, clears the pending sign-in, and records the sign-in time.
-10. The tool tells ChatGPT that sign-in finished and to run the original tool again; it does not rerun the tool itself.
+10. When at least 60 seconds of the code call's 280-second budget remain, `submit_verification_code` reads the stored app again, runs the tool that started the sign-in with its stored inputs, and returns that tool's answer; otherwise it tells ChatGPT that sign-in finished and to call that tool, by its name, again with the same inputs.
 
-When the website signs in without verification, the tool continues in the same tool call if at least 60 seconds of the call's 280-second budget remain; otherwise the tool tells ChatGPT to run the original tool again.
+When the website signs in without verification, the tool continues in the same tool call if at least 60 seconds of the call's 280-second budget remain; otherwise the tool tells ChatGPT to call it again, by its name, with the same inputs.
+Saved tools and `read_page` give their names for these messages; `view_image` does not, so its messages say to run the original tool again.
 When the website rejects the code, the tool asks ChatGPT to request a new code from the user and keeps the browser waiting.
 When a tool runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
 After the user changes the choice away from **With email and password**, tools and `submit_verification_code` ignore a sign-in that waits for a code, and it expires with its browser.
-Only one sign-in runs at a time for each app; another call during it tells ChatGPT to wait a minute and try again.
+Only one sign-in runs at a time for each app; a tool call that finds the website signed out during it checks the sign-in lock every 2 seconds, and when that sign-in ends it reads the stored app again and runs once, repeats the request for the code when that sign-in now waits for one, and passes on that sign-in's failure, such as a rejected password, when the website is still signed out; when the sign-in still runs once less than 60 seconds of the call's budget remain, it tells ChatGPT to wait a minute and try again.
 Any other outcome stops the browser and tells the user to select **Sign in to website** in MCParrot, and MCParrot does not try the same login again for 10 minutes.
 MCParrot does not keep the code after the call, and Sentry never receives it.
 

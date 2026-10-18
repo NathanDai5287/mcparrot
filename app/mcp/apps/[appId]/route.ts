@@ -8,7 +8,7 @@ import { connectionAllowed } from "../../../../lib/connection";
 import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
-import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
+import { readSigningIn, submitVerificationCode, type Rerun } from "../../../../lib/sign-in";
 import { isGetRequest } from "../../../../lib/task-request";
 import { viewImage } from "../../../../lib/view-image";
 import { findApp } from "../../../../lib/workspace";
@@ -97,23 +97,33 @@ function appServer(app: Website, orderLimitUsd?: number) {
     names.set(task, name);
     usedNames.add(name);
   }
+  const reruns = new Map<string, (signedInApp: Website, args: unknown) => Promise<string>>();
   for (const task of tasks) {
     const name = names.get(task);
     if (!name) continue;
+    const schema = inputSchema(task);
+    const taskArgs = z.object(schema);
+    const run = (signedInApp: Website, args: unknown) => {
+      const { fullAnswer, ...inputs } = taskArgs.parse(args);
+      return runTask(signedInApp, task, inputs, fullAnswer);
+    };
+    reruns.set(name, run);
     server.registerTool(name, {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
-      inputSchema: inputSchema(task),
+      inputSchema: schema,
       annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer))));
+    }, async (args) => textResult(await readSigningIn(app, (signedInApp) => run(signedInApp, args), { toolName: name, args })));
   }
   const website = new URL(app.url).origin;
+  const pageArgs = z.object({ url: z.string() });
+  reruns.set("read_page", (signedInApp, args) => readPage(signedInApp, pageArgs.parse(args).url));
   server.registerTool("read_page", {
     title: `Read a page on ${app.name}`,
     description: `Open any page on ${website} that the signed-in user can see and return its text. Use it for pages that no other tool covers, such as a link that the user shares.`,
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
     annotations: { readOnlyHint: true },
-  }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
+  }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url), { toolName: "read_page", args: { url } })));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
     description: `Read one image and return its text and numbers and a short description of any chart. It opens images on ${website} with the user's sign-in and https images on any other website, such as an image server that ${website} uses, without the sign-in. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
@@ -137,12 +147,13 @@ function appServer(app: Website, orderLimitUsd?: number) {
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
+  const rerun: Rerun = (signedInApp, toolName, args) => reruns.get(toolName)?.(signedInApp, args);
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
     description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a tool result says that a code was sent.`,
     inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-  }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
+  }, async ({ code }) => textResult(await submitVerificationCode(app, code, rerun)));
   if (orderLimitUsd) registerOrderTools(server, app, orderLimitUsd);
   return server;
 }
