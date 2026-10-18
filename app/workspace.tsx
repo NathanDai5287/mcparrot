@@ -2,12 +2,12 @@
 
 import { UserButton } from "@clerk/nextjs";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ExplorationPanel, requestExtension } from "./exploration-panel";
-import { AssistantPanel } from "./assistant-panel";
+import { ExplorationPanel, requestExtension, type SaveResult } from "./exploration-panel";
+import { AssistantPanel, stopStoredSignIn } from "./assistant-panel";
 import { ImagePanel } from "./image-panel";
 import { OrderingPanel } from "./ordering-panel";
 import { PublishPanel } from "./publish-panel";
-import type { DiscoveredCapability, Task, Website } from "../lib/capabilities";
+import type { Capability, DiscoveredCapability, Task, TaskRequest, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
 
 type Screen =
@@ -16,6 +16,23 @@ type Screen =
   | { view: "missing" }
   | { view: "app"; app: Website }
   | { view: "explore"; app: Website };
+
+type WorkspaceResult = { apps: Website[]; error?: undefined } | { apps?: undefined; error: string };
+
+const storageWarning = "MCParrot cannot reach its storage, so your apps may not load or save. Reload the page to try again.";
+const signedOutWarning = "Your MCParrot sign-in has ended. Reload the page to sign in again.";
+const shownErrorStatuses = [403, 404, 409, 413, 503];
+
+const requestsText = (requests: TaskRequest[]) => requests.map(({ method, urlPattern, bodyPattern = "" }) => `${method} ${urlPattern} ${bodyPattern}`).join("\n");
+const savedAs = (task: Task | undefined, capability: Capability) => task?.name === capability.name && requestsText(task.requests) === requestsText(capability.requests);
+
+function screenTitle(screen: Screen) {
+  if (screen.view === "app") return `${screen.app.name} — MCParrot`;
+  if (screen.view === "explore") return `Explore ${screen.app.name} — MCParrot`;
+  if (screen.view === "create-app") return "Create an app — MCParrot";
+  if (screen.view === "missing") return "App not found — MCParrot";
+  return "MCParrot — Workspace";
+}
 
 function screenPath(screen: Screen) {
   if (screen.view === "apps" || screen.view === "missing") return "/";
@@ -79,15 +96,18 @@ function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolea
   </li>;
 }
 
-function ToolList({ app, onDelete }: { app: Website; onDelete: (toolId: string) => void }) {
+function ToolList({ app, onDelete }: { app: Website; onDelete: (toolId: string) => Promise<string> }) {
   const [query, setQuery] = useState("");
   const [openToolId, setOpenToolId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   if (app.tasks.length === 0) return <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tools to keep.</p></section>;
-  const search = query.trim().toLowerCase();
+  const filterShown = app.tasks.length > toolFilterThreshold;
+  const search = filterShown ? query.trim().toLowerCase() : "";
   const shownTools = app.tasks.filter((tool) => `${tool.name} ${tool.description}`.toLowerCase().includes(search));
   return <>
-    {app.tasks.length > toolFilterThreshold && <input className="tool-filter" type="search" aria-label="Filter tools" placeholder="Filter tools by name or description" value={query} onChange={(event) => setQuery(event.target.value)} />}
-    {shownTools.length === 0 ? <p className="tool-empty" role="status">No tools match “{query.trim()}”.</p> : <ul className="tool-list">{shownTools.map((tool) => <ToolItem key={tool.id} tool={tool} open={openToolId === tool.id} onToggle={() => setOpenToolId(openToolId === tool.id ? null : tool.id)} onDelete={() => onDelete(tool.id)} />)}</ul>}
+    {deleteError && <p className="pilot-error" role="alert">{deleteError}</p>}
+    {filterShown && <input className="tool-filter" type="search" aria-label="Filter tools" placeholder="Filter tools by name or description" value={query} onChange={(event) => setQuery(event.target.value)} />}
+    {shownTools.length === 0 ? <p className="tool-empty" role="status">No tools match “{query.trim()}”.</p> : <ul className="tool-list">{shownTools.map((tool) => <ToolItem key={tool.id} tool={tool} open={openToolId === tool.id} onToggle={() => setOpenToolId(openToolId === tool.id ? null : tool.id)} onDelete={async () => setDeleteError(await onDelete(tool.id))} />)}</ul>}
   </>;
 }
 
@@ -114,18 +134,33 @@ function DeleteAppButton({ app, busy, error, onDelete, onClose }: { app: Website
   </>;
 }
 
+function ScreenLink({ screen, onNavigate, className, current, children }: { screen: Screen; onNavigate: (screen: Screen) => void; className?: string; current?: boolean; children: ReactNode }) {
+  return <a className={className} href={screenPath(screen)} aria-current={current ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onNavigate(screen); }}>{children}</a>;
+}
+
 function Breadcrumb({ trail, current, onNavigate }: { trail: { label: string; screen: Screen }[]; current: string; onNavigate: (screen: Screen) => void }) {
   return <nav className="breadcrumb" aria-label="Breadcrumb"><ol>
-    {trail.map(({ label, screen }) => <li key={screenPath(screen)}><a href={screenPath(screen)} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onNavigate(screen); }}>{label}</a></li>)}
+    {trail.map(({ label, screen }) => <li key={screenPath(screen)}><ScreenLink screen={screen} onNavigate={onNavigate}>{label}</ScreenLink></li>)}
     <li aria-current="page">{current}</li>
   </ol></nav>;
 }
 
-function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => void; onCancel: () => void }) {
-  function submit(event: FormEvent<HTMLFormElement>) {
+function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => Promise<string>; onCancel: () => void }) {
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving.current) return;
     const fields = new FormData(event.currentTarget);
-    onSave(String(fields.get("name")).trim(), String(fields.get("url")).trim());
+    saving.current = true;
+    setBusy(true);
+    setError("");
+    const problem = await onSave(String(fields.get("name")).trim(), String(fields.get("url")).trim());
+    saving.current = false;
+    setBusy(false);
+    setError(problem);
   }
 
   return (
@@ -135,7 +170,8 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
       <label htmlFor="website-url">Website address</label>
       <input id="website-url" name="url" type="url" pattern="https?://.+" placeholder="https://your-website.com" required aria-describedby="url-help" />
       <p className="field-help" id="url-help">Use the address you normally visit in your browser, starting with https:// or http://.</p>
-      <div className="form-actions"><button className="button primary" type="submit">Create app</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
+      {error && <p className="pilot-error" role="alert">{error}</p>}
+      <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Creating app…" : "Create app"}</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
     </form>
   );
 }
@@ -144,7 +180,7 @@ export default function Workspace() {
   const [apps, setApps] = useState<Website[]>([]);
   const [screen, setScreen] = useState<Screen>({ view: "apps" });
   const [loaded, setLoaded] = useState(false);
-  const [storageError, setStorageError] = useState(false);
+  const [warning, setWarning] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const focusHeading = useRef(false);
@@ -152,24 +188,32 @@ export default function Workspace() {
 
   useEffect(() => {
     fetch("/api/workspace").then(async (response) => {
-      if (!response.ok) throw new Error("Storage is unavailable.");
-      const workspace: { apps: Website[] | null; isOwner: boolean } = await response.json();
+      const workspace: { apps?: Website[] | null; isOwner?: boolean } | null = await response.json().catch(() => null);
+      if (!response.ok || !workspace || !(workspace.apps === null || Array.isArray(workspace.apps))) {
+        setWarning(response.status === 404 && !workspace ? signedOutWarning : storageWarning);
+        return;
+      }
       const savedApps = workspace.apps ?? [];
-      setIsOwner(workspace.isOwner);
+      setIsOwner(workspace.isOwner === true);
       setApps(savedApps);
       setScreen(screenAtPath(savedApps));
       setLoaded(true);
-    }).catch(() => setStorageError(true));
+    }).catch(() => setWarning(storageWarning));
   }, []);
 
   useEffect(() => {
     const restoreScreen = () => {
+      focusHeading.current = true;
       setScreen(screenAtPath(apps));
       setDeleteError("");
     };
     window.addEventListener("popstate", restoreScreen);
     return () => window.removeEventListener("popstate", restoreScreen);
   }, [apps]);
+
+  useEffect(() => {
+    document.title = screenTitle(screen);
+  }, [screen]);
 
   useEffect(() => {
     if (!focusHeading.current) return;
@@ -192,51 +236,74 @@ export default function Workspace() {
   async function deleteApp(app: Website) {
     setDeleteBusy(true);
     setDeleteError("");
+    await stopStoredSignIn(app.id);
     const login = await fetch(`/api/login?appId=${encodeURIComponent(app.id)}`, { method: "DELETE" }).catch(() => null);
     if (login?.ok) updateApp(app.id, { loginSavedAt: undefined });
-    const savedApps = login?.ok ? await changeWorkspace({ operation: "deleteApp", appId: app.id }) : null;
-    if (savedApps) await requestExtension("clear", app.id).catch(() => undefined);
+    const saved = login?.ok ? await changeWorkspace({ operation: "deleteApp", appId: app.id }) : null;
+    if (saved?.apps) await requestExtension("clear", app.id).catch(() => undefined);
     setDeleteBusy(false);
-    if (!savedApps) {
-      setDeleteError(login?.ok ? "MCParrot deleted this app’s saved login but could not delete the app. Try again." : "MCParrot could not delete this app’s saved login, so it kept the app. Try again.");
+    if (!saved?.apps) {
+      setDeleteError(saved ? `MCParrot deleted this app’s saved login but could not delete the app. ${saved.error || "Try again."}` : "MCParrot could not delete this app’s saved login, so it kept the app. Try again.");
       return;
     }
     navigate({ view: "apps" }, true);
   }
 
-  async function changeWorkspace(change: WorkspaceOperation) {
+  async function changeWorkspace(change: WorkspaceOperation): Promise<WorkspaceResult> {
     const response = await fetch("/api/workspace", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
-    setStorageError(!response?.ok);
-    if (!response?.ok) return null;
-    const { apps: savedApps }: { apps: Website[] } = await response.json();
-    showApps(savedApps);
-    return savedApps;
+    const result: { apps?: unknown; error?: unknown } | null = await response?.json().catch(() => null) ?? null;
+    if (response?.ok && Array.isArray(result?.apps)) {
+      setWarning("");
+      showApps(result.apps);
+      return { apps: result.apps };
+    }
+    if (response?.status === 404 && !result) {
+      setWarning(signedOutWarning);
+      return { error: signedOutWarning };
+    }
+    setWarning(!response || response.ok || response.status === 503 ? storageWarning : "");
+    return { error: response && shownErrorStatuses.includes(response.status) && typeof result?.error === "string" ? result.error : "" };
   }
 
   function showApps(savedApps: Website[]) {
     setApps(savedApps);
+    setLoaded(true);
     setScreen((current) => "app" in current ? { ...current, app: savedApps.find((app) => app.id === current.app.id) ?? current.app } : current);
   }
 
   async function createApp(name: string, url: string) {
-    if (!URL.canParse(url) || !["http:", "https:"].includes(new URL(url).protocol)) return;
+    if (!URL.canParse(url) || !["http:", "https:"].includes(new URL(url).protocol)) return "Use a website address that starts with https:// or http://.";
     const app: Website = { id: crypto.randomUUID(), name, url, tasks: [] };
-    const savedApps = await changeWorkspace({ operation: "createApp", app }) ?? apps;
-    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
+    const saved = await changeWorkspace({ operation: "createApp", app });
+    const savedApp = saved.apps?.find((candidate) => candidate.id === app.id);
+    if (!savedApp) return saved.error || "MCParrot could not create the app. Try again.";
+    navigate({ view: "app", app: savedApp });
+    return "";
   }
 
-  async function saveTasks(app: Website, capabilities: DiscoveredCapability[]) {
-    let savedApps: Website[] | null = apps;
+  async function saveTasks(app: Website, capabilities: DiscoveredCapability[]): Promise<SaveResult> {
+    const skipped: string[] = [];
+    let savedApp: Website | undefined = app;
     for (const { updatesTaskId, ...capability } of capabilities) {
       if (!updatesTaskId) continue;
-      savedApps = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
-      if (!savedApps) return false;
+      const saved = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
+      if (!saved.apps) return { error: saved.error };
+      savedApp = saved.apps.find((candidate) => candidate.id === app.id);
+      if (!savedAs(savedApp?.tasks.find((task) => task.id === updatesTaskId), capability)) skipped.push(capability.name);
     }
     const newCapabilities = capabilities.filter((capability) => !capability.updatesTaskId);
-    if (newCapabilities.length) savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
-    if (!savedApps) return false;
-    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
-    return true;
+    if (newCapabilities.length) {
+      const earlierTaskIds = new Set(savedApp?.tasks.map((task) => task.id));
+      const saved = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
+      if (!saved.apps) return { error: saved.error };
+      savedApp = saved.apps.find((candidate) => candidate.id === app.id);
+      const addedTasks = savedApp?.tasks.filter((task) => !earlierTaskIds.has(task.id)) ?? [];
+      for (const capability of newCapabilities) if (!addedTasks.some((task) => savedAs(task, capability))) skipped.push(capability.name);
+    }
+    if (!savedApp) return { error: "This app no longer exists. It may have been deleted." };
+    if (skipped.length) return { skipped };
+    navigate({ view: "app", app: savedApp });
+    return {};
   }
 
   function updateApp(appId: string, changes: Partial<Website>) {
@@ -257,11 +324,11 @@ export default function Workspace() {
         <div className="sidebar-apps">
           <div className="sidebar-apps-heading"><h2>Apps {loaded && <span>{apps.length}</span>}</h2><button className="sidebar-icon-button" aria-label="Create app" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" /></button></div>
           {loaded && apps.length === 0 && <p className="sidebar-empty">No apps yet</p>}
-          <nav aria-label="Apps" className="sidebar-app-list">{apps.map((app) => <button className="sidebar-app" key={app.id} aria-current={currentApp?.id === app.id ? "page" : undefined} onClick={() => navigate({ view: "app", app })}>
+          <nav aria-label="Apps" className="sidebar-app-list">{apps.map((app) => <ScreenLink className="sidebar-app" key={app.id} current={currentApp?.id === app.id} screen={{ view: "app", app }} onNavigate={navigate}>
             <span className="sidebar-app-mark" aria-hidden="true">{app.name.charAt(0).toUpperCase()}</span>
             <span className="sidebar-app-name">{app.name}</span>
             <span className={app.signedInAt ? "status-dot signed-in" : "status-dot"}><span className="visually-hidden">{app.signedInAt ? "Signed in" : "Not signed in"}</span></span>
-          </button>)}</nav>
+          </ScreenLink>)}</nav>
         </div>
         <div className="sidebar-footer">
           <a className="sidebar-link" href="/marketplace">Marketplace</a>
@@ -270,17 +337,17 @@ export default function Workspace() {
       </aside>
       <div className="page">
         <main id="main-content">
-          {storageError && <p className="workspace-warning" role="status">MCParrot cannot reach its storage, so your apps may not load or save. Reload the page to try again.</p>}
+          {warning && <p className="workspace-warning" role="status">{warning}</p>}
           {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
 
           {loaded && screen.view === "apps" && <>
             <PageHeader title="Your apps" description="One website. Many tools for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
             <div className="section-heading"><h2>Websites <span>{apps.length}</span></h2><span>Choose a website to explore</span></div>
-            <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
+            <div className="app-list">{apps.map((app) => <ScreenLink className="app-row" key={app.id} screen={{ view: "app", app }} onNavigate={navigate}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
               <span className="app-main"><span className="app-name">{app.name}</span><span className="website-address">{app.url}</span></span>
               <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tools yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "tool" : "tools"}`}</small></span><Icon name="arrow" />
-            </button>)}</div>
+            </ScreenLink>)}</div>
             <p className="preview-note">MCParrot stores apps and chosen tools so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
           </>}
           {screen.view === "create-app" && <>
@@ -290,17 +357,17 @@ export default function Workspace() {
           </>}
           {screen.view === "app" && <>
             <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }]} current={screen.app.name} onNavigate={navigate} />
-            <PageHeader title={screen.app.name} description={screen.app.url} action={<div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button></div>}><AppStatus app={screen.app} /></PageHeader>
+            <PageHeader title={screen.app.name} description={screen.app.url} action={<div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><ScreenLink className="button primary" screen={{ view: "explore", app: screen.app }} onNavigate={navigate}><Icon name="browser" />Explore website</ScreenLink></div>}><AppStatus app={screen.app} /></PageHeader>
             <div className="app-layout">
               <section className="app-tools" aria-labelledby="app-tools-heading">
                 <div className="section-heading"><h2 id="app-tools-heading">What ChatGPT can do on {screen.app.name} <span>{screen.app.tasks.length} {screen.app.tasks.length === 1 ? "tool" : "tools"}</span></h2><span>Explore, find what the site can do, then choose</span></div>
-                <ToolList key={screen.app.id} app={screen.app} onDelete={(toolId) => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: toolId })} />
+                <ToolList key={screen.app.id} app={screen.app} onDelete={async (toolId) => { const saved = await changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: toolId }); return saved.apps ? "" : saved.error || "MCParrot could not delete this tool. Try again."; }} />
               </section>
               <aside className="setup-rail" aria-label="Setup">
                 <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onAutomaticSignIn={(automaticSignIn) => changeWorkspace({ operation: "setAutomaticSignIn", appId: screen.app.id, automaticSignIn })} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
                 <ImagePanel key={`image-${screen.app.id}`} app={screen.app} />
-                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
+                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={async (ordering) => (await changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })).apps} />}
               </aside>
             </div>
           </>}

@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabilities";
 
-type Exploration = { recording: boolean; requests: CapturedRequest[] };
+type Exploration = { recording: boolean; requests: CapturedRequest[]; activeAppId?: string | null; saveError?: string };
 type Choice = DiscoveredCapability & { selected: boolean };
+export type SaveResult = { error?: string; skipped?: string[] };
 const emptyExploration: Exploration = { recording: false, requests: [] };
-const connectionToolNames = ["read_page", "save_task", "submit_verification_code"];
+const connectionToolNames = ["read_page", "view_image", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
 const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 const isText = (value: unknown) => typeof value === "string";
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
@@ -48,7 +49,7 @@ export function requestExtension(action: string, appId: string, websiteUrl?: str
 
 function CapabilityChoice({ choice, updatedTask, problem, problemId, onChange }: { choice: Choice; updatedTask?: Task; problem: string; problemId: string; onChange: (changes: Partial<Choice>) => void }) {
   const inputs = choice.inputs.map((input) => `${input.name} (for example, ${input.example})`).join(", ");
-  return <div className="capability">
+  return <div className="capability" role="group" aria-label={choice.name.trim() || "Unnamed tool"}>
     <label className="capability-pick"><input type="checkbox" checked={choice.selected} onChange={(event) => onChange({ selected: event.target.checked })} />Keep this tool · {updatedTask ? `Updates ${updatedTask.name}` : "New"}</label>
     <input aria-label="Tool name" value={choice.name} maxLength={80} aria-invalid={problem ? true : undefined} aria-describedby={problem ? problemId : undefined} onChange={(event) => onChange({ name: event.target.value })} />
     {problem && <p className="pilot-error" id={problemId}>{problem}</p>}
@@ -58,10 +59,10 @@ function CapabilityChoice({ choice, updatedTask, problem, problemId, onChange }:
   </div>;
 }
 
-export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: { appId: string; websiteUrl: string; tasks: Task[]; active: boolean; onSave: (capabilities: DiscoveredCapability[]) => Promise<boolean> }) {
+export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: { appId: string; websiteUrl: string; tasks: Task[]; active: boolean; onSave: (capabilities: DiscoveredCapability[]) => Promise<SaveResult> }) {
   const [state, setState] = useState(emptyExploration);
   const [connected, setConnected] = useState(false);
-  const [busy, setBusy] = useState<"" | "exploration" | "discovery">("");
+  const [busy, setBusy] = useState<"" | "exploration" | "discovery" | "saving">("");
   const [choices, setChoices] = useState<Choice[]>([]);
   const [discoveredAt, setDiscoveredAt] = useState("");
   const [error, setError] = useState("");
@@ -86,6 +87,16 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
     setConnected(true);
   });
 
+  async function refreshStatus() {
+    if (working.current) return;
+    try {
+      const nextState = await requestExtension("status", appId, websiteUrl);
+      if (working.current) return;
+      setState(nextState);
+      setConnected(true);
+    } catch {}
+  }
+
   function showDiscovery(discovery: { discoveredAt?: unknown; capabilities?: unknown }) {
     if (!Array.isArray(discovery.capabilities) || !isText(discovery.discoveredAt)) throw new Error("Discovery returned a reply MCParrot could not read. Try again.");
     const capabilities: DiscoveredCapability[] = discovery.capabilities.filter(isCapability);
@@ -105,8 +116,13 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   async function showLastDiscovery() {
     const response = await fetch(`/api/discover?appId=${encodeURIComponent(appId)}`).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
-    if (!response?.ok) setError(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
-    else if (result.discovery) showDiscovery(result.discovery);
+    if (working.current) return;
+    try {
+      if (!response?.ok) throw new Error(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
+      if (result.discovery) showDiscovery(result.discovery);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "MCParrot could not load the last search. Reload the page to try again.");
+    }
   }
 
   const clearRequests = () => run("exploration", async () => {
@@ -125,23 +141,31 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   const lastSearch = discoveredAt && new Date(discoveredAt).toLocaleString();
   const namesValid = problems.every((problem) => !problem);
 
-  async function save() {
-    setError("");
-    if (await onSave(chosen.map(({ selected, ...capability }) => capability))) setChoices([]);
-    else setError("MCParrot could not save these tools. Try again.");
-  }
+  const save = () => run("saving", async () => {
+    const result = await onSave(chosen.map(({ selected, ...capability }) => capability));
+    const skipped = result.skipped ?? [];
+    if (skipped.length) {
+      setChoices(chosen.filter((choice) => skipped.includes(choice.name)));
+      const one = skipped.length === 1;
+      throw new Error(`MCParrot did not save ${skipped.join(", ")}, because ${one ? "its" : "their"} name or requests match another tool in this app. Rename ${one ? "it" : "them"}, or untick ${one ? "it" : "them"}.`);
+    }
+    if (result.error !== undefined) throw new Error(result.error || "MCParrot could not save these tools. Try again.");
+    setChoices([]);
+  });
 
   useEffect(() => {
     if (!active) return;
-    const refresh = () => { if (!working.current) void operate("status"); };
+    const refresh = () => void refreshStatus();
     window.addEventListener("focus", refresh);
     refresh();
     return () => window.removeEventListener("focus", refresh);
   }, [active, appId]);
 
   useEffect(() => {
-    if (active) void showLastDiscovery();
+    if (active && choices.length === 0 && busy === "") void showLastDiscovery();
   }, [active, appId]);
+
+  const otherAppExploring = !!state.activeAppId && state.activeAppId !== appId;
 
   return <section className="teaching-pilot" aria-label="Explore the website in your browser" aria-busy={busy !== ""}>
     <h2>{state.recording ? "Explore the website in the other tab" : connected ? "Explore in your own browser" : "Set up your browser once"}</h2>
@@ -156,10 +180,12 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
       <p className="field-help">Chrome or Edge only. This private extension is not in the extension store. It records only in the tab you open here, and the browser shows that the extension is debugging that tab.</p>
     </>}
     <div className="pilot-controls">
-      {connected && <button className="button primary" disabled={busy !== ""} onClick={() => operate(state.recording ? "stop" : "start")}>{busy === "exploration" ? "Updating exploration…" : state.recording ? "Stop exploring" : state.requests.length ? "Continue exploring" : "Open website and explore"}</button>}
+      {connected && <button className="button primary" disabled={busy !== ""} onClick={() => operate(state.recording || otherAppExploring ? "stop" : "start")}>{busy === "exploration" ? "Updating exploration…" : state.recording ? "Stop exploring" : otherAppExploring ? "Stop the other exploration" : state.requests.length ? "Continue exploring" : "Open website and explore"}</button>}
       <button className="button" disabled={busy !== ""} onClick={() => operate("status")}>{connected ? "Refresh" : "Check extension"}</button>
       {connected && <span role="status">{state.requests.length} data requests recorded{state.recording ? " · Exploring" : ""}</span>}
     </div>
+    {connected && otherAppExploring && <p className="field-help">MCParrot Explorer is exploring another app. Stop that exploration to explore this one.</p>}
+    {connected && state.saveError && <p className="pilot-error">{state.saveError}</p>}
     {!state.recording && state.requests.length > 0 && <div className="pilot-candidates">
       <details className="teaching-details">
         <summary>Recorded requests · {state.requests.length}</summary>
@@ -179,7 +205,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
       <p className="field-help">Found on {lastSearch}. Find what this site can do again for a new list.</p>
       <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} updatedTask={tasks.find((task) => task.id === choice.updatesTaskId)} problem={problems[index]} problemId={`${appId}-task-name-${index}`} onChange={(changes) => changeChoice(index, changes)} />)}</div>
       <p className="field-help">Saving adds new tools, replaces each tool that an update changes, and skips ones that match another tool. Saved tools appear in this app’s ChatGPT connection.</p>
-      <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0 || !namesValid} onClick={save}>Save {chosen.length} {chosen.length === 1 ? "tool" : "tools"}</button>{!namesValid && <span className="field-help">Fix the tool names above to save.</span>}</div>
+      <div className="pilot-controls"><button className="button primary" disabled={busy !== "" || chosen.length === 0 || !namesValid} onClick={save}>{busy === "saving" ? "Saving tools…" : `Save ${chosen.length} ${chosen.length === 1 ? "tool" : "tools"}`}</button>{!namesValid && <span className="field-help">Fix the tool names above to save.</span>}</div>
     </div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
   </section>;
