@@ -47,6 +47,11 @@ function addressProblem(app: Website, urlPattern: string) {
   }
 }
 
+const redactionMarker = /\[redacted\]|%5Bredacted%5D|[?&][^=&#]*=redacted(?=[&#]|$)|\/redacted(?=[/?#]|$)/i;
+const bodyRedactionMarker = /\[redacted\]|"redacted"|=redacted\b|Bearer redacted/;
+
+const keepsRedactionMarker = ({ urlPattern, bodyPattern = "" }: TaskRequest) => redactionMarker.test(urlPattern) || bodyRedactionMarker.test(bodyPattern);
+
 function requestProblem(app: Website, capability: Capability) {
   const parsed = capabilitySchema.safeParse(capability);
   if (!parsed.success) return `The tool is too long or incomplete: ${parsed.error.issues.map((issue) => `${issue.path.join(".") || "tool"}: ${issue.message}`).join("; ")}.`;
@@ -58,6 +63,7 @@ function requestProblem(app: Website, capability: Capability) {
   if (nameProblem) return nameProblem;
   if (capability.requests.some((request) => request.method === "GET" && request.bodyPattern !== undefined)) return "Only a POST request can have a bodyPattern.";
   if (!capability.requests.every(isAllowedRequest)) return paymentRefusal;
+  if (capability.requests.some(keepsRedactionMarker)) return "A request still contains a redacted value. Turn it into a {placeholder} input instead.";
   if (!usesOnlyEarlierSteps(capability.requests)) return "A {stepN.path} placeholder can only use the response of an earlier request in this tool, where step1 is the first request.";
   if (!sameNames([...new Set(capability.requests.flatMap(requestPlaceholders))], capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern and bodyPattern, other than {stepN.path} placeholders, needs exactly one input with the same name, and every input needs a placeholder.";
 }

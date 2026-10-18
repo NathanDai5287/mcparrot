@@ -71,8 +71,6 @@ const storedDiscoverySchema = z.object({
 const saveDiscovery = `if redis.call("EXISTS", KEYS[1]) == 0 then return 0 end
 redis.call("SET", KEYS[2], ARGV[1])
 return 1`;
-const redactionMarker = /\[redacted\]|%5Bredacted%5D|[?&][^=&#]*=redacted(?=[&#]|$)|\/redacted(?=[/?#]|$)/i;
-const bodyRedactionMarker = /\[redacted\]|"redacted"|=redacted\b|Bearer redacted/;
 const maximumCandidates = 200;
 const maximumCapabilities = 50;
 
@@ -226,7 +224,7 @@ function valueMatches(pattern: unknown, recorded: unknown): boolean {
     return new RegExp(`^${marked.split(placeholderMark).map(escaped).join("[\\s\\S]*")}$`).test(typeof recorded === "string" ? recorded : JSON.stringify(recorded));
   }
   if (Array.isArray(pattern)) return Array.isArray(recorded) && pattern.length === recorded.length && pattern.every((item, index) => valueMatches(item, recorded[index]));
-  if (pattern && typeof pattern === "object") return !!recorded && typeof recorded === "object" && !Array.isArray(recorded) && Object.entries(pattern).every(([key, item]) => Object.hasOwn(recorded, key) && valueMatches(item, (recorded as Record<string, unknown>)[key]));
+  if (pattern && typeof pattern === "object") return !!recorded && typeof recorded === "object" && !Array.isArray(recorded) && Object.keys(pattern).length === Object.keys(recorded).length && Object.entries(pattern).every(([key, item]) => Object.hasOwn(recorded, key) && valueMatches(item, (recorded as Record<string, unknown>)[key]));
   return pattern === recorded;
 }
 
@@ -246,12 +244,10 @@ function bodyMatches(bodyPattern: string, body: string) {
 
 const wasRecorded = (request: TaskRequest, recorded: CapturedRequest[], origin: string) => recorded.some((candidate) =>
   candidate.method.toUpperCase() === request.method
-  && (pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin) || addressMatches(request.urlPattern, candidate.url, origin))
+  && ((URL.canParse(candidate.pattern) && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin)) || addressMatches(request.urlPattern, candidate.url, origin))
   && (request.bodyPattern === undefined ? !candidate.body : candidate.body !== undefined && bodyMatches(request.bodyPattern, candidate.body)));
 
-const keepsRedactionMarker = ({ urlPattern, bodyPattern = "" }: TaskRequest) => redactionMarker.test(urlPattern) || bodyRedactionMarker.test(bodyPattern);
-
-const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: string) => capability.requests.every((request) => wasRecorded(request, recorded, origin) && !keepsRedactionMarker(request));
+const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: string) => capability.requests.every((request) => wasRecorded(request, recorded, origin));
 
 function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
   const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
