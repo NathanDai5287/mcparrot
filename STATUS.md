@@ -7,9 +7,10 @@ Nathan reads the same facts in plain language in the [status guide](public/docs/
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authentication.
-Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in this browser's local storage.
-The discovery route returned capabilities from sample requests in a direct Composer check; Nathan's live exploration and discovery still need a demonstration.
-Task testing, request replay, remote MCP access, Browser Use sign-in during MCP use, persistent storage, and Sentry remain aspirational.
+Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in Upstash Redis.
+Each app page offers **Sign in to website** through a Browser Use cloud browser and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks.
+The MCP route passed a direct Node check, but Browser Use sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
+Task testing, the management connection, automatic sign-in recovery, and Sentry remain aspirational.
 
 ## Status word meanings
 
@@ -28,26 +29,28 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | --- | --- | --- |
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, opens exploration, and lists chosen tasks; automatic type and production build checks pass |
 | App and exploration addresses | shipped | `/apps/<app-id>` and `/apps/<app-id>/explore` use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
-| Local app deletion | shipped | Inline confirmation removes an app and its tasks from browser storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
+| App deletion | shipped | Inline confirmation removes an app and its tasks from storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
+| Persistent storage in Upstash Redis | gap | `/api/workspace` stores the workspace under one Redis key, and a direct Node check saved and read it through the same storage functions on a temporary Upstash database on October 17, 2026; the production store needs Nathan to finish the Upstash setup in Vercel |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
 | Explore any website | gap | MCParrot Explorer 0.2.0 records data requests with short response samples in the opened tab; syntax checks pass; Nathan's live recording demonstration must pass |
 | Capability discovery with Cursor Composer | shipped | `/api/discover` returned three capabilities with inputs from three sample requests in a direct Node check through the Cursor SDK on October 17, 2026; discovery on Vercel and from a live recording needs Nathan's demonstration |
-| Choose and save tasks | shipped | The checklist saves ticked, edited capabilities as the app's tasks in local storage; automatic type and production build checks pass; Nathan tests the live flow |
-| Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; it is reserved for sign-in and authentication during later MCP use |
-| UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
-| Task testing with changed inputs | aspirational | Run a chosen task's requests with changed inputs and compare the result with the website before publication |
+| Choose and save tasks | shipped | The checklist saves ticked, edited capabilities as the app's tasks; automatic type and production build checks pass; Nathan tests the live flow |
+| MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026 |
+| Private ChatGPT connection link | gap | The Vercel automation bypass secret exists and the app page shows the link with **Copy link**; a live ChatGPT connector needs Nathan's test |
+| Sign-in through Browser Use | gap | `/api/sign-in` creates the app's Browser Use profile, starts a cloud browser with its live view, and stops it on **Done signing in**; it needs Nathan's live sign-in |
+| Running tasks from ChatGPT | gap | Each tool call runs the task's GET requests inside a Browser Use browser with the app's profile and returns the response or a signed-out error; it needs Nathan's live ChatGPT request |
+| Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; sign-in and tasks use Browser Use cloud browsers directly |
+| UI and MCP parity | gap | App connections run saved tasks, but no dashboard capability has a management MCP operation |
+| Task testing with changed inputs | aspirational | Run a chosen task's requests with changed inputs and compare the result with the website before it becomes a tool |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic in a tested request sequence |
-| Recorded request replay | aspirational | Run the recorded API request with valid authentication and check the result |
-| MCP server per website app | aspirational | Expose one saved task through an authenticated remote MCP address |
-| Management MCP connection | aspirational | Add MCP operations that match each dashboard capability |
-| Browser Use sign-in during MCP use | aspirational | After the MCP server exists, Browser Use signs in and passes authentication when tasks run |
-| Owner authentication | aspirational | Product accounts, MCP authorization, and multi-user ownership remain unavailable |
-| Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it |
+| Write tasks | aspirational | Run tasks that change website data; the first version runs GET requests only |
+| Management MCP connection | aspirational | Add MCP operations that match each dashboard capability; Nathan scoped the first version to app connections only |
+| Owner authentication | aspirational | Product accounts, MCP sign-in, and multi-user ownership remain unavailable; the private link is the only MCP access control |
+| Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it; today the tool returns a signed-out error instead |
 | Saved credentials | aspirational | Optional per-website username/password entry, replacement, and deletion require durable encrypted storage, a separate managed key, and product owner authorization |
-| Secure session transfer | aspirational | Prove how session tokens move to request replay without exposing them |
-| Persistent storage | aspirational | Store apps, tasks, and operation status in managed PostgreSQL |
+| Long task status | aspirational | Store operation status for tasks that take longer than one 60-second request |
 | Sentry monitoring | aspirational | Add error monitoring, Tracing, and Logs across the complete path |
 | Second website support | aspirational | Teach and run a task on a second website with the same product flow |
 
@@ -63,13 +66,19 @@ In that check, the dashboard and its JavaScript assets returned successfully, an
 On October 17, 2026, the discovery route sent three sample requests from a public test website to Cursor Composer 2.5 Fast through the Cursor SDK and returned three capabilities with their requests and inputs in about five seconds.
 That check called the route handler directly from Node; it does not prove discovery on Vercel or from a live recording.
 
+On October 17, 2026, a direct Node check saved a test app with one GET task and one POST task to a temporary Upstash database and called the MCP route handler.
+The route answered initialize with the server name, listed only the GET task as a read-only tool with its input, returned the signed-out tool error because the app had no sign-in, and returned 404 for an unknown app.
+That check does not prove the production store, Browser Use sign-in, task execution, or a live ChatGPT connector.
+
 ## Known gaps
 
 These gaps exist inside shipped work and stay open until a change closes them:
 
-- The dashboard has no MCP access, including `delete_app` and the discovery operations, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
-- Apps and tasks stay in one browser only, without product accounts or a hosted database.
-- Chosen tasks are not tested or published tools and cannot perform website actions.
+- The dashboard has no management MCP operations, including `delete_app`, sign-in, and the discovery operations, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
+- The production Upstash store needs Nathan to finish its setup in Vercel before apps and tasks can load.
+- Browser Use sign-in, task execution, and a live ChatGPT connector need Nathan's production demonstration.
+- Saved tasks become tools without a test, run GET requests only, and fail when a website needs header tokens instead of cookies.
+- Anyone with an app's connection link can use the whole site until the bypass secret is regenerated.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
 
@@ -84,10 +93,10 @@ For how the demo must present Browser Use and Sentry to judges, see [hackathon j
 
 | Stage | Work | Completion check |
 | --- | --- | --- |
-| 1. Prove discovery and API execution | Explore a reading page, find capabilities, and choose one task | Run the recorded API request with valid authentication and check the result |
-| 2. Prove MCP use | Expose that saved task through an authenticated remote MCP server | Request the task from an assistant with changed inputs |
+| 1. Prove discovery and API execution | Explore a reading page, find capabilities, choose one task, and sign in through Browser Use | Run the saved request in the signed-in Browser Use browser and check the result |
+| 2. Prove MCP use | Add the app's connection link to ChatGPT | Request the task from ChatGPT with changed inputs |
 | 3. Add Sentry | Add error monitoring, Tracing, and Logs across the complete path | Diagnose and fix a real problem using captured evidence |
 | 4. Build task management | Add changed-input tests and publication for chosen tasks | Discover several tasks in one session and reuse each enabled task |
-| 5. Prove reconnection | Use Browser Use to sign in and preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
+| 5. Prove reconnection | Preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
 | 6. Prove general use | Teach a task on a second website | Reuse the same product flow without a website-specific architecture |
 | 7. Prepare the demo | Show teaching, assistant use, and the Sentry-backed improvement | Complete the demonstrated flow and explain its limits |

@@ -62,7 +62,7 @@ For example, the Commit Fellowship requires a supplemental form.
 
 | Sponsor | Challenge | Why it matches |
 | --- | --- | --- |
-| Browser Use | Best Use of Browser Use | Browser Use signs in and passes authentication when saved tasks run through MCP; this use is aspirational |
+| Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved task in a hidden Browser Use browser with that profile; this use is a gap until Nathan's live demonstration passes |
 | Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; the demo must show how that evidence changed what we built |
 | Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents |
 
@@ -89,7 +89,7 @@ Devpost lists the LA Hacks grand prize amounts as TBD, so confirm them at [ai.la
 
 Prove one complete path before building a wide interface.
 The strongest path explores a website once, lets Cursor Composer find what it can do, and chooses a task.
-It then shows that task's verified replay and an assistant calling it through MCP.
+It then signs in once through Browser Use, adds the app's private connection link to ChatGPT, and asks ChatGPT for a result that the saved task returns.
 This path addresses technical depth and execution better than a polished interface without working features.
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.
 Canvas is an example of that user's website, not the only one.
@@ -99,4 +99,4 @@ Judges penalize polish that hides parts that do not work, so never present an as
 Plan the Devpost text, a clean public repository, and a video that shows the same flow that judges see live.
 To claim the Sentry prize, show evidence from Tracing, Logs, Replay, or another allowed product, not only caught errors.
 To claim the Browser Use prize, show a working web agent and the people it serves.
-Browser Use is reserved for sign-in during MCP use, so this prize needs the MCP server first.
+Show Browser Use in two places: the live view where the user signs in once, including Duo, and the hidden browser that runs each task when ChatGPT calls it.

@@ -1,7 +1,7 @@
 # MCParrot
 
 MCParrot turns the website pages you explore into proposed tools your assistant can use.
-You browse once, review suggested tasks, and test them before an assistant such as ChatGPT can run them.
+You browse once, choose suggested tasks, sign in once in a Browser Use cloud browser, and connect ChatGPT to run those tasks.
 One website app can contain many saved tasks.
 Canvas is a useful example, not a product limit.
 
@@ -18,14 +18,15 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | --- | --- |
 | [What the product does](#what-the-product-does) | The product goal, its two phases, and what MCP means |
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
-| [Assistant connection architecture](#assistant-connection-architecture) | The management connection and one connection per website app |
+| [Assistant connection architecture](#assistant-connection-architecture) | One private connection link per website app, and the later management connection |
 | [Teaching website tasks](#teaching-website-tasks) | How a user explores a website, finds what it can do, and chooses tasks |
 | [Discovery data sent to Composer](#discovery-data-sent-to-composer) | What discovery sends to Cursor Composer and what it never includes |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
-| [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
-| [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
-| [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, and the target service architecture |
-| [Authentication and private data](#authentication-and-private-data) | Owner access, secrets, recordings, and diagnostics data |
+| [Signing in to websites](#signing-in-to-websites) | How the user signs in once in a Browser Use cloud browser |
+| [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
+| [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
+| [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, storage, and the service architecture |
+| [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, recordings, and diagnostics data |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
 | [Running the task runner](#running-the-task-runner) | How to start the dormant Browser Use Cloud task runner |
 
@@ -49,7 +50,7 @@ The UI and MCP must call the same underlying operations with matching inputs, pe
 Neither interface may bypass the other's authorization or user verification requirements.
 
 This rule covers both managing MCParrot and running taught website tasks.
-The frontend has no MCP access, which the [status page](STATUS.md) lists as a gap.
+Each website app's connection runs its saved reading tasks through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
 The table maps each frontend capability to its aspirational management MCP equivalent.
 
 | Frontend capability | Aspirational management MCP equivalent |
@@ -63,10 +64,12 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | List or delete recorded requests | `list_recorded_requests`, `delete_recorded_requests` |
 | Find what the website can do | `discover_capabilities` |
 | Save chosen capabilities as tasks | `save_tasks` |
+| Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
+| Copy the app's connection link | `get_connection_link` |
 | Delete an app and its tasks | `delete_app` |
 
 These operation names are examples.
-Testing, publishing, connection, and recovery controls are aspirational and must follow the same rule.
+Testing, publishing, and recovery controls are aspirational and must follow the same rule.
 Every operation in the table is available in the UI, but none has its matching management operation yet, which is a parity gap.
 Keep an operation inventory that maps each user capability to its MCP equivalent.
 For each new capability, check matching inputs, results, status, owner access, and required user actions through both interfaces.
@@ -74,23 +77,28 @@ A capability is shipped only after these parity checks pass; do not accept capab
 
 ## Assistant connection architecture
 
-The target design has one management connection plus one logical connection for each website app.
-This design is agreed and aspirational.
+The design has one connection for each website app plus one management connection.
+Nathan scoped the first version to app connections only, so the management connection is aspirational.
 
-| Connection | Scope | Intended use |
+| Connection | Scope | Use |
 | --- | --- | --- |
-| MCParrot management | The signed-in user's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
-| One connection per website app | Only that app's verified, enabled taught tools | Execute saved website tasks |
+| One connection per website app | Only that app's saved reading tasks | Run saved website tasks from ChatGPT |
+| MCParrot management (aspirational) | The owner's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
 
-For example, Canvas and YouTube would each have their own connection.
+For example, Canvas and YouTube each have their own connection.
 With management added, that user would have three connections, not one connection per task.
-Management MCP support is required by the parity rule.
-Users who manage apps only through the UI do not need to add the management connection, but users who manage apps through an assistant do.
+Management MCP support is required by the parity rule, and its absence is a gap.
+Users who manage apps only through the UI do not need the management connection, but users who manage apps through an assistant do.
 
-These connections are separate access scopes within one hosted service, not separately deployed servers.
-Example addresses are `/mcp/management` and `/mcp/apps/<app-id>`; the exact routes are not decided.
-Authenticate each connection, and restrict it to the owner's authorized apps and operations.
-The product supplies each address and setup instructions, and users add and authorize the connections in their compatible assistant.
+Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
+The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
+Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
+Tasks that use other methods stay off the connection, because the first version only reads website data.
+
+Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
+The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
+Vercel gives that secret to each deployment as `VERCEL_AUTOMATION_BYPASS_SECRET`, and the app page shows the full link with a **Copy link** button and setup steps.
+In ChatGPT, the user opens Settings, then Apps & Connectors, then Advanced settings, turns on Developer mode, selects Create, pastes the link as the MCP server URL, and chooses No authentication.
 Do not promise automatic connector installation or identical support across assistant clients.
 
 Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tasks, report status, and request sign-in recovery.
@@ -116,8 +124,8 @@ Canvas is a useful example, but the same flow works on any website.
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
 Saving replaces the app's current tasks, and the app page lists them.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
-Chosen tasks stay in this browser's local storage and are not assistant tools yet.
-Testing tasks with changed inputs, publishing them, and serving them through MCP remain aspirational, as the [status page](STATUS.md) records.
+MCParrot stores chosen tasks with the app, and each saved reading task becomes a tool in the app's connection right away.
+Testing tasks with changed inputs before they become tools remains aspirational, as the [status page](STATUS.md) records.
 
 ### Recording in the explore tab
 
@@ -143,7 +151,7 @@ The extension is not published in an extension store, and website policies can d
 Composer's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
 Unvisited pages and actions remain unavailable unless separately explored and tested.
 Some pages return HTML or use browser state rather than a separate data response; those tasks still need a tested execution path.
-The application must verify a reusable request sequence with valid authentication before it enables a task as a tool.
+Saved tasks become tools without a separate test, so a tool can fail when its request cannot be reused; checking each task before it becomes a tool is aspirational.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
 
 ## Discovery data sent to Composer
@@ -163,44 +171,65 @@ During teaching, also called parroting, the user browses a normal Chrome or Edge
 The extension records only in the tab that the user opens through **Open website and explore**.
 The user signs in normally and completes personal verification; exploration does not use a cloud browser.
 
-During MCP use, the product must never open a visible website browser window.
-It runs direct API requests where supported and uses a hidden browser only for steps that require browser state or sign-in recovery.
-For supported recovery flows, sign-in and verification use secure forms inside our app.
+Signing in for assistant use is the one step with a visible cloud browser: the user selects **Sign in to website** on the app page and signs in through Browser Use's live view in a popup.
+During MCP use, the product never opens a visible website browser window.
+Each tool call runs in a hidden Browser Use cloud browser that the user never sees.
+For aspirational recovery flows, sign-in and verification use secure forms inside our app.
 Browser Use enters those values into the hidden website browser without sending them to an AI model.
 Required personal verification stays in place in both UI and MCP flows.
 Unsupported recovery must return a clear failure instead of opening a visible browser during MCP use.
 
+## Signing in to websites
+
+Nathan chose Browser Use cloud browsers with a persistent profile for each website app, so the user signs in once and tasks reuse that sign-in.
+A Browser Use profile keeps cookies, local storage, and sign-in state, and Browser Use saves it when the browser stops.
+The user's normal browser and the Browser Use browser have separate sign-ins, so exploring does not sign in the cloud browser.
+
+1. Open the app page and select **Sign in to website**.
+2. MCParrot creates the app's Browser Use profile the first time, starts a cloud browser with it for up to 15 minutes, and opens the website there.
+3. A popup shows the browser's live view; sign in and complete any verification, such as Duo.
+4. Select **Done signing in** to stop the browser, which saves the sign-in to the profile.
+
+MCParrot stores the profile ID and the sign-in time with the app, and the app page and app list show whether the app is signed in.
+If the popup is blocked, select **Open the sign-in window** on the app page.
+The server route `/api/sign-in` starts and stops these browsers with `BROWSER_USE_API_KEY`, which never reaches the browser.
+
 ## Using saved tasks
 
-1. Ask the connected assistant for information or an action.
-2. Let the assistant select the required saved tools and supply their inputs.
+1. Ask ChatGPT, after you add the app's connection link, for information from the website.
+2. ChatGPT selects the saved tools it needs and supplies their inputs.
 3. Receive the results without opening the website yourself.
 
-The server checks the inputs and runs the saved API request sequence where this works.
-It supplies valid session data for the correct user and website.
-Browser Use is reserved for this later MCP use: it signs in and passes authentication when tasks run, after the MCP server exists.
-Direct requests are the intended normal way to run a task, rather than an agent navigating the website each time.
-Measure speed against browser execution before you claim an improvement.
+When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
+It opens the app's website address, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
+Inputs that ChatGPT leaves out use the example value that discovery found.
+The tool returns each request's address, status, and response body, shortened to 20,000 characters, and the server then stops the browser.
+The whole call must finish within Vercel's 60-second function limit.
+
+The task fails with a clear message when the website is signed out: when the website address lands on a sign-in page, a request returns 401 or 403, or a request redirects to a sign-in page.
+That message tells the user to open MCParrot and select **Sign in to website** on the app.
+Tasks run only GET requests in this first version, because the first milestone reads website data and never changes it.
 
 Assistants can combine taught tasks in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
-One discovery session may produce several proposed tasks, but only separately tested and enabled tools are available to an assistant.
-An unsupported action needs further discovery and testing; a successful example does not establish support for all related actions.
+An unsupported action needs further discovery; a successful example does not establish support for all related actions.
 
-Some requests depend on browser state or short-lived tokens, and some websites block request reuse outside their browser session.
-These tasks need a tested browser path, or they must stay unavailable.
-The first implementation must prove a reading task before it supports tasks that change website data.
+Some requests depend on short-lived tokens in headers rather than cookies, and some websites block reuse of a recorded request.
+Those tasks fail when they run, and they need a separate browser path or must stay unused.
+Measure speed against an agent navigating the website before you claim an improvement.
 
 ## Reconnecting expired sessions
 
 During normal use, tasks run without another sign-in while the website session is valid.
+When the session expires, the tool returns an error that tells the user to select **Sign in to website** in MCParrot, and the user signs in again and repeats the request.
+The automatic recovery below is aspirational.
+
 Users can optionally save a username and password for each website app through a private form inside MCParrot.
 They can replace or delete those saved details and can use manual sign-in instead.
 Saved details belong to one owner, one website app, and its approved login origin.
 Never reuse one app's password on another website or assume the website origin matches its separate sign-in provider.
 For example, Berkeley Canvas uses its approved CalNet login origin.
 The product must not capture typed passwords while exploring or import passwords from the user's normal browser.
-A normal-browser sign-in does not automatically sign in the separate Browser Use session.
 User-managed saved logins remain aspirational, as the [status page](STATUS.md) records.
 When a session expires, the product follows these steps:
 
@@ -236,42 +265,50 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the discovery route at `/api/discover`, and the HTML guides at `/docs`.
-Vercel Authentication protects every deployment, including the production domain.
+The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, and `/mcp/apps/<app-id>`, and the HTML guides at `/docs`.
+Vercel Authentication protects every deployment, including the production domain; only requests that carry the automation bypass secret skip it.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
-The dashboard saves app names, website addresses, and chosen tasks in this browser’s local storage.
-This supports refresh and direct app links without a database.
-It does not save credentials or recorded requests there; recorded requests stay in the extension.
-Durable task storage and remote MCP access remain aspirational.
-Short server operations can share the Next.js deployment.
-Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
-Vercel requests must not own a browser session that waits for user verification.
+Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
+MCParrot has one owner for now, because Vercel Authentication lets only Nathan reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
+The value holds each app's name, website address, chosen tasks, Browser Use profile ID, and sign-in time; it holds no credentials, and recorded requests stay in the extension.
+The dashboard reads the workspace through `/api/workspace` when it opens and saves the whole workspace after each change.
+The first time it finds no stored workspace, it copies apps that an earlier version saved in this browser's local storage.
+The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
+Operation status for tasks that outlast one request remains aspirational.
 
 The following table describes the complete product; the [status page](STATUS.md) records which parts exist:
 
 | Part | Choice | Purpose |
 | --- | --- | --- |
-| App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, verification, and task status |
+| App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
 | Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
-| Browser sessions | Browser Use Cloud | Sign in and pass authentication when tasks run through MCP later |
-| Task execution | Application-owned HTTP execution | Run chosen tasks as verified API request sequences |
-| Assistant connection | Official MCP TypeScript SDK, authenticated Streamable HTTP | Provide a remote MCP address for compatible assistants |
-| Persistent storage | Hosted PostgreSQL | Store user-owned connections, task definitions, and operation status |
+| Browser sessions | Browser Use Cloud browsers with one persistent profile per app | Keep the user's website sign-in, and run each task in a hidden browser |
+| Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests with the website's own cookies |
+| Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
+| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, and Browser Use profile IDs |
 | Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
-Browser Use later hosts sign-in and authentication during MCP use, and our app shows progress and verification controls.
-A Vercel request must not wait for a whole browser session to finish.
-For work that takes longer than one request, store durable operation status and let clients check progress.
-Secure session transfer and long-task coordination still need technical proof.
+A sign-in browser runs for up to 15 minutes, but the Vercel request that starts it returns at once, and **Done signing in** stops it with a separate request.
+Each task call runs inside one Vercel request with `maxDuration = 60`, so a task must finish within 60 seconds.
+For work that takes longer than one request, durable operation status that clients check is aspirational.
 
 ## Authentication and private data
 
 Keep every connection, browser profile, task, and pending operation limited to its owner.
-Require authentication for MCP access and verification links.
+Vercel Authentication protects the dashboard and its routes, so only Nathan can manage apps, start sign-in, or read the connection link.
+
+The connection link is the only access control on MCP use, and Nathan accepted this trade-off for the first version.
+Anyone with the link can use the whole site, not only that app's tools, because the bypass secret skips Vercel Authentication for every page.
+Keep the link private, and regenerate the secret if it leaks: open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, and regenerate it.
+After a new secret, redeploy, copy each app's new link, and replace the URL in each ChatGPT connector.
+MCP sign-in for each owner remains aspirational.
+
+The Browser Use profile holds the website's cookies inside Browser Use, and MCParrot stores only its ID.
+A sign-in browser's live view address works like a password while the browser runs, so MCParrot shows it only on the protected app page.
 Use encrypted storage and controlled access for saved credentials, cookies, and tokens.
 Before adding user-managed saved logins, provide durable encrypted storage, a separate managed encryption key, and server-enforced owner authorization for every access.
 Vercel deployment access alone does not establish product ownership for each credential record.
@@ -284,21 +321,22 @@ Define how long recordings are kept and how they are deleted before you store ca
 Sentry is a service that collects errors, traces, and logs to help find problems.
 Send task status, duration, and sanitized errors to Sentry.
 Do not send credentials, cookies, tokens, or verification codes.
-Do not assume that a Browser Use profile alone gives a secure way to transfer tokens.
 
 ## Workspace navigation behavior
 
 App and exploration pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/explore`.
-Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the apps and tasks saved in this browser.
-These addresses do not transfer a browser’s saved apps to another user or device.
-Select **Delete app** inside an app, then confirm inline to remove that app and its tasks from this browser and delete its recorded requests in the extension.
+Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tasks.
+The same apps appear on any device where Nathan opens the dashboard.
+Select **Delete app** inside an app, then confirm inline to remove that app and its tasks from MCParrot and delete its recorded requests in the extension.
 Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
 
 ## Running the frontend
 
 Use Node.js 24 or later.
-The frontend does not need a Browser Use API key, but discovery needs `CURSOR_API_KEY` in `.env.local`.
+The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
+That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
+The connection link appears only on Vercel, where `VERCEL_AUTOMATION_BYPASS_SECRET` exists.
 
 ```sh
 npm install
@@ -311,8 +349,8 @@ MCParrot Explorer connects to this local dashboard as well as to the production 
 
 ## Running the task runner
 
-The task runner sends one task to Browser Use Cloud.
-It is dormant and reserved for signing in and passing authentication when tasks run through MCP later.
+The task runner sends one natural-language task to a Browser Use Cloud agent.
+It is dormant: sign-in and task execution use Browser Use cloud browsers directly, not this runner.
 Use Node.js 24 or later, and have a Browser Use account.
 
 1. Install packages with `npm install`.
