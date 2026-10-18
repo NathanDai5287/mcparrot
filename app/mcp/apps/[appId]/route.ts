@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
-import { saveTask, toolName } from "../../../../lib/save-task";
+import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { readWorkspace } from "../../../../lib/workspace";
 
@@ -19,8 +19,15 @@ const textResult = (text: string) => ({ content: [{ type: "text" as const, text 
 
 function appServer(app: Website) {
   const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
+  const usedNames = new Set(connectionToolNames);
   for (const task of app.tasks.filter(isReadingTask)) {
-    server.registerTool(toolName(task.name), {
+    const idSuffix = task.id.slice(0, 8);
+    const baseName = toolName(task.name) || `task_${idSuffix}`;
+    const name = [baseName, `${baseName.slice(0, 55)}_${idSuffix}`].find((candidate) => !usedNames.has(candidate));
+    if (name !== toolName(task.name)) Sentry.logger.warn("Task tool name changed or skipped", { appId: app.id, taskId: task.id, toolName: name ?? null });
+    if (!name) continue;
+    usedNames.add(name);
+    server.registerTool(name, {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
@@ -44,16 +51,18 @@ function appServer(app: Website) {
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder, with the value from the page you read as the example."),
       returns: z.string().describe("What the task returns, in a few words."),
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
     description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a task result says that a code was sent.`,
     inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
   }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
   return server;
 }
 
-async function handle(request: Request, { params }: RouteContext<"/mcp/apps/[appId]">) {
+async function POST(request: Request, { params }: RouteContext<"/mcp/apps/[appId]">) {
   const { appId } = await params;
   Sentry.setTag("app.id", appId);
   const app = (await readWorkspace())?.find((candidate) => candidate.id === appId);
@@ -63,4 +72,9 @@ async function handle(request: Request, { params }: RouteContext<"/mcp/apps/[app
   return transport.handleRequest(request);
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+const methodNotAllowed = () => Response.json(
+  { jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null },
+  { status: 405, headers: { Allow: "POST" } },
+);
+
+export { POST, methodNotAllowed as GET, methodNotAllowed as DELETE };
