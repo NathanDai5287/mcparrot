@@ -161,6 +161,15 @@ function operationOf({ url, body }) {
   }
 }
 
+function digestOf(text) {
+  if (!text) return undefined;
+  return [0x811c9dc5, 0x01000193].map((seed) => {
+    let hash = seed;
+    for (const character of text) hash = Math.imul(hash ^ character.codePointAt(0), 16777619) >>> 0;
+    return hash.toString(16).padStart(8, "0");
+  }).join("");
+}
+
 function rememberRequest({ requestId, request }) {
   pendingRequests.delete(requestId);
   const url = new URL(request.url);
@@ -169,7 +178,7 @@ function rememberRequest({ requestId, request }) {
   if (pattern.length > maximumUrlLength) return;
   const tokenValues = Object.entries(request.headers ?? {}).filter(([name, value]) => tokenHeaderName.test(name) && value);
   const requestHeaders = replayedHeaders(request.headers);
-  const captured = { method: request.method, url: withoutSecrets(request.url), pattern, ...(tokenValues.length ? { tokenValues } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}) };
+  const captured = { method: request.method, url: withoutSecrets(request.url), rawUrl: request.url, pattern, ...(tokenValues.length ? { tokenValues } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}) };
   if (request.method === "GET") return pendingRequests.set(requestId, captured);
   const requestContentType = contentTypeOf(request.headers);
   pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), postData: request.postData, hasPostData: request.hasPostData });
@@ -222,7 +231,7 @@ function save(tabId, captured) {
     const { active } = await chrome.storage.session.get("active");
     if (active?.tabId !== tabId) return;
     const requests = await readRequests(active.appId);
-    if (requests.length >= maximumRequests || requests.some((request) => request.method === captured.method && request.pattern === captured.pattern && operationOf(request) === operationOf(captured))) return;
+    if (requests.length >= maximumRequests || requests.some((request) => request.method === captured.method && request.pattern === captured.pattern && request.operation === captured.operation)) return;
     await chrome.storage.local.set({ [explorationKey(active.appId)]: { recordedAt: Date.now(), requests: [...requests, captured] } });
   }).catch((error) => chrome.storage.session.set({ saveError: `Could not save a recorded request: ${error.message}` }));
 }
@@ -231,11 +240,12 @@ async function recordRequest(tabId, requestId) {
   const request = pendingRequests.get(requestId);
   pendingRequests.delete(requestId);
   if (!request?.data) return;
-  const { postData, hasPostData, tokenValues, data, ...captured } = request;
+  const { postData, hasPostData, tokenValues, data, rawUrl, ...captured } = request;
   const sentBody = await requestBody(tabId, requestId, { postData, hasPostData });
+  const operation = digestOf(operationOf({ url: rawUrl, body: sentBody }));
   const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
   const tokenHeaders = await tokenHeadersOf(tabId, tokenValues);
-  await save(tabId, { ...captured, ...(tokenHeaders.length ? { tokenHeaders } : {}), ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
+  await save(tabId, { ...captured, ...(operation ? { operation } : {}), ...(tokenHeaders.length ? { tokenHeaders } : {}), ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
 }
 
 async function recordPage(tabId) {
@@ -244,7 +254,7 @@ async function recordPage(tabId) {
   if (page?.contentType !== "text/html") return;
   const url = new URL(page.url);
   const pattern = url.origin + pathPattern(url);
-  if (!url.protocol.startsWith("http") || isAuthenticationPath(url.pathname) || pattern.length > maximumUrlLength) return;
+  if (!url.protocol.startsWith("http") || authenticationHost.test(url.hostname) || isAuthenticationPath(url.pathname) || pattern.length > maximumUrlLength) return;
   const sample = redactText(page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength * 2)).slice(0, maximumSampleLength);
   await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern, status: page.status, contentType: page.contentType, sample });
 }
