@@ -1,4 +1,4 @@
-const dashboardOrigins = ["https://mcparrot.vercel.app", "http://localhost:4317", "http://127.0.0.1:4317"];
+const dashboardOrigins = ["https://mcparrot.vercel.app", "http://localhost:4317"];
 const maximumRequests = 150;
 const maximumStringLength = 80;
 const maximumArrayItems = 2;
@@ -158,7 +158,7 @@ async function tokenHeadersOf(tabId, tokenValues = []) {
   const sources = evaluation?.result?.value ?? [];
   return tokenValues.flatMap(([name], index) => {
     const source = sources[index];
-    return source ? [{ header: name.toLowerCase(), fromLocalStorage: source.key, ...(source.prefix ? { prefix: source.prefix } : {}), ...(source.path ? { path: source.path } : {}) }] : [];
+    return source && source.key.length <= maximumHeaderLength && (source.path ?? "").length <= maximumHeaderLength ? [{ header: name.toLowerCase(), fromLocalStorage: source.key, ...(source.prefix ? { prefix: source.prefix } : {}), ...(source.path ? { path: source.path } : {}) }] : [];
   });
 }
 
