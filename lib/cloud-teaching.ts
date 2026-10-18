@@ -1,11 +1,11 @@
 import { APIError, Sandbox } from "@vercel/sandbox";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const browserApi = "https://api.browser-use.com/api/v4/browsers";
 const sessionDuration = 30 * 60 * 1000;
-export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "stop_recording", "test_saved_request", "end_teaching_session"] as const;
+export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "stop_recording", "test_saved_request", "end_teaching_session", "continue_canvas_signin", "submit_canvas_code"] as const;
 export type TeachingOperation = typeof teachingOperations[number];
 type Session = { sandboxName: string; browserId: string; appId: string; taskId: string; expiresAt: number };
 type TeachingResult = { session?: Session; state: Record<string, unknown> };
@@ -50,6 +50,40 @@ async function recorderOperation(sandbox: Sandbox, name: string, input: object =
   const result = JSON.parse(await command.stdout());
   if (result.error) throw new Error(result.error);
   return result;
+}
+
+function authenticationKey(sandbox: Sandbox) {
+  return createHmac("sha256", signingSecret()).update(`authentication:${sandbox.name}`).digest();
+}
+
+function encryptedAuthentication(sandbox: Sandbox, payload: object) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", authenticationKey(sandbox), iv);
+  const data = Buffer.concat([cipher.update(JSON.stringify(payload)), cipher.final()]);
+  return { iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), data: data.toString("base64") };
+}
+
+async function authenticationOperation(sandbox: Sandbox, name: string, payload: object) {
+  const lock = await sandbox.runCommand({ cmd: "mkdir", args: ["auth-start.lock"] });
+  if (lock.exitCode === 0) {
+    await sandbox.writeFiles([
+      { path: "cloud-auth.mjs", content: await readFile(join(process.cwd(), "cloud-auth.mjs")) },
+      { path: "auth-control.json", content: Buffer.from(JSON.stringify({ key: authenticationKey(sandbox).toString("hex") })) },
+    ]);
+    await sandbox.runCommand({ cmd: "node", args: ["cloud-auth.mjs"], detached: true });
+  }
+  const envelope = encryptedAuthentication(sandbox, payload);
+  const command = await sandbox.runCommand({ cmd: "curl", args: ["--silent", "--show-error", "--retry", "8", "--retry-connrefused", "--retry-delay", "1", "--max-time", "35", "-X", "POST", "-H", "Content-Type: application/json", "--data", JSON.stringify({ name, envelope }), "http://127.0.0.1:4324"] });
+  if (command.exitCode !== 0) throw new Error("The cloud sign-in helper is unavailable. Continue manually in the Canvas window.");
+  return JSON.parse(await command.stdout());
+}
+
+async function authenticationStatus(sandbox: Sandbox) {
+  const control = await sandbox.readFileToBuffer({ path: "auth-control.json" });
+  if (!control) return undefined;
+  const command = await sandbox.runCommand({ cmd: "curl", args: ["--silent", "--max-time", "5", "-X", "POST", "-H", "Content-Type: application/json", "--data", '{"name":"get_authentication_status"}', "http://127.0.0.1:4324"] });
+  if (command.exitCode !== 0) return { stage: "manual_required", message: "Automatic sign-in is unavailable. Continue in the Canvas window." };
+  return JSON.parse(await command.stdout());
 }
 
 async function teachingSandbox(name: string) {
@@ -111,8 +145,18 @@ export async function operateTeaching(name: TeachingOperation, session: Session 
     return { session: undefined, state: { ready: false, recording: false, candidates: [], ended: true } };
   }
   const sandbox = await Sandbox.get({ name: session.sandboxName });
-  const operation = name === "create_teaching_session" ? "get_teaching_status" : name;
-  const state = await recorderOperation(sandbox, operation, input);
+  const authenticationAction = name === "continue_canvas_signin" || name === "submit_canvas_code";
+  let authentication;
+  if (authenticationAction) {
+    await recorderOperation(sandbox, "stop_recording");
+    const code = (input as { code?: string }).code;
+    if (name === "submit_canvas_code" && (typeof code !== "string" || !/^\d{6,10}$/.test(code))) throw new Error("Enter the numeric text code from your phone.");
+    const payload = name === "continue_canvas_signin" ? { username: process.env.CANVAS_USERNAME, password: process.env.CANVAS_PASSWORD } : { code };
+    authentication = await authenticationOperation(sandbox, name, payload);
+  }
+  const operation = name === "create_teaching_session" || authenticationAction ? "get_teaching_status" : name;
+  const state = await recorderOperation(sandbox, operation, authenticationAction ? {} : input);
+  authentication ??= await authenticationStatus(sandbox);
   const browser = await browserRequest(`/${session.browserId}`) as Browser;
-  return { session, state: { ...state, liveUrl: browser.liveUrl, expiresAt: session.expiresAt } };
+  return { session, state: { ...state, authentication, liveUrl: browser.liveUrl, expiresAt: session.expiresAt } };
 }

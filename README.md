@@ -339,7 +339,7 @@ Neither value is sent to the browser, stored in the repository, or included in r
 A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
 Select **Connect Canvas** to open the hosted browser in a separate popup window; no local service or installation is involved.
 The popup opens on the user's click before the connection request, so the browser can allow it.
-The user signs in there and completes Duo, then returns to the task screen to start recording.
+Connect attempts Berkeley sign-in with the private pilot credentials, then asks for the text code inside MCParrot when that option is offered. The user can also sign in manually in the Canvas window.
 Browse course reading pages in the Canvas window and return to MCParrot to stop recording and review requests.
 Select **Open Canvas window** to focus or reopen the same hosted session without restarting it or deleting its captures.
 If the browser blocks the popup, allow popups for MCParrot and select the button again.
@@ -355,7 +355,31 @@ A test obtains matching cookies privately and sends the observed GET request wit
 It reports a result count or a syllabus-page check without storing the returned course data.
 The user can change the numeric course input for a second reading test.
 
-The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, and `end_teaching_session`.
+The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, `end_teaching_session`, `continue_canvas_signin`, and `submit_canvas_code`.
 The UI calls those operations; authenticated remote MCP exposure remains a parity gap and must use the same operations.
-This pilot does not infer unvisited actions, publish suggested tasks, store credentials, or support another school automatically.
+This pilot does not infer unvisited actions, publish suggested tasks, provide a multi-user credential vault, or support another school automatically.
 Cloud school sign-in, live capture, and direct replay require Nathan's production demonstration before their gaps can close; see the [status page](STATUS.md).
+
+
+## Private Canvas sign-in
+
+The private pilot reads `CANVAS_USERNAME` and `CANVAS_PASSWORD` from Sensitive Vercel production environment variables.
+These values belong to the single protected pilot owner; they are not a general credential-storage service.
+Connecting a browser starts a sign-in attempt; an existing session exposes **Sign in automatically** or **Check sign-in** without creating another browser.
+The authentication helper attaches to the existing Browser Use Cloud session and pauses request recording before sign-in.
+It only fills credentials on `https://auth.berkeley.edu/cas/login`, after checking that the form submits to that origin.
+It submits the password at most once per hosted session, and never automatically retries rejected credentials.
+
+The helper checks actual Duo controls and selects text verification for the approved phone ending in 2199 only when offered.
+It requests that text option once, opens the supported method selector when needed, and skips optional device trust.
+The user enters the code into MCParrot's code form; the helper submits it once for that explicit user action.
+A rejected code requires the user to enter a current code and submit again.
+Unsupported school policies or verification methods require manual action in the existing Canvas window; no phone approval is automated.
+**Check sign-in** observes the current page and continues supported steps without another password attempt or text request.
+After Canvas authentication is detected, the primary action becomes **Start recording**.
+
+Credentials and codes travel to the private Sandbox as AES-GCM encrypted envelopes, never as plaintext command arguments or files.
+The helper decrypts them only in memory and clears its payload after the action.
+It never sends these inputs to an AI model or includes them in captured requests, application responses, diagnostics, or documentation.
+The helper's control key stays inside the nonpersistent hosted session and is deleted with that session.
+Existing-session sign-in, SMS selection, code acceptance, and recording handoff remain a production proof gap until Nathan's live test passes.
