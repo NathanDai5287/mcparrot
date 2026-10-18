@@ -179,19 +179,17 @@ function capabilitiesFrom(reply: string, websiteUrl: string) {
   return capabilities;
 }
 
-async function createAgent(apiKey: string, cwd: string, storeDir: string) {
-  const options = (sandbox: boolean) => ({
+function agentOptions(apiKey: string, cwd: string, storeDir: string, sandbox: boolean) {
+  return {
     apiKey,
     model: { id: "composer-2.5", params: [{ id: "fast", value: "true" }] },
     tools: [],
     local: { cwd, settingSources: [], sandboxOptions: { enabled: sandbox }, store: new JsonlLocalAgentStore(storeDir) },
-  });
-  try {
-    return await Agent.create(options(true));
-  } catch (error) {
-    if (!(error instanceof Error) || !/sandboxing is not supported/i.test(error.message)) throw error;
-    return Agent.create(options(false));
-  }
+  };
+}
+
+function isSandboxUnsupported(error: unknown) {
+  return error instanceof Error && /sandboxing is not supported/i.test(error.message);
 }
 
 async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
@@ -203,13 +201,20 @@ async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
   const timeout = () => new DiscoveryError("timeout", 504, "Composer took too long. Try again, or explore fewer pages.");
   const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
   const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
+  const start = async (sandbox: boolean) => {
+    agent = await Agent.create(agentOptions(apiKey, dirs[0], dirs[1], sandbox));
+    if (timedOut) throw timeout();
+    return agent.send(prompt);
+  };
   const work = (async () => {
     dirs.push(await mkdtemp(join(tmpdir(), "discover-")));
     dirs.push(await mkdtemp(join(tmpdir(), "discover-store-")));
     if (timedOut) throw timeout();
-    agent = await createAgent(apiKey, dirs[0], dirs[1]);
-    if (timedOut) throw timeout();
-    run = await agent.send(prompt);
+    run = await start(true).catch(async (error) => {
+      if (!isSandboxUnsupported(error)) throw error;
+      await dispose();
+      return start(false);
+    });
     if (timedOut) await run.cancel();
     return run.wait();
   })();
