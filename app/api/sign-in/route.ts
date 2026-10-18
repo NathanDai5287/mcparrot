@@ -4,7 +4,7 @@ import { signedInUserId } from "../../../lib/account";
 import { browserUse, isGone, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
 import { appIdSchema } from "../../../lib/capabilities";
 import { stopPendingSignIn } from "../../../lib/login";
-import { ensureProfile } from "../../../lib/sign-in";
+import { ensureProfile, signInLockKey, withLock } from "../../../lib/sign-in";
 import { ownedApp, StorageUnavailable, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -12,6 +12,7 @@ export const maxDuration = 60;
 
 const signInMinutes = 15;
 const openPageTimeout = 10_000;
+const automaticSignInBusyMessage = "MCParrot is signing in to this website automatically. Wait a minute, then select Sign in to website again.";
 
 const SignInBody = z.object({ appId: appIdSchema });
 const StopQuery = z.object({ appId: appIdSchema, browserId: z.string().min(1) });
@@ -22,6 +23,14 @@ export async function POST(request: Request) {
   const body = SignInBody.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Missing appId." }, { status: 400 });
   const { appId } = body.data;
+  const started = await withLock(signInLockKey(appId), automaticSignInBusyMessage, () => openSignInBrowser(userId, appId)).catch((error) => {
+    Sentry.captureException(error);
+    return Response.json({ error: "Browser Use could not open a sign-in browser. Try again." }, { status: 502 });
+  });
+  return typeof started === "string" ? Response.json({ error: started }, { status: 409 }) : started;
+}
+
+async function openSignInBrowser(userId: string, appId: string) {
   let browser: Awaited<ReturnType<typeof startBrowser>>;
   let profileId: string;
   try {

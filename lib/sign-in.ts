@@ -66,7 +66,8 @@ ${finishSteps(website)}`;
 
 const pendingKey = pendingSignInKey;
 const readPendingSignIn = (appId: string) => Redis.fromEnv().get<PendingSignIn>(pendingKey(appId));
-const lockKey = (appId: string) => `sign-in-lock:${appId}`;
+export const signInLockKey = (appId: string) => `sign-in-lock:${appId}`;
+const lockKey = signInLockKey;
 const rejectedKey = rejectedLoginKey;
 const cooldownKey = signInCooldownKey;
 const releaseLockScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;

@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import { Redis } from "@upstash/redis";
-import { stopBrowser } from "./browser-use";
+import { isGone, stopBrowser } from "./browser-use";
 
 export type Login = { username: string; password: string; hosts: string[] };
 type SealedLogin = { v?: 1; kid?: string; iv: string; tag: string; data: string };
@@ -62,13 +62,13 @@ export async function stopPendingSignIn(appId: string) {
   if (!pending) return;
   try {
     await stopBrowser(pending.browserId);
-  } catch {
-    Sentry.logger.warn("Pending sign-in browser stop failed", { appId });
+  } catch (error) {
+    if (!isGone(error)) throw error;
   }
   await redis.del(pendingSignInKey(appId));
 }
 
 export async function deleteLogin(appId: string) {
-  await stopPendingSignIn(appId);
+  await stopPendingSignIn(appId).catch(() => Sentry.logger.warn("Pending sign-in browser stop failed", { appId }));
   await Redis.fromEnv().del(loginKey(appId), pendingSignInKey(appId), rejectedLoginKey(appId), signInCooldownKey(appId));
 }

@@ -1,5 +1,7 @@
-import { lookup } from "node:dns/promises";
-import { BlockList } from "node:net";
+import { lookup, type LookupAddress } from "node:dns";
+import http from "node:http";
+import https from "node:https";
+import { BlockList, isIP, type LookupFunction } from "node:net";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
@@ -17,21 +19,34 @@ const privateAddresses = new BlockList();
 for (const [network, prefix] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 3]] as const) privateAddresses.addSubnet(network, prefix, "ipv4");
 for (const [network, prefix] of [["::", 127], ["64:ff9b::", 96], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8]] as const) privateAddresses.addSubnet(network, prefix, "ipv6");
 
-async function publicAddress(url: URL) {
-  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
-  const addresses = await lookup(url.hostname.replace(/^\[|\]$/g, ""), { all: true });
-  return addresses.every(({ address, family }) => !privateAddresses.check(address, family === 6 ? "ipv6" : "ipv4"));
+const isPrivate = (address: string, family: number) => privateAddresses.check(address, family === 6 ? "ipv6" : "ipv4");
+
+const publicLookup: LookupFunction = (hostname, options, callback) => lookup(hostname, { ...options, all: true }, (error, addresses: LookupAddress[]) => {
+  if (error) return callback(error, "", 0);
+  if (!addresses.length || addresses.some(({ address, family }) => isPrivate(address, family))) return callback(new Error("The sign-in address is not a public address"), "", 0);
+  if (options.all) return callback(null, addresses);
+  callback(null, addresses[0].address, addresses[0].family);
+});
+
+function redirectOf(url: URL, signal: AbortSignal) {
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("The sign-in address is not a web address");
+  if (isIP(host) && isPrivate(host, isIP(host))) throw new Error("The sign-in address is not a public address");
+  return new Promise<{ status: number; location?: string }>((resolve, reject) => {
+    const request = (url.protocol === "https:" ? https : http).get(url, { lookup: publicLookup, signal, headers: { accept: "*/*", "user-agent": "node" } }, (response) => {
+      resolve({ status: response.statusCode ?? 0, location: response.headers.location });
+      response.destroy();
+    });
+    request.on("error", reject);
+  });
 }
 
 async function signInHost(website: URL) {
   const signal = AbortSignal.timeout(10_000);
   let url = website;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    if (!await publicAddress(url)) throw new Error("The sign-in address is not a public address");
-    const response = await fetch(url, { redirect: "manual", signal });
-    await response.body?.cancel();
-    const location = response.headers.get("location");
-    if (response.status < 300 || response.status >= 400 || !location) return url.hostname;
+    const { status, location } = await redirectOf(url, signal);
+    if (status < 300 || status >= 400 || !location) return url.hostname;
     url = new URL(location, url);
   }
   throw new Error("The sign-in address redirects too many times");
