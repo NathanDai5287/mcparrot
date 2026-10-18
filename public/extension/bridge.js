@@ -1,4 +1,4 @@
-const dashboardOrigins = ["https://mcparrot.vercel.app", "http://localhost:4317", "http://127.0.0.1:4317"];
+const dashboardOrigins = ["https://mcparrot.vercel.app", "http://localhost:4317"];
 const origin = window.location.origin;
 const version = chrome.runtime.getManifest().version;
 window.addEventListener("message", async (event) => {
