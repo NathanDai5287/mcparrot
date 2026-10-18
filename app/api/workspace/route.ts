@@ -1,5 +1,4 @@
 import { stopBrowser } from "../../../lib/browser-use";
-import { deleteLogin } from "../../../lib/login";
 import { addTasks } from "../../../lib/save-task";
 import { AppNotFound, changeApp, changeApps, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
@@ -22,26 +21,18 @@ export async function GET() {
   }
 }
 
-async function clearPendingSignIn(appId: string) {
+async function deleteApp(appId: string) {
   const pendingKey = `pending-sign-in:${appId}`;
-  const pending = await storage().get<{ browserId?: string }>(pendingKey);
+  const pending = await storage().get<{ browserId?: string }>(pendingKey).catch((error) => {
+    throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
+  });
+  const apps = await changeApps((apps) => apps.filter((app) => app.id !== appId), [`login:${appId}`, pendingKey]);
   if (pending?.browserId) {
     try {
       await stopBrowser(pending.browserId);
     } catch {}
   }
-  await storage().del(pendingKey);
-}
-
-async function deleteApp(appId: string) {
-  storage();
-  try {
-    await deleteLogin(appId);
-    await clearPendingSignIn(appId);
-  } catch (error) {
-    throw new StorageUnavailable("The app's saved login could not be deleted, so the app was kept. Try again.", { cause: error });
-  }
-  return changeApps((apps) => apps.filter((app) => app.id !== appId));
+  return apps;
 }
 
 function apply(change: WorkspaceOperation) {

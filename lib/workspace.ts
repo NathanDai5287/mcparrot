@@ -9,7 +9,8 @@ const retryPause = () => new Promise((resolve) => setTimeout(resolve, 20 + Math.
 
 const compareAndSet = `local current = redis.call("GET", KEYS[1]) or ""
 if current ~= ARGV[1] then return 0 end
-redis.call("SET", KEYS[1], ARGV[2])
+if ARGV[2] ~= current then redis.call("SET", KEYS[1], ARGV[2]) end
+for index = 2, #KEYS do redis.call("DEL", KEYS[index]) end
 return 1`;
 
 export const workspaceOperationSchema = z.discriminatedUnion("operation", [
@@ -52,8 +53,10 @@ function parseApps(raw: string | null): Website[] | null {
   return apps;
 }
 
+const isWellFormed = (app: unknown) => storedWebsiteSchema.safeParse(app).success;
+
 function wellFormed(apps: Website[]) {
-  const kept = apps.filter((app) => storedWebsiteSchema.safeParse(app).success);
+  const kept = apps.filter(isWellFormed);
   if (kept.length < apps.length) Sentry.logger.warn("Skipped malformed stored apps", { count: apps.length - kept.length });
   return kept;
 }
@@ -72,16 +75,17 @@ export async function readWorkspace() {
   return apps && wellFormed(apps);
 }
 
-export async function changeApps(change: (apps: Website[]) => Website[]) {
+export async function changeApps(change: (apps: Website[]) => Website[], deleteKeys: string[] = []) {
   for (let attempt = 0; attempt < changeAttempts; attempt++) {
     if (attempt) await retryPause();
     const raw = await readStoredWorkspace();
     const current = parseApps(raw) ?? [];
-    const apps = change(current);
-    checkLimits(current, apps);
-    const next = JSON.stringify(apps);
-    if (next === (raw ?? "[]")) return wellFormed(apps);
-    if (await stored((redis) => redis.eval(compareAndSet, [workspaceKey], [raw ?? "", next])) === 1) return wellFormed(apps);
+    const valid = wellFormed(current);
+    const apps = change(valid);
+    checkLimits(valid, apps);
+    const unchanged = raw === null && !apps.length;
+    const next = unchanged ? "" : JSON.stringify([...apps, ...current.filter((app) => !isWellFormed(app))]);
+    if (await stored((redis) => redis.eval(compareAndSet, [workspaceKey, ...deleteKeys], [raw ?? "", next])) === 1) return wellFormed(apps);
   }
   throw new StorageUnavailable("Storage is busy with other changes. Try again in a moment.");
 }
