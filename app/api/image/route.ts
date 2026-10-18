@@ -1,6 +1,6 @@
+import { auth } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
-import { signedInUserId } from "../../../lib/account";
 import { appIdSchema } from "../../../lib/capabilities";
 import { ImageError, viewImage } from "../../../lib/view-image";
 import { ownedApp } from "../../../lib/workspace";
@@ -11,7 +11,8 @@ export const maxDuration = 300;
 const ImageRequest = z.object({ appId: appIdSchema, url: z.string().trim().min(1).max(2000) });
 
 export async function POST(request: Request) {
-  const userId = await signedInUserId();
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in again to use MCParrot." }, { status: 401 });
   const body = ImageRequest.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Paste an image address first." }, { status: 400 });
   const app = await ownedApp(userId, body.data.appId);
