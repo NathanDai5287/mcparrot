@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The project description MCParrot submits on Devpost for LA Hacks 2026.">
+  <title>Devpost submission · MCParrot</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">MCParrot</a>
+      <p>A guide for Nathan</p>
+      <nav aria-label="Guide pages">
+        <p class="nav-label">The guide</p>
+        <ul>
+          <li><a href="index.html">The product</a></li>
+          <li><a href="status.html">What works today</a></li>
+          <li><a href="hackathon.html">LA Hacks 2026</a></li>
+          <li><a href="working-together.html">How we work together</a></li>
+          <li><a href="devpost.html" aria-current="page">Devpost submission</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="On this page">
+        <p class="nav-label">On this page</p>
+        <ul>
+          <li><a href="#problem">The Problem We Solve</a></li>
+          <li><a href="#browser-use">Browser Use Does the Work</a></li>
+          <li><a href="#sign-in">Signing In Once</a></li>
+          <li><a href="#tools">Running Every Tool</a></li>
+          <li><a href="#stay-signed-in">Staying Signed In</a></li>
+          <li><a href="#pays">An Agent That Pays</a></li>
+          <li><a href="#teach">Teaching a New Website</a></li>
+          <li><a href="#marketplace">Sharing Through the Marketplace</a></li>
+          <li><a href="#sentry">Where Sentry Helped</a></li>
+          <li><a href="#tracks">Tracks and Challenges</a></li>
+          <li><a href="#next">What Comes Next</a></li>
+          <li><a href="#links">Built With and Links</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main id="content">
+      <header>
+        <h1>MCParrot: Your Personal Web Agent</h1>
+        <p class="lead">This page holds the text MCParrot submits on Devpost.</p>
+      </header>
+
+      <p>MCParrot is a <strong>personal agent</strong> that uses the websites you already sign in to, so ChatGPT can get things done there for you. It is built on <strong>Browser Use</strong>, which gives the agent real cloud browsers that sign in as you, read pages as you, sign back in when a website forgets you, and pay at checkout when you approve. You teach MCParrot a website once by browsing it normally, and from then on you can ask ChatGPT for your syllabus, your grades, or tonight's dinner order. No website has to offer an official API (a doorway built for other programs), and you never write code. We built it for the LA Hacks <strong>Applied Intelligence</strong> track, with <strong>Best Use of Browser Use</strong> as our main company challenge and <strong>Best Use of Sentry</strong> alongside it.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Section</th><th scope="col">What it covers</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><a href="#problem">The Problem We Solve</a></th><td>Why assistants cannot help with the websites we use most</td></tr>
+            <tr><th scope="row"><a href="#browser-use">Browser Use Does the Work</a></th><td>The four jobs Browser Use does inside MCParrot</td></tr>
+            <tr><th scope="row"><a href="#sign-in">Signing In Once</a></th><td>How a person signs in a single time and stays remembered</td></tr>
+            <tr><th scope="row"><a href="#tools">Running Every Tool</a></th><td>How a hidden browser answers each ChatGPT request</td></tr>
+            <tr><th scope="row"><a href="#stay-signed-in">Staying Signed In</a></th><td>How the agent signs back in by itself</td></tr>
+            <tr><th scope="row"><a href="#pays">An Agent That Pays</a></th><td>How ordering works and how the card stays safe</td></tr>
+            <tr><th scope="row"><a href="#teach">Teaching a New Website</a></th><td>How MCParrot learns what a website can do</td></tr>
+            <tr><th scope="row"><a href="#marketplace">Sharing Through the Marketplace</a></th><td>How people share what they taught MCParrot</td></tr>
+            <tr><th scope="row"><a href="#sentry">Where Sentry Helped</a></th><td>What Sentry records and the bugs it found</td></tr>
+            <tr><th scope="row"><a href="#tracks">Tracks and Challenges</a></th><td>Where this project is entered and why</td></tr>
+            <tr><th scope="row"><a href="#next">What Comes Next</a></th><td>The parts that are not finished yet</td></tr>
+            <tr><th scope="row"><a href="#links">Built With and Links</a></th><td>Technologies, the live app, and the code</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section id="problem">
+        <h2>The Problem We Solve</h2>
+        <p>Every student knows the Canvas shuffle. You want one fact, like when the next problem set is due, so you sign in, click the course, click Assignments, scroll, and squint. ChatGPT would happily do this for you, but it cannot get into your account, and Canvas offers it no doorway. The same is true for Gradescope, for school portals, and for the food site where you order the same burrito every Tuesday. What these sites need is not a new API but an agent with a real browser, your sign-in, and good manners, and that is exactly what Browser Use makes possible.</p>
+      </section>
+
+      <section id="browser-use">
+        <h2>Browser Use Does the Work</h2>
+        <p>Inside MCParrot, Browser Use is the part that actually touches the web. MCParrot decides <em>what</em> should happen, and Browser Use's cloud browsers and agents make it happen on the real website. Each app gets its own Browser Use browser profile, which works like a personal browser that keeps that website's cookies between visits. Browser Use's built-in stealth, home-internet proxies, and automatic CAPTCHA solving keep these browsers looking like an ordinary person. Browser Use does four separate jobs:</p>
+        <ol>
+          <li>It opens a live browser where you sign in to the website once.</li>
+          <li>It runs every ChatGPT request in a hidden browser that is still signed in as you.</li>
+          <li>It runs an agent that signs you back in when the website signs you out.</li>
+          <li>It runs an agent that checks out and pays with Pay with Link after you approve.</li>
+        </ol>
+      </section>
+
+      <section id="sign-in">
+        <h2>Signing In Once</h2>
+        <p>Signing in is the moment where most automation gives up, so MCParrot hands it to a person and a real browser. When you select <strong>Sign in to website</strong>, MCParrot starts a Browser Use cloud browser on the app's profile and opens Browser Use's live view in a small window. You sign in exactly as you normally would, including Duo prompts, text-message codes, or "Continue with Google". When you select <strong>Done signing in</strong>, the browser closes, and the profile keeps your session for next time. MCParrot stores only the profile's ID, never the cookies themselves, so your session stays inside Browser Use.</p>
+      </section>
+
+      <section id="tools">
+        <h2>Running Every Tool</h2>
+        <p>Each tool MCParrot saves is a small, named job, such as "List assignments in a course" or "Read the syllabus". When ChatGPT calls one, MCParrot starts a hidden Browser Use browser on your profile and connects to it with Playwright, a library that controls a browser through code. The tool then asks the website for its data from inside your signed-in page, exactly as the page itself would, and returns the answer to ChatGPT. For whole pages, such as a Canvas syllabus, a <code>read_page</code> tool opens the page and returns its visible text. Every tool stays on the app's own website, gives up after 30 seconds, and closes its browser when it is done.</p>
+      </section>
+
+      <section id="stay-signed-in">
+        <h2>Staying Signed In</h2>
+        <p>Websites sign people out all the time, and a personal agent should not need a babysitter. When a tool finds the website signed out, MCParrot starts a Browser Use agent on the same profile and gives it your saved login as <strong>secret bindings</strong>. These are values the agent can type only into the website's own sign-in pages, without ever seeing them in its instructions. If the website texts you a code, the agent waits in its browser, ChatGPT asks you for the code in the chat, and a second agent run types it in and finishes. The agent never tries a rejected password twice, runs only one sign-in at a time for each app, and takes a ten-minute break after a failure.</p>
+      </section>
+
+      <section id="pays">
+        <h2>An Agent That Pays</h2>
+        <p>Reading your syllabus is nice, but the real test of a personal agent is whether it can buy you dinner. On shopping and food sites, a Browser Use agent fills the cart on your signed-in profile and stops at checkout. ChatGPT then shows you the items, fees, tip, and total before anything happens. Only after you approve does a second agent run pay with Browser Use's <strong>Pay with Link</strong>, which gives the agent a one-time card for that single purchase, so your real card number never reaches the agent or MCParrot. MCParrot's server also refuses to pay above your spending limit, if the total changed after you approved, or whenever Link is not in test mode, so every order in this version is safely pretend.</p>
+      </section>
+
+      <section id="teach">
+        <h2>Teaching a New Website</h2>
+        <p>Before the agent can work a website, MCParrot has to learn what that website can do. A small browser extension called MCParrot Explorer records the pages you open and what they ask the website's server for, with short samples of each answer. It skips passwords, cookies, and sign-in pages, and it blanks out anything that looks like a secret. Claude Opus 5.5, reached through the Cursor SDK, reads that recording and suggests tools, and you keep the ones you want. ChatGPT can also save a new tool on its own when it finds a useful page that no tool covers yet.</p>
+      </section>
+
+      <section id="marketplace">
+        <h2>Sharing Through the Marketplace</h2>
+        <p>Once one person has taught MCParrot a website, nobody else should have to start from scratch. The public marketplace lets you publish an app's tools, so anyone can add them to their own account with one click. A published app shares only its name, its website address, a short description, and its tool definitions. Your logins, your Browser Use profile, your recordings, and your private ChatGPT link never leave your account. Each person still signs in to the website through their own Browser Use browser, because a shared tool is a recipe, not a key.</p>
+      </section>
+
+      <section id="sentry">
+        <h2>Where Sentry Helped</h2>
+        <p>Sentry is our flight recorder, and it earned its keep on the very first night. MCParrot sends it errors, traces that time each Browser Use step and website request, logs of every tool result, recordings of dashboard sessions, and monitoring of the AI agent. Sentry caught three real failures on the live site, and each one now has a fix in the code. The cloud server could not find a Playwright file, the Cursor SDK tried to write to a folder it was not allowed to touch, and ChatGPT spoke a newer protocol version than our library knew. Sentry also strips the secret part of every ChatGPT link before saving anything, so the recorder never holds the keys.</p>
+      </section>
+
+      <section id="tracks">
+        <h2>Tracks and Challenges</h2>
+        <p>Our main company challenge is <strong>Best Use of Browser Use</strong>. Browser Use powers every moment where MCParrot meets a real website: signing in, running tools, signing back in, and paying. Our primary track is <strong>Applied Intelligence</strong>, because a personal web agent removes a chore people repeat every day. For <strong>Best Use of Sentry</strong>, we use error monitoring with Tracing, Logs, Session Replay, and AI agent monitoring, and Sentry evidence directly changed what we built. Every claim in this submission matches our public status page, which separates what works today from what is still being proven.</p>
+      </section>
+
+      <section id="next">
+        <h2>What Comes Next</h2>
+        <p>A few Browser Use features are built but still waiting for their first live proof. Ordering needs one complete purchase with Link in test mode, and then a first real DoorDash order. Signing back in with "Continue with Google" reuses the Google session that stays in the Browser Use profile, so the agent never needs a Google password, and it is being built right now. After that, we want tools that can change things on a website, not just read them, and a way for ChatGPT to set up new apps by itself.</p>
+      </section>
+
+      <section id="links">
+        <h2>Built With and Links</h2>
+        <p>MCParrot is built with Browser Use Cloud, Pay with Link, Playwright, Next.js, React, TypeScript, Vercel, Clerk, Upstash Redis, the Model Context Protocol, the Cursor SDK, Claude Opus 5.5, Sentry, and a Chrome extension. The <a href="https://mcparrot.vercel.app">live MCParrot app</a> is open to anyone with a Google account, and the <a href="https://mcparrot.vercel.app/marketplace">public marketplace</a> works without signing in. The <a href="https://github.com/NathanDai5287/mcparrot">MCParrot source code on GitHub</a> includes the full product specification and the status page, and the <a href="https://mcparrot.vercel.app/docs">plain-language product guide</a> explains every feature without code.</p>
+      </section>
+
+      <footer>
+        <p><a href="index.html">← Back to the product guide</a></p>
+        <p>Devpost submission · Updated October 17, 2026</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
