@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "MCParrot Explorer",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Record the pages you open and the data requests they make in the tab you open from MCParrot, with short samples, redacted request bodies, a few safe request headers, sign-in header names without their values, and no cookies.",
-  "permissions": ["storage", "debugger"],
-  "minimum_chrome_version": "102",
+  "permissions": ["storage", "unlimitedStorage", "debugger"],
+  "minimum_chrome_version": "118",
   "background": { "service_worker": "background.js" },
   "content_scripts": [{ "matches": ["https://mcparrot.vercel.app/*", "http://localhost:4317/*", "http://127.0.0.1:4317/*"], "js": ["bridge.js"] }]
 }
