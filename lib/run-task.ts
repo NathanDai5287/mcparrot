@@ -209,12 +209,12 @@ async function readRequests(page: Page, website: string, requests: RequestFiller
   return results.join("\n\n");
 }
 
-function readImage(page: Page, website: string, url: string) {
+function readImage(page: Page, url: string, website?: string) {
   return Sentry.startSpan({ name: "image.read" }, async (span) => {
     const navigation = await page.goto(url, { waitUntil: "load", timeout: requestTimeout });
-    requireOnWebsite(page, website);
+    if (website) requireOnWebsite(page, website);
     const status = navigation?.status() ?? 200;
-    if (status === 401 || status === 403) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
+    if (website && (status === 401 || status === 403)) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
     if (status >= 400) throw httpError("GET", url, status);
     const contentType = navigation?.headers()["content-type"]?.split(";")[0].trim().toLowerCase() ?? "";
     if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, or GIF image, so MCParrot did not read it.`);
@@ -253,7 +253,7 @@ function failureReason(error: Error): Reason {
   return "failed";
 }
 
-function logOutcome(name: string, attributes: Record<string, string | number>, read: (steps: RunSteps) => Promise<string>) {
+function logOutcome(name: string, attributes: Record<string, string | number | boolean>, read: (steps: RunSteps) => Promise<string>) {
   return Sentry.startSpan({ name: "task.run", attributes: { "task.kind": name } }, async () => {
     const steps: RunSteps = {};
     try {
@@ -288,7 +288,19 @@ export function readPage(app: Website, url: string) {
   return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps));
 }
 
+async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>) {
+  const context = await page.context().browser()!.newContext();
+  try {
+    return await read(await context.newPage());
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
+
 export function readImageDataUrl(app: Website, url: string) {
-  const address = addressOnWebsite(app, url);
-  return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => readImage(page, new URL(app.url).origin, address.href)));
+  const website = new URL(app.url).origin;
+  const address = new URL(url, website);
+  if (isOnWebsite(address, website)) return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => readImage(page, address.href, website)));
+  if (address.protocol !== "https:") throw new TaskError("off_site", `MCParrot only opens images on ${website} or at https addresses on other websites.`);
+  return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, (page) => inEmptyContext(page, (emptyPage) => readImage(emptyPage, address.href))));
 }
