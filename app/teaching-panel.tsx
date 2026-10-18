@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 type Candidate = { id: string; label: string; kind: string; courseId: string };
 type TeachingState = {
   ready: boolean; recording: boolean; candidates: Candidate[]; liveUrl?: string; expiresAt?: number;
+  authentication?: { stage: string; message: string; rejected?: boolean };
   lastTest?: { requestId: string; courseId: string; changedInput: boolean; success: boolean; resultCount: number | null };
 };
 const emptyState: TeachingState = { ready: false, recording: false, candidates: [] };
@@ -22,6 +23,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   const [selectedId, setSelectedId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [testFailed, setTestFailed] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
   const browserWindow = useRef<Window | null>(null);
   const supported = new URL(websiteUrl).origin === "https://bcourses.berkeley.edu";
 
@@ -76,6 +78,14 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
       return;
     }
     teachingWindow.location.href = interactiveBrowserUrl(next.liveUrl);
+    await operate("continue_canvas_signin");
+  }
+
+  async function submitVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = verificationCode;
+    setVerificationCode("");
+    await operate("submit_canvas_code", { code });
   }
 
   useEffect(() => {
@@ -88,6 +98,8 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   const step = !state.ready ? "connect" : state.recording || state.candidates.length === 0 ? "teach" : "review";
   const selected = state.candidates.find(({ id }) => id === selectedId);
   const liveUrl = state.liveUrl ? interactiveBrowserUrl(state.liveUrl) : undefined;
+  const authentication = state.authentication;
+  const verificationRequired = authentication?.stage === "verification_required";
 
   return <section className="teaching-pilot" aria-label="Teach this task" aria-busy={busy}>
     <ol className="teaching-progress"><li aria-current={step === "connect" ? "step" : undefined}>Connect</li><li aria-current={step === "teach" ? "step" : undefined}>Teach</li><li aria-current={step === "review" ? "step" : undefined}>Review</li></ol>
@@ -99,14 +111,23 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
     </div>}
     {state.ready && <>
       <div className="teaching-step">
-        <h2>{state.recording ? "Show us the pages you use" : state.candidates.length ? "Review what we observed" : "Sign in, then start recording"}</h2>
-        <p>{state.recording ? "Browse course reading pages in the Canvas window. Return here to stop recording when you finish." : state.candidates.length ? "Choose one reading request and test it without navigating Canvas again." : "Sign in and complete Duo in the Canvas window. Return here to start recording after you reach Canvas."}</p>
+        <h2>{state.recording ? "Show us the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "Canvas is ready" : "Continue Canvas sign-in"}</h2>
+        <p>{state.recording ? "Browse course reading pages in the Canvas window. Return here to stop recording when you finish." : state.candidates.length ? "Choose one reading request and test it without navigating Canvas again." : authentication?.stage === "signed_in" ? "Start recording, then browse the course pages you want to teach." : "We can enter your saved Berkeley sign-in details. You complete the text-code check here."}</p>
         <div className="pilot-controls">
           {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open Canvas window</button>}
-          {state.recording ? <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Stop recording</button> : state.candidates.length === 0 && <button className="button primary" disabled={busy} onClick={() => operate("start_recording")}>Start recording</button>}
+          {state.recording ? <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Stop recording</button> : state.candidates.length === 0 && authentication?.stage === "signed_in" && <button className="button primary" disabled={busy} onClick={() => operate("start_recording")}>Start recording</button>}
           <span>{state.recording ? "Recording course reading requests" : `${state.candidates.length} observed requests`}</span>
         </div>
       </div>
+      {!state.recording && state.candidates.length === 0 && authentication?.stage !== "signed_in" && <div className="pilot-review">
+        {authentication && <p role="status">{authentication.message}</p>}
+        {verificationRequired ? <form onSubmit={submitVerification} className="verification-form">
+          <label htmlFor={`verification-${taskId}`}>Text verification code</label>
+          <input id={`verification-${taskId}`} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required />
+          <button className="button primary" disabled={busy} type="submit">{busy ? "Checking code…" : "Submit code"}</button>
+        </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_canvas_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
+        <p className="field-help">You can also continue manually in the Canvas window. We never approve your phone verification for you.</p>
+      </div>}
       {state.candidates.length > 0 && !state.recording && <div className="pilot-candidates">
         <label htmlFor={`request-${taskId}`}>Suggested reading task</label>
         <select id={`request-${taskId}`} value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setCourseId(state.candidates.find(({ id }) => id === event.target.value)?.courseId ?? ""); }}>
@@ -119,7 +140,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
         <p>This session and its observed requests remain available here until the session ends. Only reading requests are supported.</p>
         <p>Task publication and assistant connections are not available yet.</p>
         {selected && <label htmlFor={`course-${taskId}`}>Test another course ID<input id={`course-${taskId}`} inputMode="numeric" pattern="[0-9]+" value={courseId} onChange={(event) => setCourseId(event.target.value)} /></label>}
-        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace recording</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
+        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace recording</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
       </details>
     </>}
     {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The browser connection ended. Close this session before opening another.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}

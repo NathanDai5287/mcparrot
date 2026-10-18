@@ -34,6 +34,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
 | Local Berkeley sign-in diagnostic | dormant | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
 | Local headless browser launcher | dormant | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
+| Cloud Canvas sign-in | gap | Protected saved-credential and in-app SMS operations exist; automatic remote checks and Nathan’s production sign-in test must pass |
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
@@ -53,7 +54,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Private pilot access | gap | Vercel Authentication protects all production and preview pages; production access and cloud session ownership need a live check |
 | Owner authentication | aspirational | Product accounts, MCP authorization, and multi-user ownership remain unavailable |
 | Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it |
-| Saved credentials | aspirational | Store optional sign-in credentials with encryption and controlled access |
+| Private pilot credentials | gap | The single owner can configure Sensitive production credentials; encrypted cloud delivery and the live school flow need a production demonstration |
+| Saved credentials | aspirational | A multi-user credential vault and user-managed saved credentials remain unavailable |
 | Secure session transfer | aspirational | Prove how session tokens move to request replay without exposing them |
 | Persistent storage | aspirational | Store apps, tasks, and operation status in managed PostgreSQL |
 | Sentry monitoring | aspirational | Add error monitoring, Tracing, and Logs across the complete path |
@@ -84,6 +86,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Production teaching has hosted connection and recorder source, but no live school proof, durable captures, or remote assistant connection. No local helper is used.
 - Capture passed its narrow live check; direct replay still needs a successful test and result review.
 - Hosted captures remain in a nonpersistent task session for at most 30 minutes. Worker failure or session deletion loses them; replacing a recording removes its earlier candidates.
+- Cloud saved-credential submission, SMS selection, and the in-app code handoff need Nathan’s live production test; school policies may require manual action.
 - The automatic Duo steps in the diagnostic have not had a full clean rerun.
 - The diagnostic works only for the Berkeley sign-in page and only on Nathan's computer.
 
