@@ -114,7 +114,7 @@ function httpError(method: string, url: string, status: number) {
 async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
   await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
   if (looksSignedOut(page.url())) return signedOut();
-  return new TaskError("off_site", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
+  return new TaskError("fetch_failed", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
 }
 
 async function readRequest(page: Page, website: string, request: FilledRequest) {
