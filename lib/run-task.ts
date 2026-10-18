@@ -6,6 +6,7 @@ import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
 import { isAllowedRequest, isOnWebsite, paymentRefusal, replaceBodyPlaceholders, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern, type BodyPlace, type PlaceholderReplacer } from "./task-request";
 
 const maximumResponseCharacters = 100_000;
+const compactedResponseCharacters = 1_000_000;
 const requestTimeout = 30_000;
 const networkQuietTimeout = 5_000;
 const shortPageWait = 2_000;
@@ -25,10 +26,11 @@ const dotSegment = /^(\.|%2e){1,2}$/i;
 const jsonLiteral = /^(-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?|true|false|null)$/;
 export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
 
-export const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
-export const csrfRefusedMessage = "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
+const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
+const csrfRefusedMessage = "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
+const outOfTimeMessage = "This call ran out of time, so MCParrot stopped it. If the tool changes something on the website, check the website before trying again.";
 
-export type TaskInputs = Record<string, string | undefined>;
+type TaskInputs = Record<string, string | undefined>;
 
 type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "not_image" | "image_too_large" | "bad_input" | "failed";
 
@@ -56,6 +58,8 @@ export const isRunnableTask = (task: Task) => task.requests.length > 0 && task.r
 
 const jsonEscaped = (value: string) => JSON.stringify(value).slice(1, -1);
 
+const exactIntegers = (_key: string, value: unknown, context?: { source: string }) => typeof value === "number" && !Number.isSafeInteger(value) && context && /^-?\d+$/.test(context.source) ? (JSON as JSON & { rawJSON: (text: string) => unknown }).rawJSON(context.source) : value;
+
 const valueAt = (value: unknown, key: string) => value !== null && typeof value === "object" && Object.hasOwn(value, key) ? (value as Record<string, unknown>)[key] : undefined;
 
 function parsedResponse(responses: StepResponse[], step: number, placeholder: string) {
@@ -63,7 +67,7 @@ function parsedResponse(responses: StepResponse[], step: number, placeholder: st
   const { body, truncated } = responses[step - 1];
   if (truncated) throw new TaskError("missing_step_value", `The response of step ${step} is longer than ${maximumResponseCharacters.toLocaleString("en-US")} characters, so this tool could not fill ${placeholder}.`);
   try {
-    return JSON.parse(body) as unknown;
+    return JSON.parse(body, exactIntegers) as unknown;
   } catch {
     throw new TaskError("missing_step_value", `Step ${step} did not return JSON, so this tool could not fill ${placeholder}.`);
   }
@@ -174,7 +178,7 @@ function fetchInPage(page: Page, request: FilledRequest) {
       } catch (error) {
         return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "", truncated: false };
       }
-    }, { request, csrfPageSelectors, limit: maximumResponseCharacters, timeout: requestTimeout });
+    }, { request, csrfPageSelectors, limit: compactedResponseCharacters, timeout: requestTimeout });
     span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
     return response;
   });
@@ -236,7 +240,7 @@ async function readRequest(page: Page, website: string, request: FilledRequest, 
   if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, truncated: response.truncated, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body.slice(0, maximumResponseCharacters), truncated: response.truncated || response.body.length > maximumResponseCharacters, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
   const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url));
   if (status >= 400) throw httpError(method, url, status);
   const body = text.slice(0, maximumResponseCharacters);
@@ -305,15 +309,23 @@ function readImage(page: Page, url: string, website?: string) {
   });
 }
 
-async function inSignedInBrowser(app: Website, steps: RunSteps, read: (page: Page) => Promise<string>) {
+type Closable = { close: () => Promise<unknown> };
+
+async function inSignedInBrowser(app: Website, steps: RunSteps, signal: AbortSignal | undefined, read: (page: Page, deadline: number, closeOnStop: (target: Closable) => void) => Promise<string>) {
+  const deadline = Date.now() + runBudget;
   if (!app.browserProfileId) throw signedOut();
-  return withWarmPage(app.id, app.browserProfileId, steps, read);
+  const stopped = AbortSignal.any([AbortSignal.timeout(runBudget), ...(signal ? [signal] : [])]);
+  const onStop = (stop: () => void) => stopped.aborted ? stop() : stopped.addEventListener("abort", stop, { once: true });
+  const closeOnStop = (target: Closable) => onStop(() => void target.close().catch(() => undefined));
+  const expired = new Promise<never>((_, reject) => onStop(() => reject(new TaskError("timeout", outOfTimeMessage))));
+  return Promise.race([withWarmPage(app.id, app.browserProfileId, steps, (page) => {
+    closeOnStop(page);
+    return read(page, deadline, closeOnStop);
+  }), expired]);
 }
 
-const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = []) => {
-  const deadline = Date.now() + runBudget;
-  return inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields, deadline));
-};
+const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = [], signal?: AbortSignal) =>
+  inSignedInBrowser(app, steps, signal, (page, deadline) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields, deadline));
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -340,10 +352,10 @@ function logOutcome(name: string, attributes: Record<string, string | number | b
   });
 }
 
-export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer = false) {
+export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer = false, signal?: AbortSignal) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, (steps) => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields);
+    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields, signal);
   });
 }
 
@@ -354,13 +366,14 @@ export function addressOnWebsite(app: Website, url: string) {
   return address;
 }
 
-export function readPage(app: Website, url: string) {
+export function readPage(app: Website, url: string, signal?: AbortSignal) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps));
+  return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps, [], signal));
 }
 
-async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>) {
+async function inEmptyContext(page: Page, closeOnStop: (target: Closable) => void, read: (page: Page) => Promise<string>) {
   const context = await page.context().browser()!.newContext();
+  closeOnStop(context);
   try {
     return await read(await context.newPage());
   } finally {
@@ -368,11 +381,11 @@ async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>)
   }
 }
 
-export function readImageDataUrl(app: Website, url: string) {
+export function readImageDataUrl(app: Website, url: string, signal?: AbortSignal) {
   const website = new URL(app.url).origin;
   const address = URL.parse(url, website);
   if (!address) throw new TaskError("bad_input", `${withoutQuery(url)} is not a valid address, so MCParrot did not read it.`);
-  if (isOnWebsite(address, website)) return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => readImage(page, address.href, website)));
+  if (isOnWebsite(address, website)) return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, signal, (page) => readImage(page, address.href, website)));
   if (address.protocol !== "https:") throw new TaskError("off_site", `MCParrot only opens images on ${website} or at https addresses on other websites.`);
-  return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, (page) => inEmptyContext(page, (emptyPage) => readImage(emptyPage, address.href))));
+  return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, signal, (page, _deadline, closeOnStop) => inEmptyContext(page, closeOnStop, (emptyPage) => readImage(emptyPage, address.href))));
 }

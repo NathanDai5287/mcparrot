@@ -129,7 +129,7 @@ function looksLikePaymentBody(body: string) {
   return hasPaymentWords(body) || (parsed !== undefined && hasPaymentWords(jsonStrings(parsed.value).join(" ")));
 }
 
-export const looksLikePayment = ({ urlPattern, bodyPattern = "" }: TaskRequest) => hasPaymentWords(urlPattern) || looksLikePaymentBody(bodyPattern);
+const looksLikePayment = ({ urlPattern, bodyPattern = "" }: TaskRequest) => hasPaymentWords(urlPattern) || looksLikePaymentBody(bodyPattern);
 
 export function isAllowedRequest(request: TaskRequest) {
   const method = request.method.toUpperCase();
