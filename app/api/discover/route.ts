@@ -178,17 +178,17 @@ function capabilitiesFrom(reply: string, app: Website) {
   try {
     parsed = firstJsonObject(reply);
   } catch {
-    throw new DiscoveryError("invalid_reply", 502, "Claude did not reply with capabilities. Try again.");
+    throw new DiscoveryError("invalid_reply", 502, "MCParrot could not find tools this time. Try again.");
   }
   const result = replySchema.safeParse(parsed);
-  if (!result.success) throw new DiscoveryError("invalid_reply", 502, "Claude did not reply with capabilities. Try again.");
+  if (!result.success) throw new DiscoveryError("invalid_reply", 502, "MCParrot could not find tools this time. Try again.");
   const origin = new URL(app.url).origin;
   const capabilities = result.data.capabilities.slice(0, maximumCandidates).flatMap((item) => {
     const capability = capabilitySchema.safeParse(item);
     return capability.success && isUsable(capability.data, origin) ? [{ ...capability.data, requests: capability.data.requests.map((request) => ({ ...request, method: "GET" })) }] : [];
   });
   const unsaved = unsavedCapabilities(app, capabilities).slice(0, maximumCapabilities);
-  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `Claude found no reading tools on ${origin}. Explore more pages, then try again.`);
+  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `MCParrot found no reading tools on ${origin}. Explore more pages, then try again.`);
   return unsaved;
 }
 
@@ -211,7 +211,7 @@ async function runDiscoveryAgent(prompt: string, apiKey: string): Promise<RunRes
   let run: Run | undefined;
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = () => new DiscoveryError("timeout", 504, "Claude took too long. Try again, or explore fewer pages.");
+  const timeout = () => new DiscoveryError("timeout", 504, "Finding tools took too long. Try again, or explore fewer pages.");
   const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
   const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
   const start = async (sandbox: boolean) => {
@@ -322,7 +322,7 @@ export async function POST(request: Request) {
     const result = await askDiscoveryAgent(discoveryPrompt(app, requests), apiKey, requests.length);
     if (result.status !== "finished" || !result.result) {
       Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
-      return Response.json({ error: "Claude returned no capabilities. Explore more pages, then try again." }, { status: 502 });
+      return Response.json({ error: "MCParrot found no tools. Explore more pages, then try again." }, { status: 502 });
     }
     const latestApp = await savedApp(userId, appId);
     const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp) };
@@ -342,6 +342,6 @@ export async function POST(request: Request) {
     }
     Sentry.logger.warn("Discovery failed", { reason: "agent_error" });
     Sentry.captureException(error);
-    return Response.json({ error: `Claude could not read the requests (${error.message}). Try again.` }, { status: 502 });
+    return Response.json({ error: `MCParrot could not read the requests (${error.message}). Try again.` }, { status: 502 });
   }
 }
