@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { maxOrderLimitUsd, type Ordering, type Website } from "../lib/capabilities";
 import type { Cart, OrderView } from "../lib/order";
+import { SetupCard } from "./setup-card";
 
 type LinkView = { connected: boolean; mode: "test" | "live" | null } | null;
 type OrderAction = { action: "prepare"; request: string } | { action: "place" | "cancel"; orderId: string };
@@ -122,14 +123,11 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
     await refresh();
   }
 
-  return <section className="assistant-section order-section">
-    <div>
-      <h2>Ordering</h2>
-      <p>Let ChatGPT order from {app.name} with Browser Use Pay with Link. MCParrot always shows the cart and total first, and it places orders only while Link is in test mode. Remove every card saved in your {app.name} account before you test, because MCParrot cannot fully stop the agent from using one.</p>
-      <p>{linkStatusText(link)}</p>
-    </div>
+  return <SetupCard title="Ordering" status={app.ordering?.enabled ? "On" : "Off"}>
+    <p>Let ChatGPT order from {app.name} with Browser Use Pay with Link. MCParrot always shows the cart and total first, and it places orders only while Link is in test mode. Remove every card saved in your {app.name} account before you test, because MCParrot cannot fully stop the agent from using one.</p>
+    <p>{linkStatusText(link)}</p>
     <OrderingSettings app={app} onSave={onSave} />
     {app.ordering?.enabled && <TestOrder app={app} order={order} busy={busy} onAction={send} />}
     {error && <p className="pilot-error" role="alert">{error}</p>}
-  </section>;
+  </SetupCard>;
 }

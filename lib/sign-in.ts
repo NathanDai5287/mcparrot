@@ -20,11 +20,11 @@ const failedCooldownSeconds = 600;
 const agentRunMaxCostUsd = 2;
 const codeSentMessage = "MCParrot is signing in to the website, and the website sent a text-message code to the user's phone. Ask the user for that code, then call submit_verification_code with it.";
 const codeRejectedMessage = "The website rejected that code. Ask the user for a new text-message code, then call submit_verification_code with it.";
-const signInFinishedMessage = "Sign-in finished. Run the original task again.";
+const signInFinishedMessage = "Sign-in finished. Run the original tool again.";
 const passwordRejectedMessage = "The website rejected the saved login. Open MCParrot, replace the login for this app, then try again.";
 const signInFailedMessage = "Browser Use could not finish signing in. Open MCParrot and select Sign in to website on this app, then try again.";
-const noPendingSignInMessage = "No sign-in is waiting for a code. Run the original task again to start signing in.";
-const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original task again.";
+const noPendingSignInMessage = "No sign-in is waiting for a code. Run the original tool again to start signing in.";
+const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original tool again.";
 const signInTimedOutMessage = "Signing in to the website took too long. Wait a few minutes, then try again, or open MCParrot and select Sign in to website on this app.";
 const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, signInInProgressMessage, signInTimedOutMessage]);
 

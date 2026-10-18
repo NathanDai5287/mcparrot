@@ -24,15 +24,15 @@ export default async function MarketplacePage() {
       <div className="page">
         <div className="topbar"><span>Marketplace</span>{!userId && <a className="button" href="/sign-in?redirect_url=/marketplace">Sign in</a>}</div>
         <main id="main-content">
-          <header className="page-header"><div><h1>Marketplace</h1><p>Apps that other people taught MCParrot. Add one to your apps, sign in to the website yourself, and use its tasks in ChatGPT.</p></div></header>
+          <header className="page-header"><div><h1>Marketplace</h1><p>Apps that other people taught MCParrot. Add one to your apps, sign in to the website yourself, and use its tools in ChatGPT.</p></div></header>
           <div className="section-heading"><h2>Published apps <span>{listings.length}</span></h2><span>Logins and sign-ins are never shared</span></div>
-          {listings.length === 0 ? <section className="empty-state"><h3>No apps yet</h3><p>Publish an app from its page to share its tasks here.</p></section> : <div className="app-list">{listings.map((listing) => <article className="task-row" id={listing.id} key={listing.id}>
+          {listings.length === 0 ? <section className="empty-state"><h3>No apps yet</h3><p>Publish an app from its page to share its tools here.</p></section> : <div className="app-list">{listings.map((listing) => <article className="listing-row" id={listing.id} key={listing.id}>
             <span className="app-mark">{listing.name.charAt(0).toUpperCase()}</span>
             <span className="app-main">
               <span className="app-name">{listing.name}{listing.supportsOrdering && <span className="badge">Supports ordering</span>}</span>
               <span className="website-address">{listing.url}</span>
               <span className="website-address">{listing.description}</span>
-              <span className="website-address">{listing.taskNames.length} {listing.taskNames.length === 1 ? "task" : "tasks"}: {listing.taskNames.join(", ") || "none"}</span>
+              <span className="website-address">{listing.taskNames.length} {listing.taskNames.length === 1 ? "tool" : "tools"}: {listing.taskNames.join(", ") || "none"}</span>
               <span className="website-address">Published by {listing.publisher} on {publishedDate(listing.publishedAt)}</span>
             </span>
             <AddToMyApps listingId={listing.id} signedIn={!!userId} />

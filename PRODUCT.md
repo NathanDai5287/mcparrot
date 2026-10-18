@@ -19,18 +19,18 @@ Nathan is the only real user today, and hackathon judges watch the product durin
 ## Product Purpose
 
 MCParrot turns a website into a set of ChatGPT tools.
-A person browses the site once in their own browser, MCParrot finds what the site can do, and the person chooses which tasks to keep.
-ChatGPT then runs those tasks in a signed-in cloud browser, without the person clicking through the site again.
+A person browses the site once in their own browser, MCParrot finds what the site can do, and the person chooses which tools to keep.
+ChatGPT then runs those tools in a signed-in cloud browser, without the person clicking through the site again.
 Success means a person can ask ChatGPT for something on a site with no official API and get the right answer.
 
 ## Positioning
 
 MCParrot makes any website a ChatGPT tool after one browse in the person's own browser, with no official API and no code.
-Other assistants can browse the web, but they do not learn a person's own signed-in sites once and keep reusable tasks for them.
+Other assistants can browse the web, but they do not learn a person's own signed-in sites once and keep reusable tools for them.
 
 ## Operating Context
 
-A person works through three steps on the dashboard: explore the website, find what it can do, and choose the tasks to keep.
+A person works through three steps on the dashboard: explore the website, find what it can do, and choose the tools to keep.
 Exploring happens in the person's normal Chrome or Edge browser through the MCParrot Explorer extension.
 The person then signs in once in a cloud browser and copies a connection link into ChatGPT.
 After that, most use happens inside ChatGPT, so the dashboard is a place people visit to set things up, not to work in every day.

@@ -1,8 +1,8 @@
 # MCParrot
 
 MCParrot turns the website pages you explore into proposed tools your assistant can use.
-You browse once, choose suggested tasks, sign in once in a Browser Use cloud browser, and connect ChatGPT to run those tasks.
-One website app can contain many saved tasks.
+You browse once, choose suggested tools, sign in once in a Browser Use cloud browser, and connect ChatGPT to run those tools.
+One website app can contain many saved tools.
 Canvas is a useful example, not a product limit.
 
 This document is the single home for product behavior, architecture, and local setup.
@@ -19,15 +19,15 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [What the product does](#what-the-product-does) | The product goal, its two phases, and what MCP means |
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | One private connection link per website app, and the later management connection |
-| [Teaching website tasks](#teaching-website-tasks) | How a user explores a website, finds what it can do, and chooses tasks |
+| [Teaching website tools](#teaching-website-tools) | How a user explores a website, finds what it can do, and chooses tools |
 | [Discovery data sent to Composer](#discovery-data-sent-to-composer) | What discovery sends to Cursor Composer and what it never includes |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Signing in to websites](#signing-in-to-websites) | How the user signs in once in a Browser Use cloud browser |
-| [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
+| [Using saved tools](#using-saved-tools) | How ChatGPT runs saved tools and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
 | [Ordering with Pay with Link](#ordering-with-pay-with-link) | How ChatGPT and the app page place test-mode orders that Browser Use pays for with Stripe Link |
 | [Accounts and ownership](#accounts-and-ownership) | Sign-in with Clerk, one workspace for each user, and the owner-only features |
-| [Shared app marketplace](#shared-app-marketplace) | Publishing an app's tasks, browsing the marketplace, and adding a shared app |
+| [Shared app marketplace](#shared-app-marketplace) | Publishing an app's tools, browsing the marketplace, and adding a shared app |
 | [Production deployment setup](#production-deployment-setup) | Publishing on request, hosting, storage, and the service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Account access, the connection link token, saved logins, and recordings |
 | [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
@@ -37,14 +37,16 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 
 ## What the product does
 
-Users explore website pages once, review suggested tasks, then request tested tasks through an assistant.
+Users explore website pages once, review suggested tools, then request tested tools through an assistant.
 After that, they do not need to navigate the website for each request.
-The product has two separate phases: teaching a task, and using the saved task later.
+The product has two separate phases: teaching a tool, and using the saved tool later.
 
 MCP means Model Context Protocol.
 It is a standard that lets an assistant discover and call tools from another application.
-Each saved reading task, whose requests all use GET, becomes an MCP tool with defined inputs and results.
+Each saved reading tool, whose requests all use GET, is served as an MCP tool with defined inputs and results.
 The assistant can combine saved tools to answer a new request.
+Nathan chose Tools on October 17, 2026 as the name for what a user saves and ChatGPT runs.
+The code, the stored data, workspace operations such as `addTasks`, and MCP tool names such as `save_task` still say task, so existing ChatGPT connections keep working.
 
 ## UI and MCP parity
 
@@ -54,9 +56,9 @@ Navigation, layout, hover effects, and decorative controls do not need separate 
 The UI and MCP must call the same underlying operations with matching inputs, permissions, results, and status.
 Neither interface may bypass the other's authorization or user verification requirements.
 
-This rule covers both managing MCParrot and running taught website tasks.
-Each website app's connection runs its saved reading tasks and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
-Running a task and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
+This rule covers both managing MCParrot and running taught website tools.
+Each website app's connection runs its saved reading tools and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
+Running a tool and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
 Ordering has both paths: the app page's **Test order** box and the app connection's ordering tools call the same operations, and `check_order` reports the Pay with Link status that the app page shows.
 Both paths enforce the same account rules: each operation reaches only the apps of its user, and ordering only the owner's apps, as [accounts and ownership](#accounts-and-ownership) describes.
 The table maps each frontend capability to its aspirational management MCP equivalent.
@@ -66,15 +68,15 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Browse website apps | `list_apps` |
 | Open a website app | `get_app` |
 | Create a website app | `create_app` |
-| List an app's chosen tasks | `list_tasks` |
+| List an app's chosen tools | `list_tasks` |
 | Open the website and start recording | `start_exploration` |
 | Stop recording | `stop_exploration` |
 | List or delete recorded requests | `list_recorded_requests`, `delete_recorded_requests` |
 | Find what the website can do | `discover_capabilities` |
 | Open the last discovery result | `get_last_discovery` |
-| Save chosen capabilities as tasks | `save_tasks` |
-| Replace a task with a suggested update | `replace_task` |
-| Delete one task | `delete_task` |
+| Save chosen capabilities as tools | `save_tasks` |
+| Replace a tool with a suggested update | `replace_task` |
+| Delete one tool | `delete_task` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
 | Create or regenerate the app's connection link | `regenerate_connection_link` |
@@ -82,7 +84,7 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Publish, update, or unpublish the app on the marketplace | `publish_app`, `unpublish_app` |
 | Browse the marketplace | `browse_marketplace` |
 | Add a marketplace app to my apps | `install_from_marketplace` |
-| Delete an app and its tasks | `delete_app` |
+| Delete an app and its tools | `delete_app` |
 
 These operation names are examples.
 Testing, publishing, and recovery controls are aspirational and must follow the same rule.
@@ -98,38 +100,38 @@ Nathan scoped the first version to app connections only, so the management conne
 
 | Connection | Scope | Use |
 | --- | --- | --- |
-| One connection per website app | That app's saved reading tasks, and reading any page on its website | Run saved website tasks and read website pages from ChatGPT |
-| MCParrot management (aspirational) | The owner's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
+| One connection per website app | That app's saved reading tools, and reading any page on its website | Run saved website tools and read website pages from ChatGPT |
+| MCParrot management (aspirational) | The owner's website apps and tool lifecycle | Create apps, manage tools, start teaching, check status, and request recovery |
 
 For example, Canvas and YouTube each have their own connection.
-With management added, that user would have three connections, not one connection per task.
+With management added, that user would have three connections, not one connection per tool.
 Management MCP support is required by the parity rule, and its absence is a gap.
 Users who manage apps only through the UI do not need the management connection, but users who manage apps through an assistant do.
 
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
-Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
-The tool name is the task name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
+Each saved tool whose requests all use GET becomes one read-only MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter.
+The MCP tool name is the saved tool's name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
-Each tool in a connection needs its own name, so saving rejects or skips a task whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another task in the app.
-If stored tasks still share a tool name, the connection adds the first 8 characters of the later task's ID to its name, uses `task_` and the task's whole ID when that name is also taken, skips the task only when both names are taken, and writes a warning log either way.
-Tasks that use other methods stay off the connection, because the first version only reads website data.
+Each tool in a connection needs its own name, so saving rejects or skips a tool whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another tool in the app.
+If stored tools still share a tool name, the connection adds the first 8 characters of the later tool's ID to its name, uses `task_` and the tool's whole ID when that name is also taken, skips the tool only when both names are taken, and writes a warning log either way.
+Tools that use other methods stay off the connection, because the first version only reads website data.
 The route answers only POST requests; GET and DELETE return 405.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 When the app's **Ordering** switch is on, the connection also lists `prepare_order`, `check_order`, `place_order`, and `cancel_order`, as [ordering with Pay with Link](#ordering-with-pay-with-link) describes.
 
 Each connection also has a read-only `read_page` tool, titled "Read a page on <app name>", whose one input `url` is a full address or a path on the app's website.
-It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a task does, as [using saved tasks](#using-saved-tasks) describes, with the same length limit, signed-out check, and automatic sign-in.
+It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a tool does, as [using saved tools](#using-saved-tools) describes, with the same length limit, signed-out check, and automatic sign-in.
 It rejects any address on another origin with an error that names the allowed website, before it starts a browser.
-Nathan chose this tool so that ChatGPT can answer from pages that no saved task covers, such as a syllabus link he pastes.
-He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tasks he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
+Nathan chose this tool so that ChatGPT can answer from pages that no saved tool covers, such as a syllabus link he pastes.
+He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tools he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
 
-Each connection also has a `save_task` tool, titled "Save a page as a task for <app name>", so the connection grows while Nathan uses ChatGPT.
+Each connection also has a `save_task` tool, titled "Save a page as a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`.
-Its inputs are `name`, `description`, `urlPattern`, `inputs` as a list of name, description, and example, and `returns`, which become one GET request in the same task shape as a chosen task.
-It rejects a URL pattern on another origin, placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a task whose tool name or URL pattern, ignoring placeholder names, matches an existing task.
-A saved task appears on the app page, where **Delete** removes it, and becomes its own tool in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
-Nathan chose that ChatGPT saves tasks without asking him first, and he accepted that unwanted tasks can appear until he deletes them on the app page.
+Its inputs are `name`, `description`, `urlPattern`, `inputs` as a list of name, description, and example, and `returns`, which become one GET request in the same tool shape as a chosen tool.
+It rejects a URL pattern on another origin, placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or URL pattern, ignoring placeholder names, matches an existing tool.
+A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
+Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
 
 Nathan chose a private connection link for each app instead of MCP sign-in.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?token=<token>`, where the token is 32 random bytes that MCParrot creates when the user selects **Create link** or **Regenerate link** on the app page.
@@ -143,17 +145,17 @@ The user names the plugin, pastes the link as the Server URL, sets Authenticatio
 Workspace accounts can have custom MCP servers disabled by an administrator.
 Do not promise automatic connector installation or identical support across assistant clients.
 
-Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tasks, report status, and request sign-in recovery.
+Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tools, report status, and request sign-in recovery.
 An agent can start exploration, but the user browses the website in the explore tab.
 An agent cannot replace required personal verification.
 For example, Duo is a sign-in check that sends a code to the user's phone or asks the user to approve a request there, and only the user can do it.
 Nathan decided that the user types website verification codes, such as a text-message code, in the ChatGPT chat.
 Passwords never go into assistant messages; the user enters them only in MCParrot's **Save login** form.
 
-## Teaching website tasks
+## Teaching website tools
 
 Teaching has three steps for each website app: explore, discover, and choose.
-One exploration can suggest several tasks, so the user does not name or record each task separately.
+One exploration can suggest several tools, so the user does not name or record each tool separately.
 Canvas is a useful example, but the same flow works on any website.
 
 1. Open the hosted app and select **Create app**.
@@ -161,22 +163,22 @@ Canvas is a useful example, but the same flow works on any website.
 3. Select **Explore website**, install MCParrot Explorer once, then select **Open website and explore**.
 4. Sign in normally in the new tab and complete any required verification, such as Duo.
 5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
-6. Select **Find what this site can do** to send the recorded requests and the app's saved tasks to Cursor Composer 2.5 Fast and receive a list of capabilities that are new or that improve a saved task.
-7. Tick the capabilities to keep, edit their names and descriptions if needed, and select the save button, which shows the number of ticked tasks, such as **Save 3 tasks**.
+6. Select **Find what this site can do** to send the recorded requests and the app's saved tools to Cursor Composer 2.5 Fast and receive a list of capabilities that are new or that improve a saved tool.
+7. Tick the capabilities to keep, edit their names and descriptions if needed, and select the save button, which shows the number of ticked tools, such as **Save 3 tools**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
-Each capability is marked **New** or **Updates <task name>**, where an update is a clearly better version of that saved task.
-Saving adds the ticked new capabilities to the app's current tasks, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing task, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
-Saving a ticked update replaces that task in place and keeps its ID, by the same name rules, compared with the app's other tasks; an update whose task was deleted, or whose name or URL pattern breaks those rules, is skipped.
+Each capability is marked **New** or **Updates <tool name>**, where an update is a clearly better version of that saved tool.
+Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
+Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or URL pattern breaks those rules, is skipped.
 
 The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another Composer run.
-The list hides each new capability that now matches a saved task and each update that its task already equals, so saved items disappear after a save or reload.
-An update that the user renamed before saving no longer equals its task, so it appears again until the next discovery run.
+The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
+An update that the user renamed before saving no longer equals its tool, so it appears again until the next discovery run.
 Select **Find what this site can do** again to replace the saved result with a new run.
-An app holds at most 500 tasks, and the workspace holds at most 100 apps.
+An app holds at most 500 tools, and the workspace holds at most 100 apps.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
-MCParrot stores chosen tasks with the app, and each saved reading task becomes a tool in the app's connection right away.
-Testing tasks with changed inputs before they become tools remains aspirational, as the [status page](STATUS.md) records.
+MCParrot stores chosen tools with the app, and each saved reading tool appears in the app's connection right away.
+Testing tools with changed inputs before they appear in ChatGPT remains aspirational, as the [status page](STATUS.md) records.
 
 ### Recording in the explore tab
 
@@ -207,27 +209,27 @@ The extension is not published in an extension store, and website policies can d
 
 ### Limits of discovery
 
-Composer's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
+Composer's capabilities are suggestions inferred from one visit, not proof that a tool works for this user.
 Unvisited pages and actions remain unavailable unless separately explored and tested.
-Discovery can suggest page-reading tasks, such as "Read course syllabus" with a `{courseId}` input, from recorded pages.
+Discovery can suggest page-reading tools, such as "Read course syllabus" with a `{courseId}` input, from recorded pages.
 Pages that build their content only after later user actions, rather than when they load, can still return incomplete text.
-Saved tasks become tools without a separate test, so a tool can fail when its request cannot be reused; checking each task before it becomes a tool is aspirational.
+Saved tools appear in ChatGPT without a separate test, so a tool can fail when its request cannot be reused; checking each tool before it appears in ChatGPT is aspirational.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
 
 ## Discovery data sent to Composer
 
 Discovery sends the recorded requests and pages, including their truncated samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
-The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tasks from storage and adds each task's ID, name, description, requests, inputs, and returns to the recorded data.
+The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tools from storage and adds each tool's ID, name, description, requests, inputs, and returns to the recorded data.
 The agent runs with its tools disabled by configuration, in an empty temporary folder, and inside the SDK's sandbox; when the server does not support the sandbox, it runs again without it.
 The server deletes the temporary folders after each run and stops waiting after 50 seconds with a timeout error.
-The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tasks where a page's text is useful, in the same capability shape as data tasks.
-It asks Composer to skip anything a saved task already does and to suggest a change to a saved task only when it clearly improves that task, with the task's ID as `updatesTaskId`.
-It marks the recorded data, including the saved tasks, as untrusted website content that Composer must never follow as instructions.
+The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tools where a page's text is useful, in the same capability shape as data tools.
+It asks Composer to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
+It marks the recorded data, including the saved tools, as untrusted website content that Composer must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys, JWTs, long random-looking strings, and values after labels such as `password:` again.
 It keeps at most 50 replied capabilities, and only those whose requests all use GET on the app's own origin and whose placeholders match their inputs one to one.
-It treats a capability whose `updatesTaskId` is not a saved task of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved task, and updates that equal their task.
-After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tasks.
-When nothing is new or better, the result is an empty list, unless the app has no saved tasks, which stays an error.
+It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
+After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
+When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Composer's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Composer in a sample.
@@ -251,7 +253,7 @@ Unsupported recovery returns a clear failure instead of opening a visible browse
 
 ## Signing in to websites
 
-Nathan chose Browser Use cloud browsers with a persistent profile for each website app, so the user signs in once and tasks reuse that sign-in.
+Nathan chose Browser Use cloud browsers with a persistent profile for each website app, so the user signs in once and tools reuse that sign-in.
 A Browser Use profile keeps cookies, local storage, and sign-in state, and Browser Use saves it when the browser stops.
 The user's normal browser and the Browser Use browser have separate sign-ins, so exploring does not sign in the cloud browser.
 
@@ -265,14 +267,14 @@ If the popup is blocked, select **Open the sign-in window** on the app page.
 The server route `/api/sign-in` starts and stops these browsers with `BROWSER_USE_API_KEY`, which never reaches the browser.
 The user can also save a login on the app page, so MCParrot signs in again by itself when the website signs out, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 
-## Using saved tasks
+## Using saved tools
 
 1. Ask ChatGPT, after you add the app's connection link, for information from the website.
 2. ChatGPT selects the saved tools it needs and supplies their inputs.
 3. Receive the results without opening the website yourself.
 
 When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
-It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
+It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the tool's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
 Inputs that ChatGPT leaves out use the example value that discovery found.
 When a response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
@@ -280,22 +282,22 @@ Each request and page load has a 30-second limit, a status of 400 or more other 
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 
-The task treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
+The tool treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
 When the app has a saved login, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
-Without a saved login, the task fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
-Tasks run only GET requests in this first version, because the first milestone reads website data and never changes it.
+Without a saved login, the tool fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
+Tools run only GET requests in this first version, because the first milestone reads website data and never changes it.
 
-Assistants can combine taught tasks in new ways without another recording.
+Assistants can combine taught tools in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
 An unsupported action needs further discovery; a successful example does not establish support for all related actions.
 
 Some requests depend on short-lived tokens in headers rather than cookies, and some websites block reuse of a recorded request.
-Those tasks fail when they run, and they need a separate browser path or must stay unused.
+Those tools fail when they run, and they need a separate browser path or must stay unused.
 Measure speed against an agent navigating the website before you claim an improvement.
 
 ## Reconnecting expired sessions
 
-During normal use, tasks run without another sign-in while the website session is valid.
+During normal use, tools run without another sign-in while the website session is valid.
 When the session expires and the app has a saved login, MCParrot signs in again by itself during the ChatGPT tool call.
 The user only types a text-message code in the ChatGPT chat when the website asks for one.
 Without a saved login, the tool returns an error that tells the user to save a login or select **Sign in to website** in MCParrot.
@@ -321,11 +323,11 @@ Deleting the app also deletes its saved login and any pending sign-in, but delet
 7. The tool result tells ChatGPT that a code was sent to the user's phone and to ask the user for it, then call `submit_verification_code`.
 8. That tool reads the page's host names over CDP and starts a follow-up agent run in the same browser, which receives the code as a secret binding for those hosts, submits it, and skips optional device trust.
 9. When sign-in finishes, MCParrot stops the browser so the profile saves the session, clears the pending sign-in, and records the sign-in time.
-10. The tool tells ChatGPT that sign-in finished and to run the original task again; it does not rerun the task itself.
+10. The tool tells ChatGPT that sign-in finished and to run the original tool again; it does not rerun the tool itself.
 
-When the website signs in without verification, the task continues in the same tool call if at least 60 seconds of the call's 280-second budget remain; otherwise the tool tells ChatGPT to run the original task again.
+When the website signs in without verification, the tool continues in the same tool call if at least 60 seconds of the call's 280-second budget remain; otherwise the tool tells ChatGPT to run the original tool again.
 When the website rejects the code, the tool asks ChatGPT to request a new code from the user and keeps the browser waiting.
-When a task runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
+When a tool runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
 Only one sign-in runs at a time for each app; another call during it tells ChatGPT to wait a minute and try again.
 Any other outcome stops the browser and tells the user to select **Sign in to website** in MCParrot, and MCParrot does not try the same login again for 10 minutes.
 MCParrot does not keep the code after the call, and Sentry never receives it.
@@ -340,7 +342,7 @@ Nathan decided that ChatGPT and the dashboard can place food and shopping orders
 Link issues a one-time card for each payment that the user approves, so MCParrot stores no card number or security code.
 DoorDash is the first live target, and Nathan's hard requirement is that ordering must never charge his real card.
 So MCParrot places an order only while the Link connection is in test mode, as [payment safety rules](#payment-safety-rules) describes.
-Ordering is the first path that changes website data, and it runs through Browser Use agent runs, not through saved tasks, which still only read.
+Ordering is the first path that changes website data, and it runs through Browser Use agent runs, not through saved tools, which still only read.
 This ordering path is a gap until a live check passes, as the [status page](STATUS.md) records.
 
 ### Ordering settings
@@ -407,27 +409,27 @@ The owner is the account whose verified primary email matches `MCPARROT_OWNER_EM
 The first time the owner opens the dashboard, MCParrot moves the older single `workspace` value to `workspace:<owner-id>` and writes an owner key for each of its apps, in one atomic Redis step that runs only while the older value exists, so it runs once.
 Until then, the older apps have no owner key and their connections return 404, so Nathan must open the dashboard once right after this change is published.
 Only the owner can turn on and use ordering.
-Nathan chose no usage limits for other users, so every user's discovery spends his Cursor credit and every sign-in and task spends his Browser Use credit, which the [status page](STATUS.md) lists as a risk.
+Nathan chose no usage limits for other users, so every user's discovery spends his Cursor credit and every sign-in and tool spends his Browser Use credit, which the [status page](STATUS.md) lists as a risk.
 
 ## Shared app marketplace
 
-Nathan decided that users can share an app's tasks on a public marketplace at `/marketplace`, which anyone can open without signing in.
-It lists each published app's name, website address, short description, task count and task names, publisher name, and published date, newest first.
+Nathan decided that users can share an app's tools on a public marketplace at `/marketplace`, which anyone can open without signing in.
+It lists each published app's name, website address, short description, tool count and tool names, publisher name, and published date, newest first.
 `GET /api/marketplace` returns the same summaries without signing in.
 
 1. On the app page, select **Publish to marketplace** in the **Marketplace** section.
 2. Write a short description of up to 500 characters, and read the preview of exactly what will be shared.
 3. Select **Publish** to confirm.
 
-The listing holds the app name, website address, description, the publisher's name from their Clerk account, and each task's name, description, requests, inputs, and returns.
+The listing holds the app name, website address, description, the publisher's name from their Clerk account, and each tool's name, description, requests, inputs, and returns.
 When ordering is on for the app, the listing says only "Supports ordering", and copies always start with ordering off.
 A listing never holds logins, Browser Use profile IDs, sign-in times, connection tokens, recordings, discovery results, or orders.
-After publishing, the section shows the published date with **Update listing**, which publishes the app's current tasks and description again under the same listing, and **Unpublish**, which removes the listing; deleting the app also removes it.
+After publishing, the section shows the published date with **Update listing**, which publishes the app's current tools and description again under the same listing, and **Unpublish**, which removes the listing; deleting the app also removes it.
 
-Each marketplace item has **Add to my apps**, which copies it into the signed-in user's workspace as a new app with new app and task IDs, ordering off, no sign-in, and no connection link, then opens that app.
+Each marketplace item has **Add to my apps**, which copies it into the signed-in user's workspace as a new app with new app and tool IDs, ordering off, no sign-in, and no connection link, then opens that app.
 A signed-out visitor sees **Sign in to add**, which opens the sign-in page and then returns to the marketplace.
 Redis keeps the listing IDs in the set `marketplace` and each listing under `listing:<listing-id>`, and the app keeps its listing ID, published date, and description.
-The server validates each listing with zod and refuses an app with more than 100 tasks, a listing longer than 200,000 characters, and a new listing when the marketplace holds 200.
+The server validates each listing with zod and refuses an app with more than 100 tools, a listing longer than 200,000 characters, and a new listing when the marketplace holds 200.
 Matching marketplace MCP operations are aspirational, as the [UI and MCP parity section](#ui-and-mcp-parity) records.
 
 ## Production deployment setup
@@ -445,19 +447,19 @@ Nathan decided to turn Vercel Authentication off for production once accounts sh
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
-Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
+Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tools as the dashboard.
 Each user's workspace is one JSON value under `workspace:<user-id>`, as [accounts and ownership](#accounts-and-ownership) describes.
-The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, login-saved time, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
+The value holds each app's name, website address, chosen tools, Browser Use profile ID, sign-in time, login-saved time, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
 Each app's last discovery result is a separate value under `discovery:<app-id>`.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
-Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, replace one task, delete one task, or set the app's ordering.
-The server reads the current workspace from Redis, changes only that app or task, and writes it back in one atomic Redis step only if no other change arrived in between, retrying otherwise; it then returns the updated apps, which the dashboard shows.
+Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tools, replace one tool, delete one tool, or set the app's ordering.
+The server reads the current workspace from Redis, changes only that app or tool, and writes it back in one atomic Redis step only if no other change arrived in between, retrying otherwise; it then returns the updated apps, which the dashboard shows.
 Deleting an app removes its saved login, pending sign-in, last discovery result, and order in that same step, stops the pending sign-in browser, and cancels the order's agent run and stops its browser.
 `/api/sign-in` stores the app's profile ID and sign-in time, and `/api/login` stores or clears its login-saved time, in the same way.
-So a task that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
+So a tool that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
-Operation status for tasks that outlast one request remains aspirational.
+Operation status for tools that outlast one request remains aspirational.
 
 The following table describes the complete product; the [status page](STATUS.md) records which parts exist:
 
@@ -466,27 +468,27 @@ The following table describes the complete product; the [status page](STATUS.md)
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record pages, data requests, and short samples in one opened tab |
 | Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
-| Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each task in a hidden browser, and sign in again with the saved login |
-| Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
+| Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login |
+| Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
 | Accounts | Clerk from the Vercel Marketplace, with Google sign-in | Give each user their own workspace and identify the owner |
-| Persistent storage | Upstash Redis from the Vercel Marketplace | Store each user's apps and tasks, owner keys, Browser Use profile IDs, encrypted saved logins, pending sign-ins, last discovery results, and marketplace listings |
+| Persistent storage | Upstash Redis from the Vercel Marketplace | Store each user's apps and tools, owner keys, Browser Use profile IDs, encrypted saved logins, pending sign-ins, last discovery results, and marketplace listings |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
 A sign-in browser runs for up to 15 minutes, but the Vercel request that starts it returns at once, and **Done signing in** stops it with a separate request.
 Each MCP tool call runs inside one Vercel request with `maxDuration = 300`, so it has at most 300 seconds.
-MCParrot waits at most 150 seconds for each Browser Use sign-in agent run, and less when the call has less time left, so a sign-in plus the task fits in one call; a slower run ends the call with an error.
+MCParrot waits at most 150 seconds for each Browser Use sign-in agent run, and less when the call has less time left, so a sign-in plus the tool fits in one call; a slower run ends the call with an error.
 The verification code arrives in a separate tool call, so waiting for the user never holds a request open.
 For work that takes longer than one request, durable operation status that clients check is aspirational.
 
 ## Authentication and private data
 
-Keep every connection, browser profile, task, and pending operation limited to its owner.
+Keep every connection, browser profile, tool, and pending operation limited to its owner.
 Clerk sign-in protects the dashboard and its routes, and each route reaches only the signed-in user's apps.
 
 An app's connection link is the only access control on MCP use, and Nathan accepted this trade-off.
-Anyone with the link can run that app's tools, read its website's pages with its saved sign-in, save tasks to it, and, for the owner's apps, order, but the link reaches nothing else.
+Anyone with the link can run that app's tools, read its website's pages with its saved sign-in, save tools to it, and, for the owner's apps, order, but the link reaches nothing else.
 Keep the link private, and select **Regenerate link** on the app page if it leaks, then replace the URL in the ChatGPT connector.
 MCParrot never logs tokens, and Sentry removes `token` and `x-vercel-protection-bypass` query values.
 An older owner link carries the Vercel bypass secret, which also skips Vercel Authentication on every page while it is on; after Vercel Authentication is off, that secret only opens the owner's app connections.
@@ -502,7 +504,7 @@ Only the automatic sign-in step on the server decrypts a login, and it passes th
 The password never returns to the dashboard, never appears in MCP results, and never reaches an AI model, a log, or Sentry.
 `/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
-Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
+Keep secrets out of prompts, public tool definitions, logs, traces, documentation, and source control.
 Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Composer](#discovery-data-sent-to-composer) describe.
 That redaction matches patterns, so a secret in another form can still reach the recording and Composer, which the [status page](STATUS.md) lists as a gap.
 Recordings stay only in the extension, which deletes them after 30 days.
@@ -518,12 +520,12 @@ MCParrot keeps every trace and every session because it has few users, and it se
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a task or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the task name for each `save_task` call |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each task run's and `read_page` call's outcome, including whether the website was signed out, each task that ChatGPT saved, with only the app ID and task name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the tool name for each `save_task` call |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each tool run's and `read_page` call's outcome, including whether the website was signed out, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
 | AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
-Spans carry only non-secret attributes, such as the app ID, task name, request count, response status, and response size.
+Spans carry only non-secret attributes, such as the app ID, tool name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
 MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses; `read_page` logs carry only the app ID, the result size, and any failure reason, never the page text.
 Order logs and spans never carry the delivery address, the items, the order request, the Link connection ID, or the Link email.
@@ -537,9 +539,14 @@ Sentry ignores that expected error, and also the expected tool outcomes for a si
 ## Workspace navigation behavior
 
 App and exploration pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/explore`.
-Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tasks.
+Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tools.
 The same apps appear on any device where the user signs in.
-Select **Delete app** inside an app, then confirm inline to remove that app and its tasks from MCParrot and delete its recorded requests in the extension.
+Each app page shows the app name, its website address, **Explore website**, and status labels for sign-in, a saved login, and ordering.
+On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, and **Delete tool**.
+A filter box appears above the list when the app has more than 8 tools.
+A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, and, for the owner, Ordering in that order, with **Delete app** at the bottom, and it stays in view while the list scrolls.
+On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.
+Select **Delete app** inside an app, then confirm inline to remove that app and its tools from MCParrot and delete its recorded requests in the extension.
 Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
 
@@ -548,7 +555,7 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 Use Node.js 24, which `.nvmrc` and the `engines` field in `package.json` pin.
 `.env.example` lists every environment variable the app needs.
 The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
-That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
+That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tools again afterwards.
 Add `MCPARROT_CREDENTIAL_KEY` to save logins; it must be standard base64 of exactly 32 bytes, for example from `openssl rand -base64 32`, or saving a login returns a setup error.
 The production key is Sensitive and cannot be pulled, so logins saved locally cannot be read in production.
 The pulled `KV_REST_API_URL` and `KV_REST_API_TOKEN` point at the production Redis, so a login saved from a local server overwrites the app's production login with one that production cannot decrypt, and other local changes reach production apps too.
@@ -570,7 +577,7 @@ MCParrot Explorer connects to this local dashboard as well as to the production 
 ## Running the task runner
 
 The task runner sends one natural-language task to a Browser Use Cloud agent.
-It is dormant: sign-in and task execution use Browser Use cloud browsers directly, not this runner.
+It is dormant: sign-in and tool runs use Browser Use cloud browsers directly, not this runner.
 Use Node.js 24, and have a Browser Use account.
 
 1. Install packages with `npm install`.

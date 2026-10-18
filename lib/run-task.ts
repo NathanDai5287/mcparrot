@@ -33,7 +33,7 @@ function fillPattern(urlPattern: string, values: TaskInputs) {
     }
     return encodeURIComponent(value);
   });
-  if (missing.size) throw new TaskError("missing_input", `This task needs a value for ${[...missing].join(", ")}.`);
+  if (missing.size) throw new TaskError("missing_input", `This tool needs a value for ${[...missing].join(", ")}.`);
   return filled;
 }
 

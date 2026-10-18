@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "MCParrot — Workspace",
-  description: "Turn websites you use into ChatGPT tasks through a private MCP connection.",
+  description: "Turn websites you use into ChatGPT tools through a private MCP connection.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

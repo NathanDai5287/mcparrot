@@ -46,7 +46,7 @@ Applied Intelligence is the primary track for MCParrot, and Agentverse is a seco
 
 | Track | Fit for MCParrot |
 | --- | --- |
-| Applied Intelligence | Strong primary fit, because it rewards practical AI that improves everyday work: teach a task once, then use it from an assistant |
+| Applied Intelligence | Strong primary fit, because it rewards practical AI that improves everyday work: teach a tool once, then use it from an assistant |
 | Agentverse (Fetch.ai) | Strong secondary fit, because saved MCP tools can act as agents that turn a request into a result |
 | Model Learning | Weak fit unless the submission centers on training or adaptive models |
 | Beyond the Digital | Weak fit unless hardware, AR, or VR is central |
@@ -62,7 +62,7 @@ For example, the Commit Fellowship requires a supplemental form.
 
 | Sponsor | Challenge | Why it matches |
 | --- | --- | --- |
-| Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved task in a hidden Browser Use browser with that profile; when the website signs out, a Browser Use agent signs in again with the saved login through secret bindings, chooses the text-message check, and finishes after the user types the code in ChatGPT; this use is a gap until Nathan's live demonstration passes |
+| Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved tool in a hidden Browser Use browser with that profile; when the website signs out, a Browser Use agent signs in again with the saved login through secret bindings, chooses the text-message check, and finishes after the user types the code in ChatGPT; this use is a gap until Nathan's live demonstration passes |
 | Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; MCParrot sends error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring, and the demo must show how that evidence changed what we built, which is a gap |
 | Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents; Devpost lists $3,000, so confirm the amount on Devpost |
 
@@ -88,8 +88,8 @@ Devpost lists the LA Hacks grand prize amounts as TBD, so confirm them at [ai.la
 ## Demo planning implications
 
 Prove one complete path before building a wide interface.
-The strongest path explores a website once, lets Cursor Composer find what it can do, and chooses a task.
-It then signs in once through Browser Use, adds the app's private connection link to ChatGPT, and asks ChatGPT for a result that the saved task returns.
+The strongest path explores a website once, lets Cursor Composer find what it can do, and chooses a tool.
+It then signs in once through Browser Use, adds the app's private connection link to ChatGPT, and asks ChatGPT for a result that the saved tool returns.
 This path addresses technical depth and execution better than a polished interface without working features.
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.
 Canvas is an example of that user's website, not the only one.
@@ -99,7 +99,7 @@ Judges penalize polish that hides parts that do not work, so never present an as
 Plan the Devpost text, a clean public repository, and a video that shows the same flow that judges see live.
 To claim the Sentry prize, show evidence from Tracing, Logs, Replay, or another allowed product, not only caught errors.
 The [Sentry diagnostics section](README.md#diagnostics-with-sentry) lists what each product records.
-In the demo, open one ChatGPT tool call in Sentry Traces to show its Browser Use and task request spans, filter Sentry Logs for its task outcome, and play the dashboard replay of the same session.
+In the demo, open one ChatGPT tool call in Sentry Traces to show its Browser Use and tool request spans, filter Sentry Logs for its tool outcome, and play the dashboard replay of the same session.
 Then show the Sentry issue or slow span that led to a change in MCParrot, and the change itself.
 To claim the Browser Use prize, show a working web agent and the people it serves.
-Show Browser Use in three places: the live view where the user signs in once, including Duo, the hidden browser that runs each task when ChatGPT calls it, and the agent that signs in again by itself while the user types the text-message code in ChatGPT.
+Show Browser Use in three places: the live view where the user signs in once, including Duo, the hidden browser that runs each tool when ChatGPT calls it, and the agent that signs in again by itself while the user types the text-message code in ChatGPT.

@@ -6,7 +6,7 @@ import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
 import { OrderingPanel } from "./ordering-panel";
 import { PublishPanel } from "./publish-panel";
-import type { DiscoveredCapability, Website } from "../lib/capabilities";
+import type { DiscoveredCapability, Task, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
 
 type Screen =
@@ -49,8 +49,45 @@ function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }
   return <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
 
-function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return <header className="page-header"><div><h1 tabIndex={-1}>{title}</h1><p>{description}</p></div>{action}</header>;
+function PageHeader({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children?: ReactNode }) {
+  return <header className="page-header"><div><h1 tabIndex={-1}>{title}</h1><p>{description}</p>{children}</div>{action}</header>;
+}
+
+const toolFilterThreshold = 8;
+
+function AppStatus({ app }: { app: Website }) {
+  return <ul className="status-chips" aria-label="Status">
+    <li className={app.signedInAt ? "status-chip on" : "status-chip"}>{app.signedInAt ? "Signed in" : "Not signed in"}</li>
+    {app.loginSavedAt && <li className="status-chip on">Login saved</li>}
+    {app.ordering?.enabled && <li className="status-chip on">Ordering on</li>}
+  </ul>;
+}
+
+function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolean; onToggle: () => void; onDelete: () => void }) {
+  const detailsId = `tool-${tool.id}`;
+  return <li className="tool">
+    <button className="tool-row" aria-expanded={open} aria-controls={detailsId} onClick={onToggle}><span className="tool-name">{tool.name}</span><span className="tool-summary">{tool.description}</span><Icon name="arrow" /></button>
+    {open && <div className="tool-details" id={detailsId}>
+      <p>{tool.description}</p>
+      <dl className="tool-facts">
+        <dt>Inputs</dt><dd>{tool.inputs.length === 0 ? "None" : <ul>{tool.inputs.map((input) => <li key={input.name}><span className="tool-input-name">{input.name}</span> {input.description}</li>)}</ul>}</dd>
+        <dt>Returns</dt><dd>{tool.returns}</dd>
+      </dl>
+      <button className="delete-link" aria-label={`Delete ${tool.name}`} onClick={onDelete}>Delete tool</button>
+    </div>}
+  </li>;
+}
+
+function ToolList({ app, onDelete }: { app: Website; onDelete: (toolId: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [openToolId, setOpenToolId] = useState<string | null>(null);
+  if (app.tasks.length === 0) return <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tools to keep.</p></section>;
+  const search = query.trim().toLowerCase();
+  const shownTools = app.tasks.filter((tool) => `${tool.name} ${tool.description}`.toLowerCase().includes(search));
+  return <>
+    {app.tasks.length > toolFilterThreshold && <input className="tool-filter" type="search" aria-label="Filter tools" placeholder="Filter tools by name or description" value={query} onChange={(event) => setQuery(event.target.value)} />}
+    {shownTools.length === 0 ? <p className="tool-empty" role="status">No tools match “{query.trim()}”.</p> : <ul className="tool-list">{shownTools.map((tool) => <ToolItem key={tool.id} tool={tool} open={openToolId === tool.id} onToggle={() => setOpenToolId(openToolId === tool.id ? null : tool.id)} onDelete={() => onDelete(tool.id)} />)}</ul>}
+  </>;
 }
 
 function BackButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
@@ -220,14 +257,14 @@ export default function Workspace() {
           {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
 
           {loaded && screen.view === "apps" && <>
-            <PageHeader title="Your apps" description="One website. Many tasks for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
+            <PageHeader title="Your apps" description="One website. Many tools for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
             <div className="section-heading"><h2>Websites <span>{apps.length}</span></h2><span>Choose a website to explore</span></div>
             <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
               <span className="app-main"><span className="app-name">{app.name}</span><span className="website-address">{app.url}</span></span>
-              <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
+              <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tools yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "tool" : "tools"}`}</small></span><Icon name="arrow" />
             </button>)}</div>
-            <p className="preview-note">MCParrot stores apps and chosen tasks so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
+            <p className="preview-note">MCParrot stores apps and chosen tools so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
           </>}
           {screen.view === "create-app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
@@ -236,26 +273,32 @@ export default function Workspace() {
           </>}
           {screen.view === "app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
-            <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
-            <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
-            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" aria-label={`Delete ${task.name}`} onClick={() => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: task.id })}>Delete</button></div>)}</div>}
-            <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onApps={showApps} />
-            {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
-            <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
-            <section className="app-settings">
-              {deletingAppId !== screen.app.id ? <button className="delete-link" ref={deleteAppButton} onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
-                <h2 tabIndex={-1} ref={focusOnMount}>Delete {screen.app.name}?</h2>
-                <p>This removes this app and its tasks from MCParrot and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
-                <div className="form-actions"><button className="button danger" disabled={deleteBusy} onClick={() => deleteApp(screen.app)}>{deleteBusy ? "Deleting…" : "Delete app and tasks"}</button><button className="button" disabled={deleteBusy} onClick={() => { restoreDeleteFocus.current = true; setDeletingAppId(null); setDeleteError(""); }}>Keep app</button></div>
-                {deleteError && <p className="pilot-error" role="alert">{deleteError}</p>}
-              </div>}
-            </section>
+            <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>}><AppStatus app={screen.app} /></PageHeader>
+            <div className="app-layout">
+              <section className="app-tools" aria-labelledby="app-tools-heading">
+                <div className="section-heading"><h2 id="app-tools-heading">What ChatGPT can do on {screen.app.name} <span>{screen.app.tasks.length} {screen.app.tasks.length === 1 ? "tool" : "tools"}</span></h2><span>Explore, find what the site can do, then choose</span></div>
+                <ToolList key={screen.app.id} app={screen.app} onDelete={(toolId) => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: toolId })} />
+              </section>
+              <aside className="setup-rail" aria-label="Setup">
+                <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onApps={showApps} />
+                <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
+                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
+                <section className="app-settings">
+                  {deletingAppId !== screen.app.id ? <button className="delete-link" ref={deleteAppButton} onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
+                    <h2 tabIndex={-1} ref={focusOnMount}>Delete {screen.app.name}?</h2>
+                    <p>This removes this app and its tools from MCParrot and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
+                    <div className="form-actions"><button className="button danger" disabled={deleteBusy} onClick={() => deleteApp(screen.app)}>{deleteBusy ? "Deleting…" : "Delete app and tools"}</button><button className="button" disabled={deleteBusy} onClick={() => { restoreDeleteFocus.current = true; setDeletingAppId(null); setDeleteError(""); }}>Keep app</button></div>
+                    {deleteError && <p className="pilot-error" role="alert">{deleteError}</p>}
+                  </div>}
+                </section>
+              </aside>
+            </div>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
-            <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tasks to keep." />
+            <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tools to keep." />
             <ExplorationPanel appId={app.id} websiteUrl={app.url} tasks={app.tasks} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
-            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tasks become tools in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
+            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tools appear in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
 
         </main>
