@@ -12,7 +12,7 @@ import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../li
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const composerDeadlineMs = 50_000;
+const discoveryDeadlineMs = 50_000;
 const maximumBodyBytes = 2_000_000;
 const redacted = "[redacted]";
 const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", "pwd", "session", "sid", "sig", "signature", "auth", "authorization", "csrf", "xsrf", "jwt", "bearer", "verifier", "code", "credential", "credentials", "nonce", "otp", "cookie"]);
@@ -178,24 +178,24 @@ function capabilitiesFrom(reply: string, app: Website) {
   try {
     parsed = firstJsonObject(reply);
   } catch {
-    throw new DiscoveryError("invalid_reply", 502, "Composer did not reply with capabilities. Try again.");
+    throw new DiscoveryError("invalid_reply", 502, "Claude did not reply with capabilities. Try again.");
   }
   const result = replySchema.safeParse(parsed);
-  if (!result.success) throw new DiscoveryError("invalid_reply", 502, "Composer did not reply with capabilities. Try again.");
+  if (!result.success) throw new DiscoveryError("invalid_reply", 502, "Claude did not reply with capabilities. Try again.");
   const origin = new URL(app.url).origin;
   const capabilities = result.data.capabilities.slice(0, maximumCandidates).flatMap((item) => {
     const capability = capabilitySchema.safeParse(item);
     return capability.success && isUsable(capability.data, origin) ? [{ ...capability.data, requests: capability.data.requests.map((request) => ({ ...request, method: "GET" })) }] : [];
   });
   const unsaved = unsavedCapabilities(app, capabilities).slice(0, maximumCapabilities);
-  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `Composer found no reading tools on ${origin}. Explore more pages, then try again.`);
+  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `Claude found no reading tools on ${origin}. Explore more pages, then try again.`);
   return unsaved;
 }
 
 function agentOptions(apiKey: string, cwd: string, storeDir: string, sandbox: boolean) {
   return {
     apiKey,
-    model: { id: "composer-2.5", params: [{ id: "fast", value: "true" }] },
+    model: { id: "claude-opus-5-5", params: [{ id: "context", value: "300k" }, { id: "effort", value: "low" }, { id: "fast", value: "true" }] },
     tools: [],
     local: { cwd, settingSources: [], sandboxOptions: { enabled: sandbox }, store: new JsonlLocalAgentStore(storeDir) },
   };
@@ -205,13 +205,13 @@ function isSandboxUnsupported(error: unknown) {
   return error instanceof Error && /sandboxing is not supported/i.test(error.message);
 }
 
-async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
+async function runDiscoveryAgent(prompt: string, apiKey: string): Promise<RunResult> {
   const dirs: string[] = [];
   let agent: SDKAgent | undefined;
   let run: Run | undefined;
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = () => new DiscoveryError("timeout", 504, "Composer took too long. Try again, or explore fewer pages.");
+  const timeout = () => new DiscoveryError("timeout", 504, "Claude took too long. Try again, or explore fewer pages.");
   const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
   const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
   const start = async (sandbox: boolean) => {
@@ -235,7 +235,7 @@ async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
     timer = setTimeout(() => {
       timedOut = true;
       reject(timeout());
-    }, composerDeadlineMs);
+    }, discoveryDeadlineMs);
   });
   try {
     return await Promise.race([work, deadline]);
@@ -252,18 +252,18 @@ async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
   }
 }
 
-function askComposer(prompt: string, apiKey: string, requestCount: number) {
+function askDiscoveryAgent(prompt: string, apiKey: string, requestCount: number) {
   return Sentry.startSpan({
-    name: "discover.composer",
+    name: "discover.agent",
     op: "gen_ai.invoke_agent",
     attributes: {
       "gen_ai.operation.name": "invoke_agent",
       "gen_ai.agent.name": "MCParrot discovery",
-      "gen_ai.request.model": "composer-2.5-fast",
+      "gen_ai.request.model": "claude-opus-5-5-low-fast",
       "discover.request_count": requestCount,
     },
   }, async (span) => {
-    const result = await runComposer(prompt, apiKey);
+    const result = await runDiscoveryAgent(prompt, apiKey);
     span.setAttributes({ "discover.status": result.status, "gen_ai.response.size": result.result?.length ?? 0 });
     return result;
   });
@@ -319,10 +319,10 @@ export async function POST(request: Request) {
     const app = await savedApp(userId, appId);
 
     Sentry.logger.info("Discovery started", { requestCount: requests.length, savedTaskCount: app.tasks.length });
-    const result = await askComposer(discoveryPrompt(app, requests), apiKey, requests.length);
+    const result = await askDiscoveryAgent(discoveryPrompt(app, requests), apiKey, requests.length);
     if (result.status !== "finished" || !result.result) {
       Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
-      return Response.json({ error: "Composer returned no capabilities. Explore more pages, then try again." }, { status: 502 });
+      return Response.json({ error: "Claude returned no capabilities. Explore more pages, then try again." }, { status: 502 });
     }
     const latestApp = await savedApp(userId, appId);
     const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp) };
@@ -340,8 +340,8 @@ export async function POST(request: Request) {
       Sentry.captureException(error);
       return Response.json({ error: "Discovery failed. Try again." }, { status: 500 });
     }
-    Sentry.logger.warn("Discovery failed", { reason: "composer_error" });
+    Sentry.logger.warn("Discovery failed", { reason: "agent_error" });
     Sentry.captureException(error);
-    return Response.json({ error: `Composer could not read the requests (${error.message}). Try again.` }, { status: 502 });
+    return Response.json({ error: `Claude could not read the requests (${error.message}). Try again.` }, { status: 502 });
   }
 }

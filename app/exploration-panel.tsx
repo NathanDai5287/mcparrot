@@ -167,7 +167,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
           {state.requests.map((request) => <div className="candidate-button" key={`${request.method} ${request.pattern}`}><span>{request.method} {request.pattern}<small>{request.status} · {request.contentType}</small></span></div>)}
         </div>
       </details>
-      <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to Cursor Composer.</p>
+      <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to Claude Opus 5.5 through Cursor.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
         <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>
