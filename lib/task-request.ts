@@ -11,6 +11,12 @@ export const replayedHeaders = (headers: Record<string, string> = {}) => Object.
 
 export const requestPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [...urlPattern.matchAll(urlPlaceholderPattern), ...bodyPattern.matchAll(bodyPlaceholderPattern)].map((match) => match[1]);
 
+export function isOnWebsite(address: string | URL, website: string) {
+  const { protocol, hostname, port } = new URL(address);
+  const site = new URL(website);
+  return protocol === site.protocol && port === site.port && (hostname === site.hostname || hostname.endsWith(`.${site.hostname}`));
+}
+
 export const isGetRequest = (request: TaskRequest) => request.method.toUpperCase() === "GET";
 
 function decodedOnce(text: string) {
