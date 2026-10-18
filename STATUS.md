@@ -11,8 +11,8 @@ Users create website apps, explore any website with MCParrot Explorer in a norma
 Each app page offers **Sign in to website** through a Browser Use cloud browser, a **Save login** form that stores an encrypted username and password, and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks, a `read_page` tool for any page on its website, and a `save_task` tool that saves a useful page as a new task.
 When a task finds the website signed out, a Browser Use agent signs in again with the saved login, and the user types any text-message code in the ChatGPT chat.
 When an app's **Ordering** switch is on, ChatGPT and the app page can prepare, check, place, and cancel orders that a Browser Use agent pays for with Pay with Link, only while Link is in test mode.
-The MCP route and saved logins passed direct Node checks, but Browser Use sign-in, automatic sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
-Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring are wired in, but they need events from Nathan's use of the deployed app.
+On October 17, 2026, the production connection read tasks from the production Redis store and read a Canvas page with the app's Browser Use profile, and Nathan ran Canvas tasks from ChatGPT; automatic sign-in still needs Nathan's demonstration.
+Sentry receives errors from the deployed app, and three of them changed the product; Tracing, Logs, Session Replay, and AI agent monitoring still need confirmed events from the deployed app.
 Task testing and the management connection remain aspirational.
 
 ## Status word meanings
@@ -33,7 +33,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, opens exploration, and lists chosen tasks; automatic type and production build checks pass |
 | App and exploration addresses | shipped | `/apps/<app-id>` and `/apps/<app-id>/explore` use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
 | App deletion | shipped | Inline confirmation removes an app and its tasks from storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
-| Persistent storage in Upstash Redis | gap | `/api/workspace` stores the workspace under one Redis key, and a direct Node check saved and read it through the same storage functions on a temporary Upstash database on October 17, 2026; the production store needs Nathan to finish the Upstash setup in Vercel |
+| Persistent storage in Upstash Redis | shipped | `/api/workspace` stores the workspace under one Redis key; on October 17, 2026, the production MCP route listed all 23 Canvas tools from the production Upstash Redis |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
@@ -42,10 +42,10 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Choose and save tasks | shipped | The checklist adds ticked, edited capabilities to the app's tasks and skips duplicates; on October 17, 2026, a direct Node check with an in-memory Redis replacement kept a task that `save_task` had saved after a dashboard with an older copy added tasks; Nathan tests the live flow |
 | Task-aware discovery and saved results | gap | `/api/discover` sends the app's saved tasks to Composer, marks each suggestion as new or as an update of a saved task, and saves the last result under `discovery:<app-id>`; on October 17, 2026, two runs against `next dev` on a throwaway JSONPlaceholder app did not suggest the saved task again, a third run returned an update with a real task ID that `replaceTask` saved in place, the saved result hid saved items, and deleting the app removed its keys; Nathan's live test of the **New** and **Updates** labels on the explore page must pass |
 | MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026; a later check that day answered an initialize request for protocol version 2026-07-28 with version 2025-11-25 and listed `submit_verification_code` |
-| Private ChatGPT connection link | gap | The Vercel automation bypass secret exists and the app page shows the link with **Copy link**; a live ChatGPT connector needs Nathan's test |
+| Private ChatGPT connection link | shipped | The app page shows the link with **Copy link**; on October 17, 2026, Nathan added the Canvas app's link to ChatGPT as a Developer mode connector and ran Canvas tasks from ChatGPT |
 | Sign-in through Browser Use | gap | `/api/sign-in` creates the app's Browser Use profile, starts a cloud browser with its live view, and stops it on **Done signing in**; it needs Nathan's live sign-in |
-| Running tasks from ChatGPT | gap | Each tool call runs the task's GET requests inside a Browser Use browser with the app's profile and returns the response, with HTML pages as visible text and up to 100,000 characters, or a signed-out error; it needs Nathan's live ChatGPT request |
-| Reading any page from ChatGPT | gap | Each connection's read-only `read_page` tool opens a page on the app's website with the saved sign-in and returns its text; on October 17, 2026, a direct Node check with local headless Chrome in place of Browser Use listed the tool, rejected another origin, returned an HTML page as visible text and JSON as is, and returned the signed-out message for a sign-in redirect; it needs Nathan's live ChatGPT request |
+| Running tasks from ChatGPT | shipped | Each tool call runs the task's GET requests inside a Browser Use browser with the app's profile and returns the response, with HTML pages as visible text and up to 100,000 characters, or a signed-out error; on October 17, 2026, Nathan ran Canvas tasks from ChatGPT through the production connection |
+| Reading any page from ChatGPT | shipped | Each connection's read-only `read_page` tool opens a page on the app's website with the saved sign-in and returns its text; on October 17, 2026, a production `read_page` call on the EECS 126 bCourses syllabus returned status 200 with the syllabus text through the app's Browser Use profile, and Nathan used the same connection from ChatGPT |
 | Saving tasks from ChatGPT | gap | Each connection's `save_task` tool adds a page-reading task to the app in Redis; on October 17, 2026, a direct Node check of the route handler with an in-memory Redis replacement listed the tool, rejected another origin, a missing input, an extra input, a duplicate name, and a duplicate URL pattern, and saved a valid task that the next tool list showed; it needs Nathan's live ChatGPT use |
 | Delete one task | shipped | Each task on the app page has **Delete**; a direct Node check on October 17, 2026 removed only that task through `PATCH /api/workspace`; Nathan tests the live flow; its management MCP operation remains a parity gap |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; sign-in and tasks use Browser Use cloud browsers directly |
@@ -60,12 +60,12 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Saved credentials | gap | **Save login**, **Replace**, and **Delete** store each app's login in Redis encrypted with AES-256-GCM under `MCPARROT_CREDENTIAL_KEY`; a direct Node check on October 17, 2026 passed the encryption round trip, rejected changed ciphertext, and saved and deleted a login through `/api/login`; Nathan's live save must pass, and per-owner authorization remains aspirational |
 | Long task status | aspirational | Store operation status for tasks that take longer than one 300-second request |
 | Sentry connection and source maps | shipped | `@sentry/nextjs` starts in the browser and on the server; on October 17, 2026, the production build uploaded source maps, and a direct Node event sent with the project's DSN reached `nathan-s4/mcparrot`, where the Sentry API returned it |
-| Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
+| Sentry error monitoring | shipped | Server route errors, React render errors, and Composer failures go to Sentry Issues; on October 17, 2026, production errors reached `nathan-s4/mcparrot`, including the MCP protocol-version probe, the signed-out message, and a Playwright `browsers.json` module error |
 | Sentry Tracing | gap | Spans cover Composer discovery (`discover.composer`), Browser Use start and stop, the CDP connection, each automatic sign-in and verification code agent run with its outcome (`browser_use.agent_sign_in`, `browser_use.agent_verification_code`), each order step with its total and outcome (`browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, `browser_use.agent_order_place`), each request a task or `read_page` runs (`task.request`), each HTML page opened as text (`page.read`), and each `save_task` call (`task.save`); traces from the deployed app need Nathan's use |
 | Sentry Logs | gap | Discovery started and finished, sign-in started and done, login saved and deleted, automatic sign-in started and finished, each verification code outcome, each task run's and `read_page` call's outcome with whether the website was signed out, each task saved from ChatGPT, and each order outcome with only the app ID, the reason, and the amounts go to Sentry Logs through the SDK, not a Vercel Log Drain; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
 | Sentry Session Replay | gap | Every dashboard session is recorded with text, inputs, and link and image addresses masked; replays need Nathan's use |
 | Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
-| Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
+| Sentry evidence that changed the product | shipped | Three production Sentry errors on October 17, 2026 changed MCParrot: the missing `playwright-core/browsers.json` led to `outputFileTracingIncludes` in `next.config.ts`, the Cursor SDK `ENOENT` under the read-only home folder led to `HOME=/tmp` in `instrumentation.ts`, and the protocol-version error led to the documented fallback and a Sentry ignore rule; the demo must show them |
 | Second website support | aspirational | Teach and run a task on a second website with the same product flow |
 | Shared app marketplace | aspirational | Let owners share a website app with its saved tasks so other people can reuse it; a shared app must contain only the app address and task definitions, never saved logins, Browser Use profiles, or recorded samples; Nathan added it on October 17, 2026 |
 
@@ -119,17 +119,24 @@ A direct Node script then sent one test error and one test log with the project'
 The available auth token cannot read organization data, so the API could not confirm the log.
 That check proves the project receives events, not that the deployed app sends them.
 
+### Production checks
+
+On October 17, 2026, checks on mcparrot.vercel.app, including after the 9:34 PM PDT production deployment, called the Canvas app's MCP route.
+`tools/list` returned all 23 Canvas tools from the production Upstash Redis, and `read_page` on the EECS 126 bCourses syllabus returned status 200 with the syllabus text through the app's Browser Use profile.
+A GET request to the MCP route returned 405, and `/api/discover` returned one validated capability from Cursor Composer in about 8 seconds.
+Nathan then added the app's private link to ChatGPT as a Developer mode connector and confirmed that Canvas tasks work from ChatGPT.
+Production errors reached the Sentry project `nathan-s4/mcparrot`, and three of them changed the product, as the capability table describes.
+
 ## Known gaps
 
 These gaps exist inside shipped work and stay open until a change closes them:
 
 - The dashboard has no management MCP operations, including `delete_app`, sign-in, and the discovery operations, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
-- The production Upstash store needs Nathan to finish its setup in Vercel before apps and tasks can load.
-- Browser Use sign-in, task execution, and a live ChatGPT connector need Nathan's production demonstration.
+- Browser Use sign-in through **Sign in to website** needs Nathan's production demonstration.
 - Automatic sign-in with a saved login and the text-message code step need Nathan's live Canvas test; the agent prompt, Duo option choice, and secret-binding hosts are untested against the real website.
 - Browser Use keeps a waiting sign-in browser for 15 minutes only on paid projects; free projects stop it after 2 minutes, so a slow code entry fails and the task must start sign-in again.
 - A sign-in agent run that takes longer than 150 seconds ends the tool call with an error, because Vercel stops the call at 300 seconds.
-- ChatGPT first sends MCP protocol version 2026-07-28, which no MCP SDK supports; the route relies on ChatGPT falling back to version 2025-11-25, which Nathan's live connector test must confirm.
+- ChatGPT first sends MCP protocol version 2026-07-28, which no MCP SDK supports; the route relies on ChatGPT falling back to version 2025-11-25, as it did in Nathan's connector test on October 17, 2026.
 - Saved tasks become tools without a test, run GET requests only, and fail when a website needs header tokens instead of cookies.
 - Running a task and reading a page with `read_page` work only through ChatGPT; the dashboard has no matching control.
 - `read_page` lets ChatGPT read any page Nathan's account can see on the app's website, not only chosen tasks, which Nathan accepted; it only opens pages, so it changes nothing unless opening a page on that website has side effects, such as a sign-out link.
@@ -140,7 +147,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The explore page's **New** and **Updates** labels, replacing a task from an update, and reopening the last discovery result need Nathan's live test; an update renamed before saving appears again in the saved result until the next run.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
-- Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
+- Sentry traces, logs, and replays from the deployed app are not yet confirmed.
 - Ordering has not met a real Browser Use run, Link connection, or website; the agent instructions, the cart report, and the total check need a live test.
 - Ordering places orders only in Link test mode, which Nathan chose; DoorDash has no test mode, so a DoorDash order always stops when the website declines the test-mode Link card.
 - A card saved in the website account can still be charged if the agent ignores its instructions, so the user must remove saved cards from the website account before testing ordering.
