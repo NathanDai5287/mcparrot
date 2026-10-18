@@ -341,8 +341,10 @@ The guard exists so that a tool cannot place a real order with a card saved on a
 The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address, non-GraphQL body, or GraphQL operation name contains one of the words, such as a query named `paymentHistory`, is refused.
 `read_page` only opens pages with GET, so the guard does not apply to it.
 A GET or POST tool sends its saved `headers`, filtered again to the same short list of header names, and a POST tool also adds a fresh anti-forgery (CSRF) token as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many websites refuse a request without that header.
-Before the requests, the run opens the website's home page in the signed-in browser and reads the token from the first of `meta[name=csrf-token]`, `meta[name=csrf_token]`, `meta[name=_csrf]`, `input[name=csrfmiddlewaretoken]`, and `input[name=authenticity_token]`, or else from a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`.
+A GET request to a path that ends in `/graphql` or `/api/graphql`, as Canvas uses, adds the same token, and other GET requests do not.
+Before the requests, the run opens the website's home page in the signed-in browser and reads the token from the first of `meta[name=csrf-token]`, `meta[name=csrf_token]`, `meta[name=_csrf]`, `input[name=csrfmiddlewaretoken]`, and `input[name=authenticity_token]`, or else from the URL-decoded value of the first readable cookie whose name contains `csrf` or `xsrf` in any case, such as Canvas's `_csrf_token`.
 When the page has `meta[name=_csrf_header]`, the run also sends the token under the header name in that tag.
+When a readable `JSESSIONID` cookie, without its surrounding quotes, starts with `ajax:`, as on LinkedIn, every request, GET included, sends that value as `csrf-token`.
 The value never leaves the website's page, and MCParrot never logs it.
 
 ## Reconnecting expired sessions
