@@ -224,6 +224,8 @@
     .recipe dt { color: var(--muted); font-weight: 600; }
     .recipe dd { margin: 0; overflow-wrap: anywhere; }
     .recipe code { font-size: .9em; padding: .05rem .3rem; border-radius: .25rem; background: var(--teal-soft); color: var(--teal-deep); }
+    .recipe--identity { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+    .recipe .plain-list { margin-top: .6rem; }
     .steps { margin: 0; padding-left: 1.3rem; display: grid; gap: .9rem; font-size: .9em; }
     .fixes { font-size: .8em; }
     .fixes th { color: var(--teal); }
@@ -387,12 +389,12 @@
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg></span>
             <h3>3. ChatGPT uses them</h3>
-            <p>Through one private link, signed in as you.</p>
+            <p>Through one private link. Each tool calls the site’s own data API, with no clicking.</p>
           </div>
         </div>
         <div class="engine">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M2.5 8.5h19"/><path d="M5.5 6.25h.01M8 6.25h.01"/><path d="M8 14.5l2.5 2 5.5-5"/></svg>
-          <p><strong>Every call runs in a Browser Use cloud browser</strong> that stays signed in as you.</p>
+          <p><strong>Browser Use keeps a cloud browser signed in as you</strong> for each website, so every call reaches your account.</p>
         </div>
       </div>
     </section>
@@ -485,30 +487,27 @@
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Browser Use makes it work" data-part="pitch" data-section="Pitch · 2 minutes">
-      <div class="slide-inner split">
-        <div>
-          <h2>Browser Use is the part that makes it work.</h2>
-          <p class="lede">Each website gets its own saved cloud browser profile, signed in as you.</p>
+    <section class="slide" aria-roledescription="slide" aria-label="Not a browser bot: Browser Use signs in as you" data-part="pitch" data-section="Pitch · 2 minutes">
+      <div class="slide-inner">
+        <h2>Not a browser bot. Browser Use is how it signs in as you.</h2>
+        <div class="two-col">
+          <div class="recipe">
+            <h3>MCParrot does</h3>
+            <ul class="plain-list">
+              <li><strong>Calls the website’s own data API.</strong> No clicking through screens, so answers are fast and exact.</li>
+              <li><strong>Builds the tools with Claude</strong> from one recording of you browsing.</li>
+              <li><strong>Sends ChatGPT a small answer,</strong> not a whole page.</li>
+            </ul>
+          </div>
+          <div class="recipe recipe--identity">
+            <h3>Browser Use does</h3>
+            <ul class="plain-list">
+              <li><strong>Stays signed in as you,</strong> with one cloud browser for each website. You sign in once in a live view, Duo included.</li>
+              <li><strong>Signs back in</strong> when the site logs you out. The AI never sees your password.</li>
+              <li><strong>Checks out</strong> with Stripe Pay with Link when you say yes.</li>
+            </ul>
+          </div>
         </div>
-        <ul class="jobs">
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
-            <div><h3>You sign in once</h3><p>In a live view of that browser, Duo included.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
-            <div><h3>Every tool runs there</h3><p>Hidden, in the same signed-in browser.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M20 4.5v4h-4"/></svg></span>
-            <div><h3>An agent signs back in</h3><p>It types your saved password as a secret the AI never sees, and asks you in ChatGPT for the phone code.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M3 10.5h18"/><path d="M7 15h3"/></svg></span>
-            <div><h3>An agent checks out</h3><p>With Stripe Pay with Link, after you confirm.</p></div>
-          </li>
-        </ul>
       </div>
     </section>
 
