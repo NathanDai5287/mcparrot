@@ -66,6 +66,7 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | List or delete recorded requests | `list_recorded_requests`, `delete_recorded_requests` |
 | Find what the website can do | `discover_capabilities` |
 | Save chosen capabilities as tasks | `save_tasks` |
+| Delete one task | `delete_task` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
 | Copy the app's connection link | `get_connection_link` |
@@ -105,6 +106,13 @@ It rejects any address on another origin with an error that names the allowed we
 Nathan chose this tool so that ChatGPT can answer from pages that no saved task covers, such as a syllabus link he pastes.
 He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tasks he chose; it still cannot change anything, because it only opens pages.
 
+Each connection also has a `save_task` tool, titled "Save a page as a task for <app name>", so the connection grows while Nathan uses ChatGPT.
+Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`.
+Its inputs are `name`, `description`, `urlPattern`, `inputs` as a list of name, description, and example, and `returns`, which become one GET request in the same task shape as a chosen task.
+It rejects a URL pattern on another origin, placeholders that do not match the inputs one to one, an empty name or a connection tool's name, and a task whose name or URL pattern, ignoring placeholder names, matches an existing task.
+A saved task appears on the app page, where **Delete** removes it, and becomes its own tool in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
+Nathan chose that ChatGPT saves tasks without asking him first, and he accepted that unwanted tasks can appear until he deletes them on the app page.
+
 Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
 Vercel gives that secret to each deployment as `VERCEL_AUTOMATION_BYPASS_SECRET`, and the app page shows the full link with a **Copy link** button and setup steps.
@@ -135,7 +143,7 @@ Canvas is a useful example, but the same flow works on any website.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
-Saving replaces the app's current tasks, and the app page lists them.
+Saving replaces the app's current tasks, including tasks that ChatGPT saved, and the app page lists them with a **Delete** button for each.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
 MCParrot stores chosen tasks with the app, and each saved reading task becomes a tool in the app's connection right away.
 Testing tasks with changed inputs before they become tools remains aspirational, as the [status page](STATUS.md) records.
@@ -298,6 +306,7 @@ MCParrot has one owner for now, because Vercel Authentication lets only Nathan r
 The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
 The dashboard reads the workspace through `/api/workspace` when it opens and saves the whole workspace after each change.
+`save_task` adds a task to the stored workspace on the server, so an open dashboard shows it only after a reload, and a change made in a dashboard opened before the save overwrites it, which the [status page](STATUS.md) lists as a gap.
 The first time it finds no stored workspace, it copies apps that an earlier version saved in this browser's local storage.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
 Operation status for tasks that outlast one request remains aspirational.
@@ -356,8 +365,8 @@ MCParrot keeps every trace and every session because it has one user, and it sen
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, one `task.request` for each request a task or `read_page` runs, and one `page.read` with the text size for each HTML page opened as text |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, and each task run's and `read_page` call's outcome, including whether the website was signed out |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, one `task.request` for each request a task or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the task name for each `save_task` call |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each task run's and `read_page` call's outcome, including whether the website was signed out, and each task that ChatGPT saved, with only the app ID and task name |
 | Session Replay | Recordings of dashboard sessions, with all text and inputs masked |
 | AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 

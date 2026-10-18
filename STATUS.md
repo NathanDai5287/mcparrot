@@ -8,7 +8,7 @@ Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authentication.
 Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in Upstash Redis.
-Each app page offers **Sign in to website** through a Browser Use cloud browser, a **Save login** form that stores an encrypted username and password, and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks and a `read_page` tool for any page on its website.
+Each app page offers **Sign in to website** through a Browser Use cloud browser, a **Save login** form that stores an encrypted username and password, and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks, a `read_page` tool for any page on its website, and a `save_task` tool that saves a useful page as a new task.
 When a task finds the website signed out, a Browser Use agent signs in again with the saved login, and the user types any text-message code in the ChatGPT chat.
 The MCP route and saved logins passed direct Node checks, but Browser Use sign-in, automatic sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
 Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring are wired in, but they need events from Nathan's use of the deployed app.
@@ -44,6 +44,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Sign-in through Browser Use | gap | `/api/sign-in` creates the app's Browser Use profile, starts a cloud browser with its live view, and stops it on **Done signing in**; it needs Nathan's live sign-in |
 | Running tasks from ChatGPT | gap | Each tool call runs the task's GET requests inside a Browser Use browser with the app's profile and returns the response, with HTML pages as visible text and up to 100,000 characters, or a signed-out error; it needs Nathan's live ChatGPT request |
 | Reading any page from ChatGPT | gap | Each connection's read-only `read_page` tool opens a page on the app's website with the saved sign-in and returns its text; on October 17, 2026, a direct Node check with local headless Chrome in place of Browser Use listed the tool, rejected another origin, returned an HTML page as visible text and JSON as is, and returned the signed-out message for a sign-in redirect; it needs Nathan's live ChatGPT request |
+| Saving tasks from ChatGPT | gap | Each connection's `save_task` tool adds a page-reading task to the app in Redis; on October 17, 2026, a direct Node check of the route handler with an in-memory Redis replacement listed the tool, rejected another origin, a missing input, an extra input, a duplicate name, and a duplicate URL pattern, and saved a valid task that the next tool list showed; it needs Nathan's live ChatGPT use |
+| Delete one task | shipped | Each task on the app page has **Delete**; automatic type and production build checks pass; Nathan tests the live flow; its management MCP operation remains a parity gap |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; sign-in and tasks use Browser Use cloud browsers directly |
 | UI and MCP parity | gap | App connections run saved tasks and read pages, but no dashboard capability has a management MCP operation, and running a task or reading a page has no dashboard control |
 | Task testing with changed inputs | aspirational | Run a chosen task's requests with changed inputs and compare the result with the website before it becomes a tool |
@@ -89,6 +91,7 @@ That check cannot prove a real Browser Use run, because the Browser Use key is r
 Also on October 17, 2026, a direct Node check called the MCP route handler with an in-memory app and a local headless Chrome in place of the Browser Use browser.
 The route listed `read_page` as a read-only tool, rejected an address on another origin with the allowed-website error, returned a small HTML page as its visible text without its script, style, or hidden text, returned JSON unchanged, and returned the signed-out message when the page redirected to a sign-in address.
 The extension's page snapshot, run in the same kind of browser, returned the page address, status 200, `text/html`, and its visible text.
+A later direct Node check that day, with an in-memory Redis replacement, called `save_task` through the route: it rejected another origin, mismatched placeholders, a duplicate name, and a duplicate URL pattern, stored a valid task as one GET request, and the next tool list included it.
 These checks cannot prove a real Browser Use run or a live recording, because the Browser Use key is readable only on Vercel and the extension needs Nathan's browser.
 
 On October 17, 2026, the production build uploaded source maps to the Sentry project `nathan-s4/mcparrot`.
@@ -111,6 +114,8 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Running a task and reading a page with `read_page` work only through ChatGPT; the dashboard has no matching control.
 - `read_page` lets ChatGPT read any page Nathan's account can see on the app's website, not only chosen tasks, which Nathan accepted; it cannot change anything.
 - Pages that build their content only after later user actions can return incomplete text from page-reading tasks and `read_page`.
+- ChatGPT saves tasks with `save_task` without asking Nathan, which he accepted, so unwanted tasks stay until he deletes them on the app page.
+- An open dashboard shows a task that ChatGPT saved only after a reload, and a change made in a dashboard opened before the save, including **Save tasks**, removes it.
 - Anyone with an app's connection link can use the whole site until the bypass secret is regenerated.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
