@@ -21,5 +21,5 @@ export default clerkMiddleware((_auth, request) => {
 }, { signInUrl: "/sign-in" });
 
 export const config = {
-  matcher: ["/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/api/(.*)"],
+  matcher: ["/((?!_next|mcp/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/api/(.*)"],
 };
