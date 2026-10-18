@@ -98,7 +98,8 @@ Users who manage apps only through the UI do not need the management connection,
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
 Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
-The tool name is the task name in lowercase, with each run of other characters replaced by an underscore and cut to 64 characters.
+The tool name is the task name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
+So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
 So each task name must give a non-empty tool name that no other task in the app shares and that is not `read_page`, `save_task`, or `submit_verification_code`, because each tool in a connection needs its own name.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
