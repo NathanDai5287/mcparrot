@@ -52,7 +52,10 @@ function table(items: unknown[]) {
   const columns = [...new Set(rows.flatMap(Object.keys))];
   const filledCells = rows.reduce((count, row) => count + Object.keys(row).length, 0);
   if (filledCells < columns.length * rows.length * sharedColumnShare) return undefined;
-  return [columns, ...rows.map((row) => columns.map((column) => row[column]))].map((line) => line.map(cell).join(" | ")).join("\n");
+  const constant = columns.filter((column) => rows.every((row) => column in row && JSON.stringify(row[column]) === JSON.stringify(rows[0][column])));
+  const varying = constant.length < columns.length ? columns.filter((column) => !constant.includes(column)) : columns;
+  const shared = varying === columns ? [] : [`every row: ${constant.map((column) => `${column}=${cell(rows[0][column])}`).join("; ")}`];
+  return [...shared, ...[varying, ...rows.map((row) => varying.map((column) => row[column]))].map((line) => line.map(cell).join(" | "))].join("\n");
 }
 
 function rendered(value: unknown): string {
