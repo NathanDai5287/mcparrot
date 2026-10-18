@@ -69,6 +69,7 @@ async function deleteApp(app: Website) {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
   const apps = await deleteStoredApp(app.id, appKeys(app.id));
+  await cleanUp(() => removeAppListing(app));
   await stopWarmBrowser(app.id);
   const { browserId } = pending ?? {};
   if (browserId) await cleanUp(() => stopBrowser(browserId));
