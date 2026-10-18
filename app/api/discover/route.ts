@@ -9,9 +9,11 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 function discoveryPrompt(websiteUrl: string, requests: CapturedRequest[]) {
-  return `A person browsed ${websiteUrl} while we recorded the data requests the page made.
+  return `A person browsed ${websiteUrl} while we recorded the pages they opened and the data requests those pages made.
 Each request below has its method, URL, status, response content type, and a short, truncated sample of the response.
+Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
 List the distinct, useful things an assistant could do for this person with these requests, such as listing, searching, or reading information.
+Suggest page-reading tasks for pages whose text is useful, such as "Read course syllabus" with a {courseId} input, especially when no data request returns the same information.
 Ignore analytics, configuration, feature flags, and authentication requests.
 For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method and URL pattern, with {placeholders} for values that change), the inputs a person could change (name, description, and an example taken from the requests), and what it returns.
 Do not use any tools. Reply with ONLY JSON in this shape and no other text:

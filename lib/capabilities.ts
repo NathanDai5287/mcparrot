@@ -1,4 +1,4 @@
-export type CapturedRequest = { method: string; url: string; pattern: string; status: number; contentType: string; sample: string };
+export type CapturedRequest = { kind?: "page"; method: string; url: string; pattern: string; status: number; contentType: string; sample: string };
 
 export type Capability = {
   name: string;

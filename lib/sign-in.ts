@@ -4,9 +4,9 @@ import type { RunCreateBody, SecretBinding } from "browser-use-sdk/v4";
 import type { Page } from "playwright-core";
 import { z } from "zod";
 import { browserUse, stopBrowser, withPage } from "./browser-use";
-import type { Task, Website } from "./capabilities";
+import type { Website } from "./capabilities";
 import { readLogin, type Login } from "./login";
-import { runTask, signedOutMessage, type TaskInputs } from "./run-task";
+import { signedOutMessage } from "./run-task";
 import { updateStoredApp } from "./workspace";
 
 const pendingSignInSeconds = 900;
@@ -87,9 +87,9 @@ async function signIn(app: Website & { browserProfileId: string }, login: Login)
   await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
 }
 
-export async function runTaskSigningIn(app: Website, task: Task, inputs: TaskInputs) {
+export async function readSigningIn(app: Website, read: (app: Website) => Promise<string>) {
   try {
-    return await runTask(app, task, inputs);
+    return await read(app);
   } catch (error) {
     if ((error as Error).message !== signedOutMessage) throw error;
   }
@@ -97,7 +97,7 @@ export async function runTaskSigningIn(app: Website, task: Task, inputs: TaskInp
   if (!login) throw new Error(signedOutMessage);
   if (await readPendingSignIn(app.id)) return codeSentMessage;
   const signingInApp = { ...app, browserProfileId: app.browserProfileId ?? await createProfile(app) };
-  return await signIn(signingInApp, login) ?? runTask(signingInApp, task, inputs);
+  return await signIn(signingInApp, login) ?? read(signingInApp);
 }
 
 export async function submitVerificationCode(app: Website, code: string) {

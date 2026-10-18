@@ -9,6 +9,7 @@ const dataContentType = /json|xml|graphql/i;
 const authenticationPath = /\b(log-?in|log-?out|sign-?in|sign-?out|auth|authorize|oauth2?|token|session|password|sso|saml|cas)\b/i;
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
 const secretParameter = /token|key|auth|password|secret|session|sig/i;
+const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
 
@@ -57,13 +58,8 @@ function rememberResponse({ requestId, type, response }) {
   request.contentType = response.mimeType;
 }
 
-async function recordRequest(tabId, requestId) {
-  const request = pendingRequests.get(requestId);
-  pendingRequests.delete(requestId);
-  if (!request?.contentType) return;
-  const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
-  const captured = { ...request, sample: body && !body.base64Encoded ? sampleOf(body.body) : "" };
-  await update(async () => {
+function save(tabId, captured) {
+  return update(async () => {
     const { active } = await chrome.storage.session.get("active");
     const { explorations = {} } = await chrome.storage.local.get("explorations");
     if (active?.tabId !== tabId) return;
@@ -74,7 +70,26 @@ async function recordRequest(tabId, requestId) {
   });
 }
 
+async function recordRequest(tabId, requestId) {
+  const request = pendingRequests.get(requestId);
+  pendingRequests.delete(requestId);
+  if (!request?.contentType) return;
+  const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
+  await save(tabId, { ...request, sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
+}
+
+async function recordPage(tabId) {
+  const evaluation = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: pageSnapshot, returnByValue: true }).catch(() => undefined);
+  const page = evaluation?.result?.value;
+  if (page?.contentType !== "text/html") return;
+  const url = new URL(page.url);
+  if (!url.protocol.startsWith("http") || authenticationPath.test(url.pathname)) return;
+  const sample = page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength);
+  await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern: url.origin + pathPattern(url), status: page.status, contentType: page.contentType, sample });
+}
+
 chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (method === "Page.loadEventFired") void recordPage(source.tabId);
   if (method === "Network.requestWillBeSent") rememberRequest(params);
   if (method === "Network.responseReceived") rememberResponse(params);
   if (method === "Network.loadingFailed") pendingRequests.delete(params.requestId);
@@ -94,6 +109,7 @@ async function startRecording(appId, websiteUrl) {
   const tab = await chrome.tabs.create({ url: "about:blank" });
   await chrome.debugger.attach({ tabId: tab.id }, "1.3");
   await chrome.debugger.sendCommand({ tabId: tab.id }, "Network.enable");
+  await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
   await chrome.storage.session.set({ active: { appId, tabId: tab.id } });
   await chrome.tabs.update(tab.id, { url: websiteUrl });
 }

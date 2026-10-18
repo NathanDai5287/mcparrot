@@ -3,8 +3,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
-import { isReadingTask } from "../../../../lib/run-task";
-import { runTaskSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
+import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
+import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { readWorkspace } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -28,8 +28,15 @@ function appServer(app: Website) {
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
       annotations: { readOnlyHint: true },
-    }, async (inputs) => textResult(await runTaskSigningIn(app, task, inputs)));
+    }, async (inputs) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs))));
   }
+  const website = new URL(app.url).origin;
+  server.registerTool("read_page", {
+    title: `Read a page on ${app.name}`,
+    description: `Open any page on ${website} that the signed-in user can see and return its text. Use it for pages that no other tool covers, such as a link that the user shares.`,
+    inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
+    annotations: { readOnlyHint: true },
+  }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
     description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a task result says that a code was sent.`,
