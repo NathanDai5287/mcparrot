@@ -24,7 +24,7 @@ export function ImagePanel({ app }: { app: Website }) {
   }
 
   return <SetupCard title="View image">
-    <p>Paste the address of an image on {app.name}, such as a chart in a post. MCParrot opens it with your website sign-in and copies its text and numbers, the same way ChatGPT’s view_image tool does.</p>
+    <p>Paste the address of an image from {app.name}, such as a chart in a post. MCParrot opens an image on the website with your website sign-in, opens an https image on another website, such as its image server, without it, and copies its text and numbers, the same way ChatGPT’s view_image tool does.</p>
     <form className="editor" onSubmit={read}>
       <label htmlFor={`image-url-${app.id}`}>Image address</label>
       <input id={`image-url-${app.id}`} name="url" type="text" required maxLength={2000} placeholder="https://…" />

@@ -116,7 +116,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
-    description: `Read one image on ${website} or its subdomains and return its text and numbers and a short description of any chart. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
+    description: `Read one image and return its text and numbers and a short description of any chart. It opens images on ${website} with the user's sign-in and https images on any other website, such as an image server that ${website} uses, without the sign-in. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
     inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult((await viewImage(app, url)).text));

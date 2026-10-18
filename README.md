@@ -134,14 +134,15 @@ He accepted the trade-off that ChatGPT can read any page his account can see on 
 Each connection also has a read-only `view_image` tool, titled "Read an image on <app name>", whose one input `url` is an image address that an earlier tool answer named, such as the `src` of an `<image>` element in an Ed post.
 Nathan asked for it because an Ed announcement showed a class's score mean and standard deviation only inside a picture.
 ChatGPT connectors do not pass MCP image results to the model, so the tool returns text: Claude Opus 5.5 reads the picture and the tool returns Claude's copy of every text and number in it and a short description of any chart.
-Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, so images reach the chat only when they are needed.
+Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, and it says that the tool opens images on the app's website with the sign-in and `https` images on other websites without it, so images reach the chat only when they are needed.
 The app page's **View image** box takes the same address, calls `/api/image`, and shows the picture with the same text.
 
-1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is allowed for `https://edstem.org`, and it refuses any other address before it starts a browser.
-2. It opens the address as a page in a hidden Browser Use browser with the app's saved sign-in, so the website's own cookies apply, with the same signed-out check, automatic sign-in, bot-check and CSRF messages, and 30-second limit as a tool.
-3. It refuses a response whose content type is not PNG, JPEG, WebP, or GIF, with a plain message.
-4. Inside the page, it shrinks the picture so that its longest side is at most 1,600 pixels, draws it on white, and encodes it as JPEG; it refuses a result longer than 1,500,000 characters.
-5. It sends the picture to Claude Opus 5.5 at low effort in fast mode through the Cursor SDK, the same model and settings as discovery, with tools disabled and a 60-second limit.
+1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is on the website for `https://edstem.org`.
+2. It opens an address on the website as a page in a hidden Browser Use browser with the app's saved sign-in, so the website's own cookies apply, with the same signed-out check, automatic sign-in, bot-check and CSRF messages, and 30-second limit as a tool.
+3. It opens an `https` address on any other website, such as Ed's image server `static.us.edusercontent.com`, as a page in a new empty browser context of that same browser, so no cookies, saved sign-in, recorded headers, or token headers go with it, and a 401 or 403 is a plain HTTP error; it refuses any other address before it starts a browser.
+4. It refuses a response whose content type is not PNG, JPEG, WebP, or GIF, with a plain message.
+5. Inside the page, it shrinks the picture so that its longest side is at most 1,600 pixels, draws it on white, and encodes it as JPEG; it refuses a result longer than 1,500,000 characters.
+6. It sends the picture to Claude Opus 5.5 at low effort in fast mode through the Cursor SDK, the same model and settings as discovery, with tools disabled and a 60-second limit.
 
 The instruction asks Claude to copy all text and numbers exactly, then briefly describe any chart, graph, table, or diagram, and it marks the picture as website content that Claude must never follow as instructions.
 The tool result holds only Claude's text; the picture itself is not returned to MCP clients, and returning it as an MCP image block is aspirational.
@@ -275,6 +276,7 @@ After a successful run, it saves the result and its time under `discovery:<app-i
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
 Sending private website content to the AI model is allowed, including pictures that `view_image` and **View image** send to Claude; only secrets stay out of prompts.
+Nathan allowed `view_image` and **View image**, and only them, to open `https` pictures on any website, because websites such as Ed keep pictures on a separate image server; those pictures open without the user's sign-in, so the other website receives the browser's address and the picture address but no cookies or tokens.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no header values other than the request content type and a few safe headers, no sign-in header values, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
