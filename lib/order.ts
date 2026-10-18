@@ -7,6 +7,7 @@ import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, sto
 import type { Ordering, Website } from "./capabilities";
 import { signedOutMessage } from "./run-task";
 import { withLock } from "./sign-in";
+import { appOwner } from "./workspace";
 
 const browserKeepAliveSeconds = 1800;
 const orderRecordSeconds = 3600;
@@ -33,13 +34,21 @@ const Cart = z.object({
 const CheckoutResult = z.object({ outcome: z.enum(["ready", "signed_out", "failed"]), cart: Cart.nullable(), problem: z.string() });
 const PaymentResult = z.object({ outcome: z.enum(["placed", "total_changed", "declined", "failed"]), total: usd, confirmation: z.string() });
 const LinkStatus = z.object({ isConnected: z.boolean(), connectionId: z.string().nullish(), mode: z.enum(["test", "live"]).nullish() });
+const PendingOrder = z.object({
+  orderId: z.string(),
+  sessionId: z.string(),
+  runId: z.string(),
+  status: z.enum(["preparing", "ready", "placing", "placed", "failed", "cancelled"]),
+  paymentStep: z.enum(["checking_total", "starting_payment"]).optional(),
+  cart: Cart.optional(),
+  problem: z.string().optional(),
+  confirmation: z.string().optional(),
+});
 
 export type Cart = z.infer<typeof Cart>;
 export type LinkStatus = z.infer<typeof LinkStatus>;
-type OrderStatus = "preparing" | "ready" | "placing" | "placed" | "failed" | "cancelled";
 type FinishedRun = Pick<RunSummary, "status" | "output">;
-type PaymentStep = "checking_total" | "starting_payment";
-type PendingOrder = { orderId: string; sessionId: string; runId: string; status: OrderStatus; paymentStep?: PaymentStep; cart?: Cart; problem?: string; confirmation?: string };
+type PendingOrder = z.infer<typeof PendingOrder>;
 export type OrderView = Omit<PendingOrder, "sessionId" | "runId" | "paymentStep">;
 
 export class OrderRefused extends Error {
@@ -48,8 +57,9 @@ export class OrderRefused extends Error {
   }
 }
 
-export const testModeOnlyMessage = "MCParrot places orders only when Browser Use Pay with Link is in test mode. Link is in live mode, so MCParrot did not place this order.";
-export const linkUnavailableMessage = "MCParrot could not confirm that Browser Use Pay with Link is connected in test mode, so it did not place this order. Connect Link under Integrations in Browser Use, then try again.";
+const testModeOnlyMessage = "MCParrot places orders only when Browser Use Pay with Link is in test mode. Link is in live mode, so MCParrot did not place this order.";
+const linkUnavailableMessage = "MCParrot could not confirm that Browser Use Pay with Link is connected in test mode, so it did not place this order. Connect Link under Integrations in Browser Use, then try again.";
+const deletedAppMessage = "This app no longer exists in MCParrot.";
 const orderingOffMessage = "Ordering is off for this app. Turn on Ordering on the app page in MCParrot first.";
 const orderBusyMessage = "MCParrot is already working on this order. Wait a minute, then try again.";
 const orderInProgressMessage = "An order is already in progress for this app. Check it, or cancel it before you prepare a new one.";
@@ -94,21 +104,20 @@ const dollars = (amount: number) => `$${amount.toFixed(2)}`;
 
 export const pendingOrderKey = (appId: string) => `pending-order:${appId}`;
 const lockKey = (appId: string) => `order-lock:${appId}`;
-const readOrder = (appId: string) => Redis.fromEnv().get<PendingOrder>(pendingOrderKey(appId));
-const saveOrder = (appId: string, order: PendingOrder) => Redis.fromEnv().set(pendingOrderKey(appId), order, { ex: orderRecordSeconds });
+const readOrder = async (appId: string) => PendingOrder.safeParse(await Redis.fromEnv().get(pendingOrderKey(appId))).data ?? null;
 const isActive = (order: PendingOrder) => ["preparing", "ready", "placing"].includes(order.status);
 const isFinished = (run: Pick<RunSummary, "status">) => ["completed", "failed", "cancelled"].includes(run.status);
 const view = ({ sessionId: _sessionId, runId: _runId, paymentStep: _paymentStep, ...order }: PendingOrder): OrderView => order;
 const agentText = (text: string | undefined) => text?.replace(/\s+/g, " ").trim().slice(0, agentTextLength) || undefined;
 const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export function requireTestMode(link: LinkStatus | undefined) {
+function requireTestMode(link: LinkStatus | undefined) {
   if (link?.mode === "live") throw new OrderRefused("live_mode", testModeOnlyMessage);
   if (link?.mode !== "test" || !link.isConnected || !link.connectionId) throw new OrderRefused("link_unavailable", linkUnavailableMessage);
   return link.connectionId;
 }
 
-export function requireAllowedTotal(limitUsd: number, approvedTotal: number, checkoutTotal: number) {
+function requireAllowedTotal(limitUsd: number, approvedTotal: number, checkoutTotal: number) {
   if (cents(checkoutTotal) > cents(limitUsd)) throw new OrderRefused("over_limit", `The total ${dollars(checkoutTotal)} is above this app's ${dollars(limitUsd)} spending limit, so MCParrot did not place the order.`);
   if (cents(checkoutTotal) !== cents(approvedTotal)) throw new OrderRefused("total_changed", `The total changed from ${dollars(approvedTotal)} to ${dollars(checkoutTotal)}, so MCParrot did not place the order. Show the new total, and place the order again only after it is approved.`);
 }
@@ -165,6 +174,14 @@ async function stopOrderBrowser(sessionId: string) {
 export async function stopOrder(order: Pick<PendingOrder, "runId" | "sessionId">) {
   await ignoreErrors(() => browserUse().runs.cancel(order.runId));
   await stopOrderBrowser(order.sessionId);
+}
+
+async function saveOrder(appId: string, order: PendingOrder) {
+  if (!await appOwner(appId)) {
+    await stopOrder(order);
+    throw new OrderRefused("no_app", deletedAppMessage);
+  }
+  await Redis.fromEnv().set(pendingOrderKey(appId), order, { ex: orderRecordSeconds });
 }
 
 export function prepareOrder(app: Website, request: string) {
