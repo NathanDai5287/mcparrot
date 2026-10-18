@@ -34,7 +34,8 @@ const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejecte
 
 const passwordOutcomes = ["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"] as const;
 const googleOutcomes = ["signed_in", "needs_user", "failed"] as const;
-type ToolCall = { toolName: string };
+type ToolCall = { toolName: string; args?: unknown };
+export type Rerun = (app: Website, toolName: string, args: unknown) => Promise<string> | undefined;
 type PendingSignIn = { sessionId: string; browserId: string; cdpUrl: string } & Partial<ToolCall>;
 type SigningInApp = Website & { browserProfileId: string };
 
@@ -287,7 +288,7 @@ export async function readSigningIn<T>(app: Website, read: (app: Website) => Pro
   return deadline - Date.now() < rereadMilliseconds ? signInFinishedText(call?.toolName) : read(signedIn);
 }
 
-export const submitVerificationCode = (app: Website, code: string) => withSignInLock(app.id, async () => {
+const finishCodeSignIn = (app: Website, code: string) => withSignInLock(app.id, async () => {
   const pending = usesPassword(app) && await readPendingSignIn(app.id);
   if (!pending) throw new Error(noPendingSignInMessage);
   let outcome = "failed";
@@ -316,5 +317,14 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
   await Redis.fromEnv().del(pendingKey(app.id));
   if (outcome !== "signed_in" || !stopped) throw new Error(signInFailedMessage);
   await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
-  return signInFinishedText(pending.toolName);
+  return pending;
 });
+
+export async function submitVerificationCode(app: Website, code: string, rerun?: Rerun) {
+  const deadline = Date.now() + callBudgetMilliseconds;
+  const signedIn = await finishCodeSignIn(app, code);
+  if (typeof signedIn === "string") return signedIn;
+  const { toolName, args } = signedIn;
+  const answer = toolName && rerun && deadline - Date.now() >= rereadMilliseconds ? await rerun((await findApp(app.id))?.app ?? app, toolName, args) : undefined;
+  return answer ?? signInFinishedText(toolName);
+}
