@@ -4,15 +4,12 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
+import { saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { readWorkspace } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-function toolName(taskName: string) {
-  return taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
-}
 
 function inputSchema(task: Task) {
   return Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)]));
@@ -37,6 +34,17 @@ function appServer(app: Website) {
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
+  server.registerTool("save_task", {
+    title: `Save a page as a task for ${app.name}`,
+    description: `After read_page returns useful content for a kind of request the user may repeat, save that page as a reading task without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern, and give one input for each placeholder. The task becomes its own tool in a new chat.`,
+    inputSchema: {
+      name: z.string().describe("A short plain task name, such as Read course syllabus."),
+      description: z.string().describe("What the task does, in one plain sentence."),
+      urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
+      inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder, with the value from the page you read as the example."),
+      returns: z.string().describe("What the task returns, in a few words."),
+    },
+  }, async (pageTask) => textResult(await saveTask(app, pageTask)));
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
     description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a task result says that a code was sent.`,

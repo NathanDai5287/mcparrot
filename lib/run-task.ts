@@ -89,9 +89,14 @@ export function runTask(app: Website, task: Task, inputs: TaskInputs) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, () => readUrls(app, urls));
 }
 
-export function readPage(app: Website, url: string) {
+export function addressOnWebsite(app: Website, url: string) {
   const website = new URL(app.url).origin;
   const address = new URL(url, website);
-  if (address.origin !== website) throw new Error(`read_page only opens pages on ${website}. Give an address on that website or a path such as /courses.`);
+  if (address.origin !== website) throw new Error(`MCParrot only uses pages on ${website}. Give an address on that website or a path such as /courses.`);
+  return address;
+}
+
+export function readPage(app: Website, url: string) {
+  const address = addressOnWebsite(app, url);
   return logOutcome("Page read", { appId: app.id }, () => readUrls(app, [address.href]));
 }
