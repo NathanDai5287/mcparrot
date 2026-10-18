@@ -1,16 +1,23 @@
 import * as Sentry from "@sentry/nextjs";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { Page } from "playwright-core";
 import { timed, withWarmPage, type RunSteps } from "./browser-use";
 import { compactAnswer } from "./compact-answer";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
-import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
+import { bodyPlaceholderPattern, isAllowedRequest, isGetRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
 
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
-const networkQuietTimeout = 5_000;
-const shortPageWait = 2_000;
-const pageLoadTimeout = requestTimeout - networkQuietTimeout - shortPageWait;
+const settleTimeout = 5_000;
+const settlePoll = 100;
+const settledFor = 500;
+const shortPageWait = 1_500;
+const pageLoadTimeout = requestTimeout - settleTimeout;
 const shortPageCharacters = 200;
+const blankPagePath = "/__mcparrot";
+const maximumPageLinks = 50;
+const maximumPageImages = 20;
+const linkTextCharacters = 60;
 const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const maximumImageSide = 1600;
 const maximumImageCharacters = 1_500_000;
@@ -18,10 +25,13 @@ const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your
 const csrfRefusal = /forgery|invalid authenticity token|csrf[^<\n]{0,40}(fail|invalid|missing|mismatch|expired)|(invalid|missing|bad)[^<\n]{0,20}csrf/i;
 const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
-export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
+const doNotRetry = "Do not retry; tell the user: ";
+const retryOnce = "Retry once now. ";
 
-export const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
-export const csrfRefusedMessage = "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
+export const signedOutMessage = doNotRetry + "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
+
+export const blockedMessage = doNotRetry + "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
+export const csrfRefusedMessage = doNotRetry + "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
 
 export type TaskInputs = Record<string, string | undefined>;
 
@@ -32,7 +42,7 @@ type FilledRequest = { method: string; url: string; body?: string; contentType?:
 type RequestFiller = (responses: string[]) => FilledRequest;
 
 class TaskError extends Error {
-  constructor(readonly reason: Reason, message: string) {
+  constructor(readonly reason: Reason, message: string, readonly retryable = false) {
     super(message);
   }
 }
@@ -86,7 +96,7 @@ function filledRequest(app: Website, request: TaskRequest, values: TaskInputs, r
   const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, responses, encodeURIComponent)).href;
   const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
   const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, responses, bodyEncoding);
-  if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
+  if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", doNotRetry + paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers), tokenHeaders: request.tokenHeaders };
 }
 
@@ -108,7 +118,7 @@ const sanitized = (message: string) => (message.split("\n")[0] ?? "").replace(/\
 
 function requireOnWebsite(page: Page, website: string) {
   if (looksSignedOut(page.url())) throw signedOut();
-  if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
+  if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `${doNotRetry}This address left the website ${website}, so MCParrot did not read it.`);
 }
 
 function fetchInPage(page: Page, request: FilledRequest) {
@@ -148,28 +158,40 @@ function fetchInPage(page: Page, request: FilledRequest) {
 
 const visibleText = (page: Page) => page.evaluate((limit) => document.body.innerText.slice(0, limit + 1), maximumResponseCharacters);
 
+const textLength = (page: Page) => page.evaluate(() => document.body?.innerText.length ?? 0);
+
 async function settledText(page: Page) {
-  await page.waitForLoadState("networkidle", { timeout: networkQuietTimeout }).catch(() => undefined);
-  const text = await visibleText(page);
-  if (text.length >= shortPageCharacters) return text;
-  await page.waitForTimeout(shortPageWait);
-  return visibleText(page);
+  const started = performance.now();
+  let length = await textLength(page);
+  let changedAt = started;
+  for (;;) {
+    const now = performance.now();
+    const steady = now - changedAt >= settledFor;
+    if (now - started >= settleTimeout || (steady && (length >= shortPageCharacters || now - started >= shortPageWait))) return visibleText(page);
+    await sleep(settlePoll);
+    const current = await textLength(page);
+    if (current !== length) {
+      length = current;
+      changedAt = performance.now();
+    }
+  }
 }
 
-function readPageText(page: Page, website: string, url: string) {
+function readPageText(page: Page, website: string, url: string, steps: RunSteps, step: string) {
   return Sentry.startSpan({ name: "page.read" }, async (span) => {
     const navigation = await page.goto(url, { waitUntil: "load", timeout: pageLoadTimeout });
     requireOnWebsite(page, website);
     const status = navigation?.status() ?? 200;
     if (status === 401 || status === 403) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
-    const text = await settledText(page);
+    const contentType = navigation?.headers()["content-type"] ?? "text/html";
+    const text = contentType.includes("html") ? await timed(steps, `${step}SettledMs`, () => settledText(page)) : (await navigation!.text()).slice(0, maximumResponseCharacters + 1);
     span.setAttribute("page.text.size", text.length);
     return { status, text };
   });
 }
 
 function httpError(method: string, url: string, status: number) {
-  return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`);
+  return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`, status >= 500);
 }
 
 async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
@@ -182,30 +204,51 @@ async function readRequest(page: Page, website: string, request: FilledRequest, 
   const { method, url } = request;
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
-  if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
+  if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`, true);
   if (response.redirected && looksSignedOut(response.url)) throw signedOut();
   if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
-  if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
+  if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `${doNotRetry}This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
-  const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url));
-  if (status >= 400) throw httpError(method, url, status);
-  return { body: text, summary: `${method} ${url} returned ${status}\n${compactAnswer(text)}` };
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, status: response.status, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
+  return readPageAt(page, website, url, steps, step);
 }
 
-async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps, keepFields: string[]) {
-  await timed(steps, "websiteOpenMs", () => Sentry.startSpan({ name: "page.open_website" }, () => page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout })));
+async function readPageAt(page: Page, website: string, url: string, steps: RunSteps, step: string) {
+  const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url, steps, step));
+  if (status >= 400) throw httpError("GET", url, status);
+  return { body: text, status, summary: `GET ${url} returned ${status}\n${compactAnswer(text)}` };
+}
+
+const graphqlPath = /\/(api\/)?graphql(?:[?#]|$)/;
+
+const needsHomePage = (requests: TaskRequest[]) => requests.some((request) => request.method.toUpperCase() !== "GET" || graphqlPath.test(request.urlPattern) || !!request.tokenHeaders?.length);
+
+async function openBlankPage(page: Page, website: string) {
+  const address = website + blankPagePath;
+  await page.route(address, (route) => route.fulfill({ contentType: "text/html", body: "" }));
+  await page.goto(address, { waitUntil: "domcontentloaded", timeout: requestTimeout }).catch(() => page.goto(`${website}/robots.txt`, { waitUntil: "domcontentloaded", timeout: requestTimeout }));
+}
+
+const openWebsite = (page: Page, website: string, homePage: boolean) => Sentry.startSpan({ name: "page.open_website", attributes: { "page.home": homePage } }, async () => {
+  if (homePage) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+  else await openBlankPage(page, website);
+});
+
+async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps, keepFields: string[], homePage: boolean, everyAnswer: boolean) {
+  steps.homePage = homePage;
+  await timed(steps, "websiteOpenMs", () => openWebsite(page, website, homePage));
   requireOnWebsite(page, website);
   const responses: string[] = [];
   const results = [];
   for (const [index, fill] of requests.entries()) {
     const request = fill(responses);
-    if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+    if (new URL(page.url()).origin !== website) await openWebsite(page, website, homePage);
     const step = `request${index + 1}`;
-    const { body, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step, index === requests.length - 1 ? keepFields : []));
+    const last = index === requests.length - 1;
+    const { body, status, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step, last ? keepFields : []));
     responses.push(body);
-    results.push(summary);
+    results.push(last || everyAnswer ? summary : `${request.method} ${withoutQuery(request.url)} returned ${status}`);
   }
   return results.join("\n\n");
 }
@@ -243,7 +286,7 @@ async function inSignedInBrowser(app: Website, steps: RunSteps, read: (page: Pag
   return withWarmPage(app.id, app.browserProfileId, steps, read);
 }
 
-const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = []) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields));
+const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[], homePage: boolean, everyAnswer: boolean) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields, homePage, everyAnswer));
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -254,7 +297,7 @@ function failureReason(error: Error): Reason {
   return "failed";
 }
 
-function logOutcome(name: string, attributes: Record<string, string | number | boolean>, read: (steps: RunSteps) => Promise<string>) {
+function logOutcome(name: string, attributes: Record<string, string | number | boolean>, read: (steps: RunSteps) => Promise<string>, readOnly = true) {
   return Sentry.startSpan({ name: "task.run", attributes: { "task.kind": name } }, async () => {
     const steps: RunSteps = {};
     try {
@@ -264,8 +307,8 @@ function logOutcome(name: string, attributes: Record<string, string | number | b
     } catch (error) {
       const reason = failureReason(error as Error);
       Sentry.logger.warn(`${name} failed`, { ...attributes, ...steps, signedOut: reason === "signed_out", reason });
-      if (error instanceof TaskError) throw error;
-      throw new TaskError(reason, sanitized((error as Error).message));
+      const failure = error instanceof TaskError ? error : new TaskError(reason, sanitized((error as Error).message), reason === "timeout" || reason === "fetch_failed");
+      throw readOnly && failure.retryable ? new TaskError(failure.reason, retryOnce + failure.message) : failure;
     }
   });
 }
@@ -273,8 +316,8 @@ function logOutcome(name: string, attributes: Record<string, string | number | b
 export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer = false) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, (steps) => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields);
-  });
+    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields ?? [], needsHomePage(task.requests), fullAnswer);
+   }, task.requests.every(isGetRequest));
 }
 
 export function addressOnWebsite(app: Website, url: string) {
@@ -284,9 +327,30 @@ export function addressOnWebsite(app: Website, url: string) {
   return address;
 }
 
+const pageLinks = (page: Page) => page.evaluate(({ maximumLinks, maximumImages, textCharacters }) => {
+  const links = new Map<string, string>();
+  for (const link of document.querySelectorAll("a[href]")) {
+    const address = new URL((link as HTMLAnchorElement).href, location.href);
+    const path = address.pathname + address.search;
+    const text = ((link as HTMLElement).innerText || link.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, textCharacters);
+    if (address.origin === location.origin && text && path !== location.pathname + location.search && !links.has(path)) links.set(path, text);
+    if (links.size >= maximumLinks) break;
+  }
+  const images = [...new Set([...document.images].map((image) => image.currentSrc || image.src).filter((source) => /^https?:/.test(source)))].slice(0, maximumImages);
+  return [links.size ? `Links on this page (text -> path):\n${[...links].map(([path, text]) => `${text} -> ${path}`).join("\n")}` : "", images.length ? `Images on this page:\n${images.join("\n")}` : ""].filter(Boolean).join("\n\n");
+}, { maximumLinks: maximumPageLinks, maximumImages: maximumPageImages, textCharacters: linkTextCharacters });
+
+async function readWholePage(page: Page, website: string, url: string, steps: RunSteps) {
+  const { status, text } = await timed(steps, "request1PageReadMs", () => readPageText(page, website, url, steps, "request1"));
+  if (status >= 400) throw httpError("GET", url, status);
+  const links = await pageLinks(page).catch(() => "");
+  return `GET ${url} returned ${status}\n${compactAnswer(links ? `${links}\n\n${text}` : text)}`;
+}
+
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps));
+  const website = new URL(app.url).origin;
+  return logOutcome("Page read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => timed(steps, "request1Ms", () => readWholePage(page, website, address.href, steps))));
 }
 
 async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>) {
