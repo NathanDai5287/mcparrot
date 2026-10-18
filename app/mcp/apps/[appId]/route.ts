@@ -16,8 +16,10 @@ import { findApp } from "../../../../lib/workspace";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+const fullAnswerInput = z.boolean().optional().describe("Use only when the short answer lacks something needed. It skips the field filter; MCParrot still shortens the answer.");
+
 function inputSchema(task: Task) {
-  return Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)]));
+  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)])), fullAnswer: fullAnswerInput };
 }
 
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
@@ -103,7 +105,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
       annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    }, async (inputs) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs))));
+    }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer))));
   }
   const website = new URL(app.url).origin;
   server.registerTool("read_page", {
@@ -131,6 +133,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
       earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first, in order, as step1, step2, and so on, with the same fields as the main request, which runs last. A later request uses a value from an earlier response with {step1.cart.id} or {step2.items.0.id}."),
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
       returns: z.string().describe("What the tool returns, in a few words."),
+      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths in the last response that the answer keeps, such as threads[].title or data.store.menu[].items[].price, where [] means every array element. Leave it out to keep every field."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));

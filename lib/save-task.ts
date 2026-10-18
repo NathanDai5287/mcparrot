@@ -45,7 +45,7 @@ function withReplacedTask(app: Website, taskId: string, capability: Capability) 
 
 export const replaceTask = (appId: string, taskId: string, capability: Capability) => changeApp(appId, (app) => withReplacedTask(app, taskId, capability));
 
-const taskContent = ({ name, description, requests, inputs, returns }: Capability) => JSON.stringify({ name, description, requests, inputs, returns });
+const taskContent = ({ name, description, requests, inputs, returns, keepFields }: Capability) => JSON.stringify({ name, description, requests, inputs, returns, keepFields });
 
 export function unsavedCapabilities(app: Website, capabilities: DiscoveredCapability[]): DiscoveredCapability[] {
   return capabilities.flatMap(({ updatesTaskId, ...capability }) => {

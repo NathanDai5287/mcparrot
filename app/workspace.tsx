@@ -71,6 +71,7 @@ function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolea
       <dl className="tool-facts">
         <dt>Inputs</dt><dd>{tool.inputs.length === 0 ? "None" : <ul>{tool.inputs.map((input) => <li key={input.name}><span className="tool-input-name">{input.name}</span> {input.description}</li>)}</ul>}</dd>
         <dt>Returns</dt><dd>{tool.returns}</dd>
+        <dt>Answer fields</dt><dd>{tool.keepFields?.length ? tool.keepFields.join(", ") : "All"}</dd>
         <dt>Requests</dt><dd><ul>{tool.requests.map((request, index) => <li key={index}><span className="tool-input-name">Step {index + 1}: {request.method}</span> {request.urlPattern}{request.bodyPattern && ` with body ${request.bodyPattern}`}</li>)}</ul></dd>
       </dl>
       <button className="delete-link" aria-label={`Delete ${tool.name}`} onClick={onDelete}>Delete tool</button>
