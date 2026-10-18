@@ -1,6 +1,6 @@
 // Checks that public/downloads/mcparrot-explorer.zip holds exactly the files in public/extension.
 import { readFileSync, readdirSync } from "node:fs";
-import { inflateRawSync } from "node:zlib";
+import { crc32, inflateRawSync } from "node:zlib";
 
 const zipPath = "public/downloads/mcparrot-explorer.zip";
 const extensionDir = "public/extension";
@@ -25,13 +25,15 @@ const entries = new Map();
 for (let i = 0; i < entryCount; i++) {
   if (zip.readUInt32LE(offset) !== 0x02014b50) throw new Error(`${zipPath} has a damaged central directory.`);
   const method = zip.readUInt16LE(offset + 10);
+  const crc = zip.readUInt32LE(offset + 16);
   const compressedSize = zip.readUInt32LE(offset + 20);
+  const size = zip.readUInt32LE(offset + 24);
   const nameLength = zip.readUInt16LE(offset + 28);
   const extraLength = zip.readUInt16LE(offset + 30);
   const commentLength = zip.readUInt16LE(offset + 32);
   const localOffset = zip.readUInt32LE(offset + 42);
   const name = zip.toString("utf8", offset + 46, offset + 46 + nameLength);
-  if (!name.endsWith("/")) entries.set(name, { method, compressedSize, localOffset });
+  if (!name.endsWith("/")) entries.set(name, { method, crc, compressedSize, size, localOffset });
   offset += 46 + nameLength + extraLength + commentLength;
 }
 
@@ -46,8 +48,11 @@ for (const file of files) {
     continue;
   }
   try {
-    if (!extract(entry.localOffset, entry.method, entry.compressedSize).equals(readFileSync(`${extensionDir}/${name}`))) {
+    const source = readFileSync(`${extensionDir}/${name}`);
+    if (!extract(entry.localOffset, entry.method, entry.compressedSize).equals(source)) {
       problems.push(`${name} differs from the ZIP`);
+    } else if (entry.size !== source.length || entry.crc !== crc32(source)) {
+      problems.push(`${name} has a wrong size or CRC-32 in the ZIP`);
     }
   } catch (error) {
     problems.push(`${name} cannot be extracted from the ZIP: ${error instanceof Error ? error.message : error}`);
