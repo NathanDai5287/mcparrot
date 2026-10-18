@@ -39,7 +39,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
 | Local teaching connection controls | dormant | Earlier local pairing code remains outside the product UI; the production-only workflow must not launch a local helper |
 | Local reading request capture | dormant | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
-| Hosted teaching controls | gap | Production Browser Use and Vercel Sandbox paths exist; automatic cloud checks and Nathan’s sign-in, capture, and replay demonstration must pass |
+| Hosted teaching controls | gap | The hosted browser opens in a separate popup; reopening uses the same session and captures. Automatic checks pass; Nathan’s sign-in, capture, and replay demonstration must pass |
 | Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; hosted teaching still needs a live demonstration |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
 | Hosted browser sessions | gap | Production Vercel Authentication and secrets are configured; the first cloud browser launch and Berkeley sign-in need a live demonstration |

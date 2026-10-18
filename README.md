@@ -337,8 +337,12 @@ The server reads `BROWSER_USE_API_KEY` and `MCPARROT_SESSION_SECRET` from Sensit
 Neither value is sent to the browser, stored in the repository, or included in request diagnostics.
 
 A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
-The browser's interactive view appears inside the teaching screen; no local service, installation, or connection popup is involved.
-The user signs in there and completes Duo, then starts recording and browses course reading pages.
+Select **Connect Canvas** to open the hosted browser in a separate popup window; no local service or installation is involved.
+The popup opens on the user's click before the connection request, so the browser can allow it.
+The user signs in there and completes Duo, then returns to the task screen to start recording.
+Browse course reading pages in the Canvas window and return to MCParrot to stop recording and review requests.
+Select **Open Canvas window** to focus or reopen the same hosted session without restarting it or deleting its captures.
+If the browser blocks the popup, allow popups for MCParrot and select the button again.
 The recorder observes only supported same-origin Canvas GET requests and syllabus navigation; it excludes authentication traffic and request bodies.
 The pilot returns request labels and numeric course inputs, not raw headers, cookies, or course content.
 Each task has one named hosted recorder; repeated connection attempts reuse the task session instead of creating another paid browser.

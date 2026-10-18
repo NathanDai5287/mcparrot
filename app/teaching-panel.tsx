@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Candidate = { id: string; label: string; kind: string; courseId: string };
 type TeachingState = {
@@ -9,6 +9,12 @@ type TeachingState = {
 };
 const emptyState: TeachingState = { ready: false, recording: false, candidates: [] };
 
+function interactiveBrowserUrl(liveUrl: string) {
+  const url = new URL(liveUrl);
+  url.searchParams.set("readOnly", "false");
+  return url.href;
+}
+
 export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: string; taskId: string; websiteUrl: string; active: boolean }) {
   const [state, setState] = useState<TeachingState>(emptyState);
   const [busy, setBusy] = useState(false);
@@ -16,6 +22,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   const [selectedId, setSelectedId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [testFailed, setTestFailed] = useState(false);
+  const browserWindow = useRef<Window | null>(null);
   const supported = new URL(websiteUrl).origin === "https://bcourses.berkeley.edu";
 
   async function operate(name: string, input?: object) {
@@ -35,11 +42,40 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
         setSelectedId(next.candidates[0]?.id ?? "");
         setCourseId(next.candidates[0]?.courseId ?? "");
       }
+      return next as TeachingState;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "The teaching action failed.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function openBrowser(url = "about:blank") {
+    if (browserWindow.current && !browserWindow.current.closed) {
+      browserWindow.current.focus();
+      return browserWindow.current;
+    }
+    const teachingWindow = window.open(url, `mcparrot-teaching-${appId}-${taskId}`, "popup,width=1440,height=1000");
+    if (!teachingWindow) {
+      setError("Allow popups for MCParrot, then select the browser button again.");
+      return;
+    }
+    teachingWindow.opener = null;
+    browserWindow.current = teachingWindow;
+    teachingWindow.focus();
+    return teachingWindow;
+  }
+
+  async function connectBrowser() {
+    const openedNewWindow = !browserWindow.current || browserWindow.current.closed;
+    const teachingWindow = openBrowser();
+    if (!teachingWindow) return;
+    const next = await operate("create_teaching_session");
+    if (!next?.liveUrl) {
+      if (openedNewWindow) teachingWindow.close();
+      return;
+    }
+    teachingWindow.location.href = interactiveBrowserUrl(next.liveUrl);
   }
 
   useEffect(() => {
@@ -51,20 +87,22 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
 
   const step = !state.ready ? "connect" : state.recording || state.candidates.length === 0 ? "teach" : "review";
   const selected = state.candidates.find(({ id }) => id === selectedId);
+  const liveUrl = state.liveUrl ? interactiveBrowserUrl(state.liveUrl) : undefined;
 
   return <section className="teaching-pilot" aria-label="Teach this task" aria-busy={busy}>
     <ol className="teaching-progress"><li aria-current={step === "connect" ? "step" : undefined}>Connect</li><li aria-current={step === "teach" ? "step" : undefined}>Teach</li><li aria-current={step === "review" ? "step" : undefined}>Review</li></ol>
     {!state.ready && <div className="teaching-step">
       <h2>Open your teaching browser</h2>
-      <p>Sign in to Canvas in the browser below. Nothing runs on your computer.</p>
-      <button className="button primary" disabled={busy} onClick={() => operate("create_teaching_session")}>{busy ? "Opening hosted browser…" : "Connect Canvas"}</button>
+      <p>A separate Canvas window opens for sign-in and teaching. The browser runs in the cloud.</p>
+      <button className="button primary" disabled={busy} onClick={connectBrowser}>{busy ? "Opening hosted browser…" : "Connect Canvas"}</button>
       <p className="field-help">This private pilot uses your Browser Use credits. Each session ends after 30 minutes.</p>
     </div>}
     {state.ready && <>
       <div className="teaching-step">
         <h2>{state.recording ? "Show us the pages you use" : state.candidates.length ? "Review what we observed" : "Sign in, then start recording"}</h2>
-        <p>{state.recording ? "Browse Assignments, Syllabus, or other course reading pages below. Stop when you finish." : state.candidates.length ? "Choose one reading request and test it without navigating Canvas again." : "Complete Canvas sign-in and Duo below. Start recording only after you reach Canvas."}</p>
+        <p>{state.recording ? "Browse course reading pages in the Canvas window. Return here to stop recording when you finish." : state.candidates.length ? "Choose one reading request and test it without navigating Canvas again." : "Sign in and complete Duo in the Canvas window. Return here to start recording after you reach Canvas."}</p>
         <div className="pilot-controls">
+          {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open Canvas window</button>}
           {state.recording ? <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Stop recording</button> : state.candidates.length === 0 && <button className="button primary" disabled={busy} onClick={() => operate("start_recording")}>Start recording</button>}
           <span>{state.recording ? "Recording course reading requests" : `${state.candidates.length} observed requests`}</span>
         </div>
@@ -77,7 +115,6 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
         <div className="pilot-controls"><button className="button primary" disabled={busy || !selected} onClick={() => operate("test_saved_request", { requestId: selectedId, courseId })}>{busy ? "Testing request…" : "Test reading request"}</button></div>
         {!testFailed && !busy && state.lastTest?.requestId === selectedId && state.lastTest.courseId === courseId && <p className="pilot-status" role="status">Reading test passed{state.lastTest.resultCount !== null ? `: ${state.lastTest.resultCount} results` : ": syllabus page received"}. {state.lastTest.changedInput ? "Changed course input tested." : "The original course was tested."}</p>}
       </div>}
-      {state.liveUrl && <iframe className="teaching-browser" src={state.liveUrl} title="Your hosted Canvas teaching browser" allow="autoplay; clipboard-read; clipboard-write" referrerPolicy="no-referrer" />}
       <details className="teaching-details"><summary>Session details</summary>
         <p>This session and its observed requests remain available here until the session ends. Only reading requests are supported.</p>
         <p>Task publication and assistant connections are not available yet.</p>
