@@ -309,32 +309,19 @@ function readImage(page: Page, url: string, website?: string) {
   });
 }
 
-async function untilDeadline(page: Page, deadline: number, signal: AbortSignal | undefined, read: () => Promise<string>) {
-  let expire = () => {};
-  const expired = new Promise<never>((_, reject) => {
-    expire = () => {
-      reject(new TaskError("timeout", outOfTimeMessage));
-      void page.close().catch(() => undefined);
-    };
-  });
-  if (signal?.aborted) {
-    expire();
-    return expired;
-  }
-  const timer = setTimeout(expire, deadline - Date.now());
-  signal?.addEventListener("abort", expire, { once: true });
-  try {
-    return await Promise.race([read(), expired]);
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener("abort", expire);
-  }
-}
+type Closable = { close: () => Promise<unknown> };
 
-async function inSignedInBrowser(app: Website, steps: RunSteps, signal: AbortSignal | undefined, read: (page: Page, deadline: number) => Promise<string>) {
+async function inSignedInBrowser(app: Website, steps: RunSteps, signal: AbortSignal | undefined, read: (page: Page, deadline: number, closeOnStop: (target: Closable) => void) => Promise<string>) {
   const deadline = Date.now() + runBudget;
   if (!app.browserProfileId) throw signedOut();
-  return withWarmPage(app.id, app.browserProfileId, steps, (page) => untilDeadline(page, deadline, signal, () => read(page, deadline)));
+  const stopped = AbortSignal.any([AbortSignal.timeout(runBudget), ...(signal ? [signal] : [])]);
+  const onStop = (stop: () => void) => stopped.aborted ? stop() : stopped.addEventListener("abort", stop, { once: true });
+  const closeOnStop = (target: Closable) => onStop(() => void target.close().catch(() => undefined));
+  const expired = new Promise<never>((_, reject) => onStop(() => reject(new TaskError("timeout", outOfTimeMessage))));
+  return Promise.race([withWarmPage(app.id, app.browserProfileId, steps, (page) => {
+    closeOnStop(page);
+    return read(page, deadline, closeOnStop);
+  }), expired]);
 }
 
 const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = [], signal?: AbortSignal) =>
@@ -384,8 +371,9 @@ export function readPage(app: Website, url: string, signal?: AbortSignal) {
   return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps, [], signal));
 }
 
-async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>) {
+async function inEmptyContext(page: Page, closeOnStop: (target: Closable) => void, read: (page: Page) => Promise<string>) {
   const context = await page.context().browser()!.newContext();
+  closeOnStop(context);
   try {
     return await read(await context.newPage());
   } finally {
@@ -399,5 +387,5 @@ export function readImageDataUrl(app: Website, url: string, signal?: AbortSignal
   if (!address) throw new TaskError("bad_input", `${withoutQuery(url)} is not a valid address, so MCParrot did not read it.`);
   if (isOnWebsite(address, website)) return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, signal, (page) => readImage(page, address.href, website)));
   if (address.protocol !== "https:") throw new TaskError("off_site", `MCParrot only opens images on ${website} or at https addresses on other websites.`);
-  return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, signal, (page) => inEmptyContext(page, (emptyPage) => readImage(emptyPage, address.href))));
+  return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, signal, (page, _deadline, closeOnStop) => inEmptyContext(page, closeOnStop, (emptyPage) => readImage(emptyPage, address.href))));
 }
