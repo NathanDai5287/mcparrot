@@ -99,8 +99,9 @@ function compactBody(body: string, keepFields: string[]) {
   try {
     const parsed: unknown = JSON.parse(body);
     const filtered = keepFields.length ? compacted(picked(parsed, keepFields.map(fieldPath))) : undefined;
-    const isFiltered = filtered !== undefined && isPresent(filtered);
-    return { ...rendered(isFiltered ? filtered : compacted(parsed)), isFiltered };
+    const whole = compacted(parsed);
+    const isFiltered = filtered !== undefined && isPresent(filtered) && JSON.stringify(filtered) !== JSON.stringify(whole);
+    return { ...rendered(isFiltered ? filtered : whole), isFiltered };
   } catch {
     return { text: markup.test(body) ? plainText(body) : body, tables: [], isFiltered: false };
   }
