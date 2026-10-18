@@ -666,12 +666,13 @@ Spans carry only non-secret attributes, such as the app ID, tool name, request c
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
 MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses; `read_page` logs carry only the app ID, the result size, and any failure reason, never the page text.
 Order logs and spans never carry the delivery address, the items, the order request, the Link connection ID, or the Link email.
-Before sending, the SDK removes URL query strings from span names, events, and breadcrumbs, and replaces `token` and bypass secret query values with `[Filtered]` in spans, events, and logs.
+Before sending, the SDK removes URL query strings from span names, events, breadcrumbs, exception values, event messages, and logs, and replaces `token` and bypass secret query values with `[Filtered]` in spans, events, and logs.
+The server does not send Sentry trace headers with its outgoing requests, so websites never receive the project's trace data.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
 The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
-Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
+Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin or a redirect off the website, a missing tool input, a rejected login, a failed, timed-out, or already running sign-in, a Google sign-in that needs the user, an image read that took too long, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, an unreadable checkout total, an order that is busy, already in progress, or not ready, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
 
 ## Workspace navigation behavior
 
