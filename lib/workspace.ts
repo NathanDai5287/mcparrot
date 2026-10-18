@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { Redis } from "@upstash/redis";
 import { z } from "zod";
-import { appIdSchema, capabilitySchema, maxApps, maxTasksPerApp, storedWebsiteSchema, websiteSchema, type Website } from "./capabilities";
+import { appIdSchema, capabilitySchema, maxApps, maxTasksPerApp, orderingSchema, storedWebsiteSchema, websiteSchema, type Website } from "./capabilities";
 
 const workspaceKey = "workspace";
 const changeAttempts = 20;
@@ -18,6 +18,7 @@ export const workspaceOperationSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("deleteApp"), appId: appIdSchema }),
   z.object({ operation: z.literal("addTasks"), appId: appIdSchema, capabilities: z.array(capabilitySchema).min(1).max(200) }),
   z.object({ operation: z.literal("deleteTask"), appId: appIdSchema, taskId: z.string().min(1).max(80) }),
+  z.object({ operation: z.literal("setOrdering"), appId: appIdSchema, ordering: orderingSchema }),
 ]);
 
 export type WorkspaceOperation = z.infer<typeof workspaceOperationSchema>;

@@ -1,4 +1,5 @@
 import { stopBrowser } from "../../../lib/browser-use";
+import { pendingOrderKey, stopOrder } from "../../../lib/order";
 import { addTasks } from "../../../lib/save-task";
 import { AppNotFound, changeApp, changeApps, deleteStoredApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
@@ -21,11 +22,14 @@ export async function GET() {
   }
 }
 
-const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`];
+const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`, pendingOrderKey(appId)];
 
 async function deleteApp(appId: string) {
   const pendingKey = `pending-sign-in:${appId}`;
-  const pending = await storage().get<{ browserId?: string }>(pendingKey).catch((error) => {
+  const [pending, order] = await Promise.all([
+    storage().get<{ browserId?: string }>(pendingKey),
+    storage().get<{ runId: string; sessionId: string }>(pendingOrderKey(appId)),
+  ]).catch((error) => {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
   const apps = await deleteStoredApp(appId, appKeys(appId));
@@ -34,6 +38,7 @@ async function deleteApp(appId: string) {
       await stopBrowser(pending.browserId);
     } catch {}
   }
+  if (order) await stopOrder(order);
   return apps;
 }
 
@@ -44,6 +49,7 @@ function apply(change: WorkspaceOperation) {
   }, appKeys(change.app.id));
   if (change.operation === "deleteApp") return deleteApp(change.appId);
   if (change.operation === "addTasks") return addTasks(change.appId, change.capabilities);
+  if (change.operation === "setOrdering") return changeApp(change.appId, (app) => ({ ...app, ordering: change.ordering }));
   return changeApp(change.appId, (app) => ({ ...app, tasks: app.tasks.filter((task) => task.id !== change.taskId) }));
 }
 

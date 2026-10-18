@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
+import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
@@ -16,6 +17,59 @@ function inputSchema(task: Task) {
 }
 
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
+
+const orderStatusText: Record<OrderView["status"], string> = {
+  preparing: "Browser Use is building the cart. Call check_order again in about 30 seconds.",
+  ready: "The cart is at checkout and nothing has been paid. Show the user every item, the fees, the tip, the total, the delivery address, and the delivery estimate. Call place_order only after the user clearly approves this exact total.",
+  placing: "Browser Use is checking the total and paying with Pay with Link. The user approves the payment in the Link app on their phone. Call check_order again in about 30 seconds.",
+  placed: "The website confirmed the order.",
+  failed: "The order did not finish.",
+  cancelled: "The order was cancelled.",
+};
+
+function orderText(order: OrderView | null) {
+  if (!order) return "No order is in progress for this app.";
+  return [`Order ${order.orderId}: ${orderStatusText[order.status]}`, order.problem, order.confirmation && `Confirmation: ${order.confirmation}`, order.cart && `Cart: ${JSON.stringify(order.cart)}`].filter(Boolean).join("\n");
+}
+
+function linkText(link: LinkStatus | undefined) {
+  if (!link) return "MCParrot could not read the Browser Use Pay with Link status.";
+  if (!link.isConnected) return "Browser Use Pay with Link is not connected.";
+  if (link.mode === "test") return "Browser Use Pay with Link is connected in test mode.";
+  return "Browser Use Pay with Link is in live mode, which MCParrot blocks, so orders cannot be placed.";
+}
+
+function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
+  const orderIdInput = { orderId: orderIdSchema.describe("The order ID that prepare_order returned.") };
+  server.registerTool("prepare_order", {
+    title: `Prepare an order on ${app.name}`,
+    description: `Start a Browser Use agent that builds a cart on ${app.name} from the user's request and stops at checkout without paying. It returns at once with an order ID; call check_order until the cart is ready. Orders are limited to $${limitUsd} each.`,
+    inputSchema: { request: orderRequestSchema.describe("What to order, such as one large pepperoni pizza from a named restaurant.") },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  }, async ({ request }) => textResult(orderText(await prepareOrder(app, request))));
+  server.registerTool("check_order", {
+    title: `Check an order on ${app.name}`,
+    description: "Return the order's progress, its cart and total when it is ready, or its confirmation after payment, and the Pay with Link status.",
+    inputSchema: orderIdInput,
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  }, async ({ orderId }) => {
+    const [order, link] = await Promise.all([checkOrder(app), readLinkStatus()]);
+    if (order && order.orderId !== orderId) throw new Error(noOrderMessage);
+    return textResult(`${orderText(order)}\n${linkText(link)}`);
+  });
+  server.registerTool("place_order", {
+    title: `Place an order on ${app.name}`,
+    description: `Pay for a prepared order with Browser Use Pay with Link. Call it only after the user explicitly approves the exact cart and total that check_order showed. MCParrot refuses unless Link is in test mode, the total is at most $${limitUsd}, and the checkout total still matches the approved total. The user also approves the payment in the Link app. Then call check_order for the confirmation.`,
+    inputSchema: orderIdInput,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  }, async ({ orderId }) => textResult(orderText(await placeOrder(app, orderId))));
+  server.registerTool("cancel_order", {
+    title: `Cancel an order on ${app.name}`,
+    description: "Stop the order's Browser Use agent and close its browser. The cart can stay in the website account.",
+    inputSchema: orderIdInput,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, async ({ orderId }) => textResult(orderText(await cancelOrder(app, orderId))));
+}
 
 function appServer(app: Website) {
   const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
@@ -72,6 +126,7 @@ function appServer(app: Website) {
     inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
   }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
+  if (app.ordering?.enabled) registerOrderTools(server, app, app.ordering.limitUsd);
   return server;
 }
 

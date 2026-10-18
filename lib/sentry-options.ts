@@ -62,6 +62,12 @@ export const sentryOptions = {
     /^MCParrot only uses pages on /,
     /^The website rejected the saved login/,
     /^Browser Use could not finish signing in/,
+    /^MCParrot places orders only when Browser Use Pay with Link is in test mode/,
+    /^MCParrot could not confirm that Browser Use Pay with Link/,
+    /spending limit, so MCParrot did not place the order/,
+    /^The total changed from /,
+    /^Ordering is off for this app/,
+    /^No order with this ID is waiting/,
   ],
   dataCollection: {
     userInfo: false,
