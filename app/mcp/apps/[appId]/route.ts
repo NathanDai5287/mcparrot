@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { isOwner } from "../../../../lib/account";
-import type { Task, Website } from "../../../../lib/capabilities";
+import { capabilitySchema, type Task, type Website } from "../../../../lib/capabilities";
 import { connectionAllowed } from "../../../../lib/connection";
 import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
@@ -11,10 +11,13 @@ import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-ta
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { isGetRequest } from "../../../../lib/task-request";
 import { viewImage } from "../../../../lib/view-image";
-import { findApp } from "../../../../lib/workspace";
+import { findApp, StorageUnavailable } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+const capabilityField = capabilitySchema.shape;
+const requestField = capabilityField.requests.element.shape;
 
 const fullAnswerInput = z.boolean().optional().describe("Use only when the short answer lacks something needed. It skips the field filter; MCParrot still shortens the answer.");
 
@@ -124,16 +127,16 @@ function appServer(app: Website, orderLimitUsd?: number) {
     title: `Save a tool for ${app.name}`,
     description: `Save a new tool for ${app.name} that reads a page with GET or sends one POST request, such as a GraphQL query. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern and bodyPattern, and give one input for each placeholder. When the request needs a value that an earlier JSON response returns, such as a cart ID, list those requests in earlierRequests and use {stepN.path.to.value} for that value, where step1 is the first earlier request and array positions are numbers; these placeholders need no input. MCParrot refuses any request that looks like checkout or payment. The tool appears in a new chat.`,
     inputSchema: {
-      name: z.string().describe("A short plain tool name, such as Read course syllabus."),
-      description: z.string().describe("What the tool does, in one plain sentence."),
+      name: capabilityField.name.describe("A short plain tool name, such as Read course syllabus."),
+      description: capabilityField.description.describe("What the tool does, in one plain sentence."),
       method: z.enum(["GET", "POST"]).optional().describe("GET to read a page, which is the default, or POST to send bodyPattern."),
-      urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
-      bodyPattern: z.string().optional().describe("Only for POST: the request body, usually JSON, with {placeholders} inside string values, such as {\"query\":\"…\",\"variables\":{\"search\":\"{search}\"}}."),
-      contentType: z.string().optional().describe("Only for POST: the body's content type. It defaults to application/json."),
-      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first, in order, as step1, step2, and so on, with the same fields as the main request, which runs last. A later request uses a value from an earlier response with {step1.cart.id} or {step2.items.0.id}."),
-      inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
-      returns: z.string().describe("What the tool returns, in a few words."),
-      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths in the last response that the answer keeps, such as threads[].title or data.store.menu[].items[].price, where [] means every array element. Leave it out to keep every field."),
+      urlPattern: requestField.urlPattern.describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
+      bodyPattern: requestField.bodyPattern.describe("Only for POST: the request body, usually JSON, with {placeholders} inside string values, such as {\"query\":\"…\",\"variables\":{\"search\":\"{search}\"}}."),
+      contentType: requestField.contentType.describe("Only for POST: the body's content type. It defaults to application/json."),
+      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: requestField.urlPattern, bodyPattern: requestField.bodyPattern, contentType: requestField.contentType })).max(9).optional().describe("Optional requests that run first, in order, as step1, step2, and so on, with the same fields as the main request, which runs last. A later request uses a value from an earlier response with {step1.cart.id} or {step2.items.0.id}."),
+      inputs: capabilityField.inputs.describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
+      returns: capabilityField.returns.describe("What the tool returns, in a few words."),
+      keepFields: capabilityField.keepFields.describe("Optional JSON paths in the last response that the answer keeps, such as threads[].title or data.store.menu[].items[].price, where [] means every array element. Leave it out to keep every field."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
@@ -147,13 +150,34 @@ function appServer(app: Website, orderLimitUsd?: number) {
   return server;
 }
 
+const unavailable = (message: string) => Response.json({ jsonrpc: "2.0", error: { code: -32603, message }, id: null }, { status: 503 });
+
+async function ownerOrderLimit(app: Website, ownerId: string) {
+  if (!app.ordering?.enabled) return undefined;
+  try {
+    return await isOwner(ownerId) ? app.ordering.limitUsd : undefined;
+  } catch (error) {
+    Sentry.captureException(error);
+    return undefined;
+  }
+}
+
 async function POST(request: Request, { params }: RouteContext<"/mcp/apps/[appId]">) {
   const { appId } = await params;
   Sentry.setTag("app.id", appId);
-  const found = await findApp(appId);
+  let found: Awaited<ReturnType<typeof findApp>>;
+  let allowed: boolean;
+  try {
+    found = await findApp(appId);
+    allowed = !!found && await connectionAllowed(request, found.app, found.ownerId);
+  } catch (error) {
+    if (error instanceof StorageUnavailable) return unavailable(error.message);
+    Sentry.captureException(error);
+    return unavailable("MCParrot could not check this connection link. Try again in a moment.");
+  }
   if (!found) return Response.json({ error: "This MCParrot app does not exist." }, { status: 404 });
-  if (!await connectionAllowed(request, found.app, found.ownerId)) return Response.json({ error: "This connection link is not valid. Copy a new link from the app page in MCParrot." }, { status: 401 });
-  const orderLimitUsd = found.app.ordering?.enabled && await isOwner(found.ownerId) ? found.app.ordering.limitUsd : undefined;
+  if (!allowed) return Response.json({ error: "This connection link is not valid. Copy a new link from the app page in MCParrot." }, { status: 401 });
+  const orderLimitUsd = await ownerOrderLimit(found.app, found.ownerId);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await appServer(found.app, orderLimitUsd).connect(transport);
   return transport.handleRequest(request);

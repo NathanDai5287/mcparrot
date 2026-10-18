@@ -2,38 +2,68 @@ const answerCharacters = 20_000;
 const stringCharacters = 2_000;
 const tableRows = 3;
 const sharedColumnShare = 0.6;
-const noiseKey = /^__typename$|tracking(?![-_]?(?:number|url|link|code|status|id))|analytics|telemetry|experiment|logging/i;
-const markup = /<\/?[a-z][\w:-]*(\s[^<>]*)?\/?>/i;
+const noiseKey = /^__typename$|(?<![a-z])(?:tracking(?![-_]?(?:number|url|link|code|status|id))|analytics|telemetry|experiments?|logging)(?![a-z])/i;
+const tag = /<\/?[a-z][\w:-]*(?:\s+[^\s<>"'=\/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`=]+))?)*\s*\/?>/gi;
+const startsWithMarkup = /^\s*<(?:[a-z!?]|\/[a-z])/i;
 const namedEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
 
-const decoded = (text: string) => text.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => name.startsWith("#") ? String.fromCodePoint(Number(name.slice(1).replace(/^x/i, "0x"))) : namedEntities[name.toLowerCase()] ?? entity);
+const keyWords = (key: string) => key.replace(/([a-z\d])([A-Z])|([A-Z])([A-Z][a-z])/g, "$1$3_$2$4");
+
+function hasMarkup(text: string) {
+  if (startsWithMarkup.test(text)) return true;
+  const closed = new Set(Array.from(text.matchAll(/<\/([a-z][\w:-]*)\s*>/gi), (match) => match[1].toLowerCase()));
+  return closed.size > 0 && Array.from(text.matchAll(/<([a-z][\w:-]*)[\s\/>]/gi)).some((match) => closed.has(match[1].toLowerCase()));
+}
+
+const codePoint = (entity: string, code: number) => code > 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : entity;
+
+const decoded = (text: string) => text.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => name.startsWith("#") ? codePoint(entity, Number(name.slice(1).replace(/^x/i, "0x"))) : namedEntities[name.toLowerCase()] ?? entity);
 
 const plainText = (text: string) => decoded(text
   .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
   .replace(/<(?:img|image)\b[^>]*?\bsrc=["']?([^"'\s>]+)[^>]*>/gi, " [image: $1] ")
-  .replace(/<[^>]+>/g, " "))
+  .replace(/<!--[\s\S]*?-->|<[!?][^<>]*>/g, " ")
+  .replace(tag, " "))
   .replace(/[^\S\n]+/g, " ")
   .replace(/\s*\n\s*/g, "\n")
   .trim();
 
 const shortString = (text: string) => text.length > stringCharacters ? `${text.slice(0, stringCharacters)}… [${text.length - stringCharacters} more characters]` : text;
 
-const isPresent = (value: unknown) => value !== null && value !== "" && !(typeof value === "object" && Object.keys(value).length === 0);
-
-function compacted(value: unknown): unknown {
-  if (typeof value === "string") return shortString(markup.test(value) ? plainText(value) : value);
-  if (Array.isArray(value)) return value.map(compacted).filter(isPresent);
-  if (value === null || typeof value !== "object") return value;
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !noiseKey.test(key)).map(([key, item]) => [key, compacted(item)]).filter(([, item]) => isPresent(item)));
+class LargeInteger {
+  source: string;
+  constructor(source: string) {
+    this.source = source;
+  }
+  toJSON() {
+    return this.source;
+  }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const keptLargeIntegers = (_key: string, value: unknown, context?: { source: string }) => typeof value === "number" && !Number.isSafeInteger(value) && context && /^-?\d+$/.test(context.source) ? new LargeInteger(context.source) : value;
+
+const isPresent = (value: unknown) => value !== null && value !== "" && !(typeof value === "object" && Object.keys(value).length === 0);
+
+function withoutTrailingNulls(items: unknown[]) {
+  let end = items.length;
+  while (end && items[end - 1] === null) end -= 1;
+  return items.slice(0, end);
+}
+
+function compacted(value: unknown): unknown {
+  if (typeof value === "string") return shortString(hasMarkup(value) ? plainText(value) : value);
+  if (Array.isArray(value)) return withoutTrailingNulls(value.map((item) => compacted(item)).map((item) => isPresent(item) ? item : null));
+  if (value === null || typeof value !== "object" || value instanceof LargeInteger) return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !noiseKey.test(keyWords(key))).map(([key, item]) => [key, compacted(item)]).filter(([, item]) => isPresent(item)));
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) && !(value instanceof LargeInteger);
 
 const fieldPath = (field: string) => field.match(/\[\]|[^.[\]]+/g) ?? [];
 
 function picked(value: unknown, paths: string[][]): unknown {
   if (paths.some((path) => !path.length)) return value;
-  if (Array.isArray(value)) return value.map((item) => picked(item, paths.map((path) => path[0] === "[]" ? path.slice(1) : path))).filter((item) => item !== undefined);
+  if (Array.isArray(value)) return value.map((item) => picked(item, paths.map((path) => path[0] === "[]" ? path.slice(1) : path))).map((item) => item ?? null);
   if (!isRecord(value)) return undefined;
   return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
     const inner = paths.filter((path) => path[0] === key).map((path) => path.slice(1));
@@ -43,7 +73,7 @@ function picked(value: unknown, paths: string[][]): unknown {
 
 const flattened = (item: Record<string, unknown>, prefix = ""): [string, unknown][] => Object.entries(item).flatMap(([key, value]) => isRecord(value) && !prefix ? flattened(value, `${key}.`) : [[`${prefix}${key}`, value]]);
 
-const cell = (value: unknown) => (typeof value === "string" ? value : value === undefined ? "" : JSON.stringify(value)).replace(/\|/g, "\\|").replace(/\n/g, "\\n");
+const cell = (value: unknown) => (typeof value === "string" ? value : value === undefined ? "" : value instanceof LargeInteger ? value.source : JSON.stringify(value)).replace(/\|/g, "\\|").replace(/\n/g, "\\n");
 
 function table(items: unknown[]) {
   if (items.length < tableRows || !items.every(isRecord)) return undefined;
@@ -57,6 +87,7 @@ function table(items: unknown[]) {
 
 function rendered(value: unknown): string {
   if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${rendered(item)}`).join(",")}}`;
+  if (value instanceof LargeInteger) return value.source;
   if (!Array.isArray(value)) return JSON.stringify(value);
   const rows = table(value);
   return rows === undefined ? `[${value.map(rendered).join(",")}]` : `[\n${rows}\n]`;
@@ -64,15 +95,14 @@ function rendered(value: unknown): string {
 
 function compactBody(body: string, keepFields: string[]) {
   try {
-    const parsed: unknown = JSON.parse(body);
+    const parsed: unknown = JSON.parse(body, keptLargeIntegers);
     const filtered = keepFields.length ? compacted(picked(parsed, keepFields.map(fieldPath))) : undefined;
     return rendered(filtered !== undefined && isPresent(filtered) ? filtered : compacted(parsed));
   } catch {
-    return markup.test(body) ? plainText(body) : body;
+    return hasMarkup(body) ? plainText(body) : body;
   }
 }
 
-export function compactAnswer(body: string, keepFields: string[] = []) {
-  const text = compactBody(body, keepFields);
-  return text.length > answerCharacters ? `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters]` : text;
-}
+export const shortAnswer = (text: string) => text.length > answerCharacters ? `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters]` : text;
+
+export const compactAnswer = (body: string, keepFields: string[] = []) => shortAnswer(compactBody(body, keepFields));
