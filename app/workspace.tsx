@@ -285,13 +285,16 @@ export default function Workspace() {
 
   async function saveTasks(app: Website, capabilities: DiscoveredCapability[]): Promise<SaveResult> {
     let savedApp: Website | undefined = app;
+    const replaced: DiscoveredCapability[] = [];
     const stillSaved = (capability: DiscoveredCapability) => !!savedApp && savedAs(savedApp.tasks.find((task) => task.id === capability.updatesTaskId), capability);
-    const savedUpdates = () => capabilities.filter((capability) => capability.updatesTaskId && stillSaved(capability)).map((capability) => capability.name);
-    for (const { updatesTaskId, ...capability } of capabilities) {
+    const savedUpdates = () => replaced.filter(stillSaved).map((capability) => capability.name);
+    for (const update of capabilities) {
+      const { updatesTaskId, ...capability } = update;
       if (!updatesTaskId) continue;
       const result = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
       if (!result.apps) return { error: result.error, saved: savedUpdates() };
       savedApp = result.apps.find((candidate) => candidate.id === app.id);
+      replaced.push(update);
     }
     const newCapabilities = capabilities.filter((capability) => !capability.updatesTaskId);
     let addedTasks: Task[] = [];
