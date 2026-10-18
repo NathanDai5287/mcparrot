@@ -171,7 +171,7 @@ Canvas is a useful example, but the same flow works on any website.
 Each capability shows a name, a plain description, the requests it uses as a method, GET or POST, and URL pattern, the inputs that can change with an example, and what it returns.
 Each capability is marked **New** or **Updates <tool name>**, where an update is a clearly better version of that saved tool.
 Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or request matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
-A request matches another when its address and its body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
+A request matches another when its method, address, and body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
 Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or request breaks those rules, is skipped.
 Selecting a tool on the app page shows its inputs, its result, and each request's method, URL pattern, and body pattern.
 
@@ -286,8 +286,9 @@ The user can also choose on the app page how MCParrot signs in again by itself w
 
 When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
 It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the tool's URL patterns and body patterns from the tool inputs, and runs each request with `fetch` inside the page with its method, its body, and the website's own cookies.
-URL values are URL-encoded, and body values are escaped as JSON string content, so a quote in an input cannot change the body's structure.
+URL values are URL-encoded, and body values are escaped as JSON string content, or URL-encoded when the content type is `application/x-www-form-urlencoded`, so a quote or `&` in an input cannot change the body's structure.
 A request with a body sends its recorded content type, or `application/json` when none was recorded.
+A POST request never follows a redirect, so its body cannot reach another origin; a redirected POST returns an error.
 Inputs that ChatGPT leaves out use the example value that discovery found.
 When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
@@ -312,7 +313,7 @@ Measure speed against an agent navigating the website before you claim an improv
 Nathan decided on October 17, 2026, that tools may use GET and POST requests, not only GET, because many websites, such as DoorDash, read and act through POST GraphQL requests to addresses such as `/graphql/<operation>` with JSON bodies.
 He accepted the risk that a POST tool can change data in his website account.
 MCParrot keeps exactly one guard on tool requests: it refuses any request whose URL path, body, or GraphQL operation name looks like checkout or payment.
-The guard splits names such as `placeOrder` into words and refuses the words checkout, check out, payment, pay, purchase, place order, create order, submit order, and order create, so `cart/checkout`, `order/create`, and `createOrderFromCart` are all refused.
+The guard decodes URL encoding until nothing changes, splits names such as `placeOrder` into words, and refuses the words checkout, check out, payment, pay, purchase, place order, create order, submit order, and order create, so `cart/checkout`, `order/create`, and `createOrderFromCart` are all refused.
 Discovery, `save_task`, the connection's tool list, and every tool run apply the guard, and a run checks the request again after it fills the inputs.
 The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
 The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address or body contains one of the words, such as a query for a payment history, is refused.

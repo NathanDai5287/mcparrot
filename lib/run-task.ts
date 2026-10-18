@@ -44,7 +44,8 @@ function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, e
 
 function filledRequest(app: Website, request: TaskRequest, values: TaskInputs): FilledRequest {
   const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, encodeURIComponent)).href;
-  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, jsonEscaped);
+  const bodyEncoding = request.contentType?.includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
+  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, bodyEncoding);
   if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json" };
 }
@@ -78,7 +79,7 @@ function fetchInPage(page: Page, request: FilledRequest) {
   return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": request.method } }, async (span) => {
     const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType }, limit, timeout }) => {
       try {
-        const reply = await fetch(address, { method, body: requestBody, headers: requestContentType ? { "content-type": requestContentType } : undefined, credentials: "include", signal: AbortSignal.timeout(timeout) });
+        const reply = await fetch(address, { method, body: requestBody, headers: requestContentType ? { "content-type": requestContentType } : undefined, redirect: method === "GET" ? "follow" : "error", credentials: "include", signal: AbortSignal.timeout(timeout) });
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
         if (html) await reply.body?.cancel();
@@ -116,7 +117,7 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
   if (response.redirected && new URL(response.url).origin !== website) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
-  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
+  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent, or the website redirected it.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return `${method} ${url} returned ${response.status}\n${shortened(response.body)}`;
   const { status, text } = await readPageText(page, website, url);
   if (status >= 400) throw httpError(method, url, status);

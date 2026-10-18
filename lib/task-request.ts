@@ -9,12 +9,19 @@ export const requestPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskReques
 
 export const isGetRequest = (request: TaskRequest) => request.method.toUpperCase() === "GET";
 
-function decoded(text: string) {
+function decodedOnce(text: string) {
   try {
     return decodeURIComponent(text);
   } catch {
     return text;
   }
+}
+
+function decoded(text: string) {
+  let previous = "";
+  let current = text;
+  while (current !== previous) [previous, current] = [current, decodedOnce(current)];
+  return current;
 }
 
 function wordsOf(text: string) {

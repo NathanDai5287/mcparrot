@@ -19,7 +19,7 @@ export function taskNameProblem(taskName: string) {
 
 const sameNames = (first: string[], second: string[]) => first.length === second.length && [...first].sort().join("\n") === [...second].sort().join("\n");
 
-const requestKey = (website: string, { urlPattern, bodyPattern = "" }: TaskRequest) => `${new URL(urlPattern.replace(/\{[^}]+\}/g, "{}"), website).href} ${bodyPattern.replace(bodyPlaceholderPattern, "{}")}`;
+const requestKey = (website: string, { method, urlPattern, bodyPattern = "" }: TaskRequest) => `${method.toUpperCase()} ${new URL(urlPattern.replace(/\{[^}]+\}/g, "{}"), website).href} ${bodyPattern.replace(bodyPlaceholderPattern, "{}")}`;
 
 function duplicateOf(website: string, tasks: Task[], capability: Capability) {
   const keys = capability.requests.map((request) => requestKey(website, request));
