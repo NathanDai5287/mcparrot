@@ -112,8 +112,12 @@ Users who manage apps only through the UI do not need the management connection,
 
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
-Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter.
-A tool whose requests all use GET has the annotation `readOnlyHint: true`, and a tool with any POST request has `readOnlyHint: false`, `destructiveHint: false`, and `openWorldHint: true`, because a POST request can change website data.
+Its initialize result carries server instructions of fewer than 450 characters, which tell ChatGPT to call the matching saved tool directly, to use `read_page` only when no saved tool fits, to set `fullAnswer` only when a needed field is missing, to tell the user and stop when a result says the website is signed out, and to run independent tools at once.
+Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes a text parameter.
+An input whose name is `id` or ends in `Id`, `ID`, or `_id`, such as `courseId`, is required and its description gives the recorded example, so ChatGPT cannot silently read the recorded course or store; every other input is optional and its description says that it defaults to the recorded example, because a run fills a missing input with that example.
+A tool whose requests are all reads has the annotations `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, and `openWorldHint: false`, so ChatGPT can run it without asking for confirmation, and `read_page` has the same annotations, while `view_image` has `openWorldHint: true` because it opens `https` images on any website.
+A request is a read when it uses GET, or when it is a POST whose body is GraphQL JSON in which every operation has a `query` text that starts with `query` or `{` after leading comments and whitespace and contains neither `mutation` nor `subscription`.
+A tool with any other POST request, including a persisted GraphQL query that sends no `query` text, has `readOnlyHint: false`, `destructiveHint: false`, and `openWorldHint: true`, because such a request can change website data.
 The MCP tool name is the saved tool's name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
 Each tool in a connection needs its own name, so saving rejects or skips a tool whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `view_image`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another tool in the app.
@@ -134,7 +138,7 @@ He accepted the trade-off that ChatGPT can read any page his account can see on 
 Each connection also has a read-only `view_image` tool, titled "Read an image on <app name>", whose one input `url` is an image address that an earlier tool answer named, such as the `src` of an `<image>` element in an Ed post.
 Nathan asked for it because an Ed announcement showed a class's score mean and standard deviation only inside a picture.
 ChatGPT connectors do not pass MCP image results to the model, so the tool returns text: Claude Opus 5.5 reads the picture and the tool returns Claude's copy of every text and number in it and a short description of any chart.
-Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, and it says that the tool opens images on the app's website with the sign-in and `https` images on other websites without it, so images reach the chat only when they are needed.
+Its description tells ChatGPT to read one image address from an earlier answer only when that image holds the answer, so images reach the chat only when they are needed.
 The app page's **View image** box takes the same address, calls `/api/image`, and shows the picture with the same text.
 
 1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is on the website for `https://edstem.org`.
@@ -149,12 +153,12 @@ The tool result holds only Claude's text; the picture itself is not returned to 
 MCParrot never logs or traces the picture, only its size and the length of Claude's reply.
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
-Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
+Its description tells ChatGPT to call it only when the user asks to save or reuse a page or request, replacing values that change with `{placeholders}`, one input each.
 Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, an optional `earlierRequests` list of up to 9 requests with the same four request fields, `inputs` as a list of name, description, and example, `returns`, and an optional `keepFields` list, as [using saved tools](#using-saved-tools) describes, which become the tool's requests in the same tool shape as a chosen tool, with the earlier requests first as steps 1, 2, and so on, and the main request last.
-Its description tells ChatGPT to use earlier requests with [step placeholders](#using-saved-tools) when a request needs a value, such as a cart ID, that an earlier JSON response returns.
+The `earlierRequests` description tells ChatGPT to use [step placeholders](#using-saved-tools) for a value, such as a cart ID, that an earlier JSON response returns.
 It rejects a URL pattern that is not on the app's website domain, a body on a GET request, a request that the checkout and payment guard refuses, a step placeholder that does not name an earlier request, placeholders other than step placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request list, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
-Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
+ChatGPT saves a tool only when the user asks, so a page that the user reads often stays a `read_page` call until the user asks to save it.
 
 Nathan chose a private connection link for each app instead of MCP sign-in.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?token=<token>`, where the token is 32 random bytes that MCParrot creates when the user selects **Create link** or **Regenerate link** on the app page.
@@ -492,11 +496,11 @@ The app's connection lists the four ordering tools only while the switch is on a
 
 1. The user asks ChatGPT to order something, or types the request in the app page's **Test order** box and selects **Prepare order**.
 2. `prepare_order` starts a Browser Use agent run with the app's browser profile; the agent builds the cart, opens the checkout page, and stops without selecting any place-order or pay button. The tool returns at once with an order ID.
-3. `check_order`, or the app page every 5 seconds, reads the run; when it finishes, the result lists the items, subtotal, fees, tip, total, delivery address, and delivery estimate.
+3. `check_order` waits on the server, checking the run every 3 seconds for up to 4 minutes, and the app page reads the run every 5 seconds; when it finishes, the result lists the items, subtotal, fees, tip, total, delivery address, and delivery estimate.
 4. ChatGPT shows the cart and asks the user to approve the exact total, and the app page shows the cart with **Place order for $total** and **Cancel order**.
 5. `place_order` checks the safety rules, then runs a short agent step in the same browser that reads the checkout total again without paying, and compares it with the approved total.
 6. When every rule passes, MCParrot starts the payment run with the Link connection, and Link asks the user to approve the payment in the Link app on their phone.
-7. `check_order` reports the website's confirmation or why the payment failed, and MCParrot stops the browser.
+7. `check_order` waits the same way, then reports the website's confirmation or why the payment failed, and MCParrot stops the browser.
 
 `cancel_order`, or **Cancel order**, cancels the agent run and stops its browser, but the cart can stay in the website account.
 Only one order runs at a time for each app; preparing another order while one is preparing, ready, or placing returns a message to check or cancel it first.

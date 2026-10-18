@@ -5,29 +5,35 @@ import { z } from "zod";
 import { isOwner } from "../../../../lib/account";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { connectionAllowed } from "../../../../lib/connection";
-import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
+import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderWaitMilliseconds, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
-import { isGetRequest } from "../../../../lib/task-request";
+import { isReadOnlyRequest } from "../../../../lib/task-request";
 import { viewImage } from "../../../../lib/view-image";
 import { findApp } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const fullAnswerInput = z.boolean().optional().describe("Use only when the short answer lacks something needed. It skips the field filter; MCParrot still shortens the answer.");
+const fullAnswerInput = z.boolean().optional().describe("Set true only if a field you need is missing from the answer.");
+
+const isIdInput = (name: string) => /(^|_)id$|I[dD]$/.test(name);
 
 function inputSchema(task: Task) {
-  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)])), fullAnswer: fullAnswerInput };
+  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, isIdInput(input.name) ? z.string().describe(`${input.description} For example, ${input.example}.`) : z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput };
 }
+
+const serverInstructions = (app: Website) => `Tools read ${app.name} as the signed-in user. Call the saved tool that matches the request directly; one call returns the whole answer. Use read_page only when no saved tool fits. Answers are already shortened; set fullAnswer only if a needed field is missing. If a result says the site is signed out, tell the user and stop. Run independent tools at once.`;
+
+const readOnlyAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
 const orderStatusText: Record<OrderView["status"], string> = {
-  preparing: "Browser Use is building the cart. Call check_order again in about 30 seconds.",
+  preparing: "Browser Use is building the cart. Call check_order again now; it waits up to 4 minutes.",
   ready: "The cart is at checkout and nothing has been paid. Show the user every item, the fees, the tip, the total, the delivery address, and the delivery estimate. Call place_order only after the user clearly approves this exact total.",
-  placing: "Browser Use is checking the total and paying with Pay with Link. The user approves the payment in the Link app on their phone. Call check_order again in about 30 seconds.",
+  placing: "Browser Use is checking the total and paying with Pay with Link. The user approves the payment in the Link app on their phone. Call check_order again now; it waits up to 4 minutes.",
   placed: "The website confirmed the order.",
   failed: "The order did not finish.",
   cancelled: "The order was cancelled.",
@@ -55,11 +61,11 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
   }, async ({ request }) => textResult(orderText(await prepareOrder(app, request))));
   server.registerTool("check_order", {
     title: `Check an order on ${app.name}`,
-    description: "Return the order's progress, its cart and total when it is ready, or its confirmation after payment, and the Pay with Link status.",
+    description: "Wait up to 4 minutes for a running order step to finish, then return the order's progress, its cart and total when it is ready, or its confirmation after payment, and the Pay with Link status.",
     inputSchema: orderIdInput,
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, async ({ orderId }) => {
-    const [order, link] = await Promise.all([checkOrder(app), readLinkStatus()]);
+    const [order, link] = await Promise.all([checkOrder(app, orderWaitMilliseconds), readLinkStatus()]);
     if (order && order.orderId !== orderId) throw new Error(noOrderMessage);
     return textResult(`${orderText(order)}\n${linkText(link)}`);
   });
@@ -78,7 +84,7 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
 }
 
 function appServer(app: Website, orderLimitUsd?: number) {
-  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
+  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }, { instructions: serverInstructions(app) }), { recordInputs: false, recordOutputs: false });
   const tasks = app.tasks.filter(isRunnableTask);
   const usedNames = new Set(connectionToolNames);
   const names = new Map<Task, string>();
@@ -104,25 +110,25 @@ function appServer(app: Website, orderLimitUsd?: number) {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
-      annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      annotations: task.requests.every(isReadOnlyRequest) ? readOnlyAnnotations : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer))));
   }
   const website = new URL(app.url).origin;
   server.registerTool("read_page", {
     title: `Read a page on ${app.name}`,
-    description: `Open any page on ${website} that the signed-in user can see and return its text. Use it for pages that no other tool covers, such as a link that the user shares.`,
+    description: `Open any page on ${website} that the signed-in user can see and return its text. Use only when no other tool covers the page, such as a link that the user shares.`,
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
-    annotations: { readOnlyHint: true },
+    annotations: readOnlyAnnotations,
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
-    description: `Read one image and return its text and numbers and a short description of any chart. It opens images on ${website} with the user's sign-in and https images on any other website, such as an image server that ${website} uses, without the sign-in. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
+    description: "Read the text, numbers, and charts in one image address from an earlier answer. Use only when that image holds the answer.",
     inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
-    annotations: { readOnlyHint: true },
+    annotations: { ...readOnlyAnnotations, openWorldHint: true },
   }, async ({ url }) => textResult((await viewImage(app, url)).text));
   server.registerTool("save_task", {
     title: `Save a tool for ${app.name}`,
-    description: `Save a new tool for ${app.name} that reads a page with GET or sends one POST request, such as a GraphQL query. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern and bodyPattern, and give one input for each placeholder. When the request needs a value that an earlier JSON response returns, such as a cart ID, list those requests in earlierRequests and use {stepN.path.to.value} for that value, where step1 is the first earlier request and array positions are numbers; these placeholders need no input. MCParrot refuses any request that looks like checkout or payment. The tool appears in a new chat.`,
+    description: `Save a page or one POST request on ${app.name} as a reusable tool for future chats. Call it only when the user asks to save or reuse it. Replace values that change with {placeholders}, one input each.`,
     inputSchema: {
       name: z.string().describe("A short plain tool name, such as Read course syllabus."),
       description: z.string().describe("What the tool does, in one plain sentence."),
@@ -130,10 +136,10 @@ function appServer(app: Website, orderLimitUsd?: number) {
       urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
       bodyPattern: z.string().optional().describe("Only for POST: the request body, usually JSON, with {placeholders} inside string values, such as {\"query\":\"…\",\"variables\":{\"search\":\"{search}\"}}."),
       contentType: z.string().optional().describe("Only for POST: the body's content type. It defaults to application/json."),
-      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first, in order, as step1, step2, and so on, with the same fields as the main request, which runs last. A later request uses a value from an earlier response with {step1.cart.id} or {step2.items.0.id}."),
+      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first as step1, step2, and so on; use {step1.cart.id} for a value from one."),
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
       returns: z.string().describe("What the tool returns, in a few words."),
-      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths in the last response that the answer keeps, such as threads[].title or data.store.menu[].items[].price, where [] means every array element. Leave it out to keep every field."),
+      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths the answer keeps, such as threads[].title."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));

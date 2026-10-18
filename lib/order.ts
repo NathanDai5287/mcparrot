@@ -12,6 +12,8 @@ const browserKeepAliveSeconds = 1800;
 const orderRecordSeconds = 3600;
 const orderSessionMaxCostUsd = 5;
 const totalCheckMilliseconds = 150_000;
+const orderPollMilliseconds = 3000;
+export const orderWaitMilliseconds = 240_000;
 const linkStatusUrl = "https://api.browser-use.com/api/v4/stripe-link";
 
 export const orderRequestSchema = z.string().trim().min(1).max(1000);
@@ -201,7 +203,15 @@ async function advanceOrder(app: Website) {
   return view(next);
 }
 
-export async function checkOrder(app: Website) {
+async function waitForRun(appId: string, waitMilliseconds: number) {
+  const deadline = Date.now() + waitMilliseconds;
+  const order = await readOrder(appId);
+  if (!order || (order.status !== "preparing" && order.status !== "placing")) return;
+  while (Date.now() < deadline && !isFinished(await browserUse().runs.get(order.runId))) await new Promise((resolve) => setTimeout(resolve, orderPollMilliseconds));
+}
+
+export async function checkOrder(app: Website, waitMilliseconds = 0) {
+  if (waitMilliseconds > 0) await waitForRun(app.id, waitMilliseconds);
   const advanced = await withLock(lockKey(app.id), orderBusyMessage, () => advanceOrder(app));
   if (typeof advanced !== "string") return advanced;
   const order = await readOrder(app.id);

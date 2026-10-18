@@ -10,7 +10,16 @@ function hasOwnerEmail(user: User) {
   return !!ownerEmail && email?.verification?.status === "verified" && email.emailAddress.toLowerCase() === ownerEmail;
 }
 
-export const isOwner = async (userId: string) => hasOwnerEmail(await clerkUser(userId));
+const ownerCacheMilliseconds = 5 * 60_000;
+const ownerCache = new Map<string, { owner: boolean; at: number }>();
+
+export async function isOwner(userId: string) {
+  const cached = ownerCache.get(userId);
+  if (cached && Date.now() - cached.at < ownerCacheMilliseconds) return cached.owner;
+  const owner = hasOwnerEmail(await clerkUser(userId));
+  ownerCache.set(userId, { owner, at: Date.now() });
+  return owner;
+}
 
 export async function displayName(userId: string) {
   const user = await clerkUser(userId);

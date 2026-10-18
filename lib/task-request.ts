@@ -32,8 +32,6 @@ export function isOnWebsite(address: string | URL, website: string) {
   return protocol === site.protocol && port === site.port && (hostname === site.hostname || (domain !== null && domain === getDomain(site.hostname, { allowPrivateDomains: true })));
 }
 
-export const isGetRequest = (request: TaskRequest) => request.method.toUpperCase() === "GET";
-
 function decodedOnce(text: string) {
   try {
     return decodeURIComponent(text);
@@ -68,6 +66,14 @@ function looksLikePaymentOperation({ query, operationName }: GraphqlOperation) {
   const name = typeof operationName === "string" ? operationName : "";
   const isMutation = typeof query === "string" && /\bmutation\b/.test(query);
   return paymentWords.test(wordsOf(isMutation ? `${name} ${query}` : name));
+}
+
+const isGraphqlQuery = (query: unknown) => typeof query === "string" && /^(query\b|\{)/.test(query.replace(/^(\s|#.*)*/, "")) && !/\b(mutation|subscription)\b/.test(query);
+
+export function isReadOnlyRequest(request: TaskRequest) {
+  const method = request.method.toUpperCase();
+  if (method === "GET") return true;
+  return method === "POST" && !!graphqlOperations(request.bodyPattern ?? "")?.every(({ query }) => isGraphqlQuery(query));
 }
 
 const looksLikePaymentBody = (body: string) => graphqlOperations(body)?.some(looksLikePaymentOperation) ?? paymentWords.test(wordsOf(body));
