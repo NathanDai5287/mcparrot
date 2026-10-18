@@ -40,7 +40,7 @@ After that, most use happens inside ChatGPT, so the dashboard is a place people 
 Every capability needs an equal path through the dashboard and through MCP, as the [UI and MCP parity section](README.md#ui-and-mcp-parity) describes.
 Status words are limited to shipped, dormant, aspirational, and gap, as the [documentation guide](DOCUMENTATION.md#use-status-vocabulary) describes.
 Secrets, passwords, and payment details never appear in the interface, logs, or prompts.
-Ordering and payment are in progress and must always show the total and wait for the person's approval.
+Ordering and payment are a gap until a live check passes, and they must always show the total and wait for the person's approval.
 A shared app marketplace is aspirational.
 
 ## Brand Commitments

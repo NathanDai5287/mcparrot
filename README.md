@@ -106,7 +106,7 @@ Each saved task whose requests all use GET becomes one read-only tool: the tool 
 The tool name is the task name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
 Each tool in a connection needs its own name, so saving rejects or skips a task whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another task in the app.
-If stored tasks still share a tool name, the connection adds the first 8 characters of the later task's ID to its name, skips the task when that name is also taken, and writes a warning log either way.
+If stored tasks still share a tool name, the connection adds the first 8 characters of the later task's ID to its name, uses `task_` and the task's whole ID when that name is also taken, skips the task only when both names are taken, and writes a warning log either way.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
 The route answers only POST requests; GET and DELETE return 405.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
@@ -152,7 +152,7 @@ Canvas is a useful example, but the same flow works on any website.
 4. Sign in normally in the new tab and complete any required verification, such as Duo.
 5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
 6. Select **Find what this site can do** to send the recorded requests and the app's saved tasks to Cursor Composer 2.5 Fast and receive a list of capabilities that are new or that improve a saved task.
-7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
+7. Tick the capabilities to keep, edit their names and descriptions if needed, and select the save button, which shows the number of ticked tasks, such as **Save 3 tasks**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
 Each capability is marked **New** or **Updates <task name>**, where an update is a clearly better version of that saved task.
@@ -262,7 +262,7 @@ The user can also save a login on the app page, so MCParrot signs in again by it
 3. Receive the results without opening the website yourself.
 
 When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
-It opens the app's website address, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
+It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
 Inputs that ChatGPT leaves out use the example value that discovery found.
 When a response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
@@ -270,7 +270,7 @@ Each request and page load has a 30-second limit, a status of 400 or more other 
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 
-The task treats the website as signed out when the website address lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
+The task treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
 When the app has a saved login, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 Without a saved login, the task fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
 Tasks run only GET requests in this first version, because the first milestone reads website data and never changes it.
@@ -335,7 +335,7 @@ This ordering path is a gap until a live check passes, as the [status page](STAT
 
 ### Ordering settings
 
-Each app page has an **Ordering** section with an **Allow ordering** switch, which is off by default, and a spending limit for each order in US dollars.
+Each app page has an **Ordering** section with an **Allow ordering from ChatGPT and from this page** switch, which is off by default, and a spending limit for each order in US dollars.
 The limit can be at most $500, because Link refuses larger payments.
 The `setOrdering` workspace operation stores both with the app.
 The section also shows whether Pay with Link is connected and whether its mode is test or live, and live mode shows that it is blocked.
@@ -381,7 +381,7 @@ When a payment run fails for another reason, the order may still have gone throu
 
 ## Production deployment setup
 
-The Vercel project `mcparrot` is linked to the public GitHub repository on the existing Hobby plan.
+The Vercel project `mcparrot` is linked to the public GitHub repository on the Pro plan.
 Its production branch is `main`.
 Pushes do not start deployments, because Nathan chose to publish only when he asks, so `vercel.json` turns off Git deployments.
 To publish, run `npx vercel deploy --prod` from an up-to-date `main` checkout.
@@ -422,7 +422,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
 A sign-in browser runs for up to 15 minutes, but the Vercel request that starts it returns at once, and **Done signing in** stops it with a separate request.
-Each MCP tool call runs inside one Vercel request with `maxDuration = 300`, the most that Fluid compute allows on the Hobby plan.
+Each MCP tool call runs inside one Vercel request with `maxDuration = 300`, so it has at most 300 seconds.
 MCParrot waits at most 150 seconds for each Browser Use sign-in agent run, and less when the call has less time left, so a sign-in plus the task fits in one call; a slower run ends the call with an error.
 The verification code arrives in a separate tool call, so waiting for the user never holds a request open.
 For work that takes longer than one request, durable operation status that clients check is aspirational.
@@ -460,7 +460,7 @@ Sentry is a service that collects errors, traces, logs, and session recordings t
 MCParrot uses `@sentry/nextjs` in the browser and on the server, and it sends everything to the Sentry project `nathan-s4/mcparrot`.
 The SDK reads `NEXT_PUBLIC_SENTRY_DSN`, and the build uploads source maps with `SENTRY_AUTH_TOKEN`, so stack traces show the original code.
 Browser events go through the same-site route `/monitoring`, which forwards them to Sentry, so ad blockers do not drop them and Vercel Authentication lets them through.
-MCParrot keeps every trace and every session because it has one user, and it sends logs through the SDK instead of a Vercel Log Drain, which needs a paid Vercel plan.
+MCParrot keeps every trace and every session because it has one user, and it sends logs through the SDK instead of a Vercel Log Drain.
 
 | Sentry product | What MCParrot sends |
 | --- | --- |
@@ -479,7 +479,7 @@ Never attach credentials, cookies, tokens, verification codes, or the bypass sec
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
 The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
-Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and each order refusal, so they do not hide real failures in Issues.
+Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
 
 ## Workspace navigation behavior
 
@@ -493,7 +493,7 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 ## Running the frontend
 
 Use Node.js 24, which `.nvmrc` and the `engines` field in `package.json` pin.
-`.env.example` lists every environment variable the app reads.
+`.env.example` lists every environment variable the app needs.
 The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
 That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
 Add `MCPARROT_CREDENTIAL_KEY` to save logins; it must be standard base64 of exactly 32 bytes, for example from `openssl rand -base64 32`, or saving a login returns a setup error.

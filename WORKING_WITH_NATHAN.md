@@ -91,8 +91,8 @@ Do not end your task with an open branch that you created.
 The one exception is work held during the Devpost submission and judging freeze, which you merge as soon as the freeze ends.
 After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
 
-[The status page](STATUS.md) records the status of automatic deployment from GitHub to Vercel.
-Every push to `main` deploys to [the production website](https://mcparrot.vercel.app), and each branch or pull request gets a Vercel preview link.
-During the submission and judging freeze, ask Nathan to test the branch's preview link instead of the live site.
+Pushes do not deploy, because `vercel.json` turns off Git deployments, so branches and pull requests get no automatic preview links.
+The [production deployment setup](README.md#production-deployment-setup) explains how to publish to [the production website](https://mcparrot.vercel.app).
+During the submission and judging freeze, make a preview deployment of the branch with `npx vercel deploy`, and ask Nathan to test that preview link instead of the live site.
 After each deploy, confirm that the deploy succeeded, and fix or revert a failed deploy immediately.
 The deployed app also serves the HTML guides in `public/docs/` at [/docs](https://mcparrot.vercel.app/docs).
