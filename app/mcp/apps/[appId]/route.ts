@@ -30,10 +30,10 @@ function appServer(app: Website) {
   }
   for (const task of tasks.filter((candidate) => !names.has(candidate))) {
     const baseName = toolName(task.name);
-    const name = baseName ? `${baseName.slice(0, 55)}_${task.id.slice(0, 8)}` : `task_${task.id.slice(0, 8)}`;
-    const free = !usedNames.has(name);
-    Sentry.logger.warn(free ? "Task tool renamed" : "Task tool skipped", { appId: app.id, taskId: task.id, toolName: name });
-    if (!free) continue;
+    const fallbacks = [baseName ? `${baseName.slice(0, 55)}_${task.id.slice(0, 8)}` : `task_${task.id.slice(0, 8)}`, `task_${task.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 59)}`];
+    const name = fallbacks.find((candidate) => !usedNames.has(candidate));
+    Sentry.logger.warn(name ? "Task tool renamed" : "Task tool skipped", { appId: app.id, taskId: task.id, toolName: name ?? fallbacks[0] });
+    if (!name) continue;
     names.set(task, name);
     usedNames.add(name);
   }
