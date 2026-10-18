@@ -155,7 +155,7 @@ function GoogleAccountForm({ app, onSave }: { app: Website; onSave: SaveAutomati
   }
 
   return <form className="editor" onSubmit={save}>
-    <p>MCParrot signs back in with Continue with Google.</p>
+    <p>MCParrot signs back in with Continue with Google. If Google asks you to verify, select Sign in to website again.</p>
     <label htmlFor={`google-email-${app.id}`}>Google account email (optional)</label>
     <input id={`google-email-${app.id}`} name="googleEmail" type="email" maxLength={320} autoComplete="off" defaultValue={current.method === "google" ? current.googleEmail : ""} aria-describedby={`google-email-help-${app.id}`} />
     <p className="field-help" id={`google-email-help-${app.id}`}>Only needed for several Google accounts.</p>
