@@ -162,7 +162,7 @@ MCParrot stores only the token's SHA-256 hash with the app and shows the full li
 Regenerating replaces the hash, so the old link stops working at once.
 The route compares hashes in constant time and returns 401 for a missing or wrong token.
 Older links in the form `?x-vercel-protection-bypass=<secret>`, where the secret is the project's `VERCEL_AUTOMATION_BYPASS_SECRET`, still work, but only for the owner's apps, so Nathan's existing ChatGPT connectors keep working.
-While Vercel Authentication protects production, Vercel blocks the new token links before they reach MCParrot, so they work only after Nathan turns Vercel Authentication off; the older links work in both states.
+Vercel Authentication is off for production, so the new token links reach MCParrot directly.
 In ChatGPT, the user opens Settings, then Plugins, selects **Browse directory**, then **Add** and **Add custom MCP server**.
 The user names the plugin, pastes the link as the Server URL, sets Authentication to No authentication, accepts the risk notice, and selects **Create as a plugin**.
 Workspace accounts can have custom MCP servers disabled by an administrator.
@@ -578,8 +578,8 @@ The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
 The Next.js app deploys the workspace, the pages `/marketplace` and `/sign-in`, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, `/api/connection`, `/api/marketplace`, `/api/image`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
-Vercel Authentication still protects every deployment, including the production domain, and only requests that carry the automation bypass secret skip it.
-Nathan decided to turn Vercel Authentication off for production once accounts ship, so that other people can reach the Clerk sign-in.
+Vercel Authentication is off for the production domain, so anyone can open the marketplace, the guides, the extension download, and the Clerk sign-in, and Clerk protects the dashboard and its routes.
+Preview deployments still need Vercel sign-in or the automation bypass secret.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
@@ -629,7 +629,7 @@ An app's connection link is the only access control on MCP use, and Nathan accep
 Anyone with the link can run that app's tools, read its website's pages with its saved sign-in, save tools to it, and, for the owner's apps, order, but the link reaches nothing else.
 Keep the link private, and select **Regenerate link** on the app page if it leaks, then replace the URL in the ChatGPT connector.
 MCParrot never logs tokens, and Sentry removes `token` and `x-vercel-protection-bypass` query values.
-An older owner link carries the Vercel bypass secret, which also skips Vercel Authentication on every page while it is on; after Vercel Authentication is off, that secret only opens the owner's app connections.
+An older owner link carries the Vercel bypass secret, which only opens the owner's app connections in production, because Vercel Authentication is off there.
 To stop older links, regenerate the bypass secret: open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, regenerate it, and redeploy.
 The server rejects cross-site `/api/*` requests that change data, so another website cannot use a signed-in browser to call them, and every page forbids framing by other websites.
 MCP sign-in for each user remains aspirational.
