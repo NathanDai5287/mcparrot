@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as Sentry from "@sentry/nextjs";
 import { Agent, JsonlLocalAgentStore, type Run, type RunResult, type SDKAgent, type SDKUserMessage } from "@cursor/sdk";
 
 export const claudeModelName = "claude-opus-5-5-low-fast";
@@ -37,6 +38,7 @@ export async function runClaudeAgent(message: string | SDKUserMessage, apiKey: s
     if (timedOut) throw timeout();
     run = await start(true).catch(async (error) => {
       if (!isSandboxUnsupported(error)) throw error;
+      Sentry.logger.warn("Claude agent sandbox is not supported here; running without it");
       await dispose();
       return start(false);
     });
