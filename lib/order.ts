@@ -56,6 +56,7 @@ const orderInProgressMessage = "An order is already in progress for this app. Ch
 export const noOrderMessage = "No order with this ID is waiting for this app. Prepare a new order.";
 const notReadyMessage = "This order is not ready to place. Check the order first.";
 const totalUnreadMessage = "Browser Use could not read the checkout total again, so MCParrot did not pay. Try again, or cancel the order.";
+const interruptedCheckMessage = "Browser Use stopped while it checked the checkout total, so MCParrot did not pay and closed the browser. Prepare the order again.";
 const orderHistoryMessage = "Check the website's order history before you try again, because the order may have gone through.";
 const paymentUnknownMessage = `MCParrot could not confirm whether Browser Use started the payment, so it stopped the browser. ${orderHistoryMessage}`;
 const unavailableMessage = "MCParrot could not reach Browser Use or its order storage. Check the order again in a moment.";
@@ -228,7 +229,7 @@ async function readRun(runId: string): Promise<FinishedRun> {
 }
 
 function afterInterruptedPlace(order: PendingOrder): PendingOrder {
-  if (order.paymentStep === "checking_total") return { ...order, status: "ready", paymentStep: undefined, problem: totalUnreadMessage };
+  if (order.paymentStep === "checking_total") return { ...order, status: "failed", paymentStep: undefined, problem: interruptedCheckMessage };
   return { ...order, status: "failed", paymentStep: undefined, problem: paymentUnknownMessage };
 }
 
