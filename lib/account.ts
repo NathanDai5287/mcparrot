@@ -2,6 +2,8 @@ import { auth, clerkClient, type User } from "@clerk/nextjs/server";
 
 export const signedInUserId = async () => (await auth.protect()).userId;
 
+export const signedInApiUserId = async () => (await auth()).userId;
+
 const clerkUser = async (userId: string) => (await clerkClient()).users.getUser(userId);
 
 function hasOwnerEmail(user: User) {

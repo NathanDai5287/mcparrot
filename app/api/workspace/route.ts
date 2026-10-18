@@ -1,29 +1,45 @@
-import { isOwner, signedInUserId } from "../../../lib/account";
-import { stopBrowser, stopWarmBrowser } from "../../../lib/browser-use";
+import * as Sentry from "@sentry/nextjs";
+import { BrowserUseError } from "browser-use-sdk/v4";
+import { isOwner, signedInApiUserId } from "../../../lib/account";
+import { browserUse, stopBrowser, stopWarmBrowser } from "../../../lib/browser-use";
 import type { Website } from "../../../lib/capabilities";
 import { removeAppListing } from "../../../lib/marketplace";
 import { pendingOrderKey, stopOrder } from "../../../lib/order";
 import { addTasks, replaceTask } from "../../../lib/save-task";
-import { AppNotFound, changeApp, changeApps, deleteStoredApp, discoveryKey, migrateLegacyWorkspace, ownedApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
+import { AppNotFound, appOwner, changeApp, changeApps, deleteStoredApp, discoveryKey, migrateLegacyWorkspace, ownedApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
 const maxBodyLength = 1_000_000;
 
 class OwnerOnly extends Error {}
+class AccountUnavailable extends Error {}
+
+const signedOut = () => Response.json({ error: "Sign in again to use MCParrot." }, { status: 401 });
 
 function failure(error: unknown) {
   if (error instanceof StorageUnavailable) return Response.json({ error: error.message }, { status: 503 });
   if (error instanceof AppNotFound) return Response.json({ error: error.message }, { status: 404 });
   if (error instanceof WorkspaceLimit) return Response.json({ error: error.message }, { status: 409 });
   if (error instanceof OwnerOnly) return Response.json({ error: error.message }, { status: 403 });
+  if (error instanceof AccountUnavailable) return Response.json({ error: error.message }, { status: 503 });
   throw error;
 }
 
-export async function GET() {
-  const userId = await signedInUserId();
+async function ownerOrFalse(userId: string) {
   try {
-    const owner = await isOwner(userId);
+    return await isOwner(userId);
+  } catch (error) {
+    Sentry.captureException(error);
+    return false;
+  }
+}
+
+export async function GET() {
+  const userId = await signedInApiUserId();
+  if (!userId) return signedOut();
+  try {
+    const owner = await ownerOrFalse(userId);
     if (owner) await migrateLegacyWorkspace(userId);
     return Response.json({ apps: await readWorkspace(userId), isOwner: owner });
   } catch (error) {
@@ -31,7 +47,15 @@ export async function GET() {
   }
 }
 
-const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`, discoveryKey(appId), pendingOrderKey(appId)];
+const appKeys = (appId: string) => [`login:${appId}`, `login-rejected:${appId}`, `sign-in-failed:${appId}`, `pending-sign-in:${appId}`, discoveryKey(appId), pendingOrderKey(appId)];
+
+async function cleanUp(work: () => Promise<unknown>) {
+  try {
+    await work();
+  } catch (error) {
+    if (!(error instanceof BrowserUseError && error.statusCode === 404)) Sentry.captureException(error);
+  }
+}
 
 async function deleteApp(app: Website) {
   const pendingKey = `pending-sign-in:${app.id}`;
@@ -41,15 +65,19 @@ async function deleteApp(app: Website) {
   ]).catch((error) => {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
+  await removeAppListing(app).catch((error) => {
+    throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
+  });
   const apps = await deleteStoredApp(app.id, appKeys(app.id));
-  await removeAppListing(app);
+  await cleanUp(async () => {
+    if (!await appOwner(app.id)) await removeAppListing(app);
+  });
   await stopWarmBrowser(app.id);
-  if (pending?.browserId) {
-    try {
-      await stopBrowser(pending.browserId);
-    } catch {}
-  }
-  if (order) await stopOrder(order);
+  const { browserId } = pending ?? {};
+  if (browserId) await cleanUp(() => stopBrowser(browserId));
+  if (order) await cleanUp(() => stopOrder(order));
+  const profileId = app.browserProfileId;
+  if (profileId) await cleanUp(() => browserUse().profiles.delete(profileId));
   return apps;
 }
 
@@ -61,7 +89,10 @@ async function apply(userId: string, change: WorkspaceOperation) {
   if (change.operation === "addTasks") return addTasks(app.id, change.capabilities);
   if (change.operation === "replaceTask") return replaceTask(app.id, change.taskId, change.capability);
   if (change.operation === "setOrdering") {
-    if (!await isOwner(userId)) throw new OwnerOnly("Only the MCParrot owner can turn on ordering.");
+    const owner = await isOwner(userId).catch((error) => {
+      throw new AccountUnavailable("MCParrot could not check your account. Try again in a moment.", { cause: error });
+    });
+    if (!owner) throw new OwnerOnly("Only the MCParrot owner can turn on ordering.");
     return changeApp(app.id, (storedApp) => ({ ...storedApp, ordering: change.ordering }));
   }
   if (change.operation === "setAutomaticSignIn") return changeApp(app.id, (storedApp) => ({ ...storedApp, automaticSignIn: change.automaticSignIn }));
@@ -69,7 +100,8 @@ async function apply(userId: string, change: WorkspaceOperation) {
 }
 
 export async function PATCH(request: Request) {
-  const userId = await signedInUserId();
+  const userId = await signedInApiUserId();
+  if (!userId) return signedOut();
   if (Number(request.headers.get("content-length")) > maxBodyLength) return Response.json({ error: "The change is too large." }, { status: 413 });
   const body = await request.text();
   if (body.length > maxBodyLength) return Response.json({ error: "The change is too large." }, { status: 413 });
