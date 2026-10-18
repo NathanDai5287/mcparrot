@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
 import { startBrowser, stopBrowser, withPage } from "./browser-use";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
-import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, urlPlaceholderPattern } from "./task-request";
+import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
 
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
@@ -14,9 +14,11 @@ export const signedOutMessage = "The website is signed out. Open MCParrot, then 
 
 export type TaskInputs = Record<string, string | undefined>;
 
-type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "refused" | "failed";
+type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "failed";
 
 type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
+
+type RequestFiller = (responses: string[]) => FilledRequest;
 
 class TaskError extends Error {
   constructor(readonly reason: Reason, message: string) {
@@ -30,9 +32,28 @@ export const isRunnableTask = (task: Task) => task.requests.length > 0 && task.r
 
 const jsonEscaped = (value: string) => JSON.stringify(value).slice(1, -1);
 
-function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, encode: (value: string) => string) {
+const valueAt = (value: unknown, key: string) => value !== null && typeof value === "object" && Object.hasOwn(value, key) ? (value as Record<string, unknown>)[key] : undefined;
+
+function parsedResponse(responses: string[], step: number) {
+  if (step < 1 || step > responses.length) throw new TaskError("missing_step_value", `Step ${step} has not run yet, so this tool cannot use its response.`);
+  try {
+    return JSON.parse(responses[step - 1]) as unknown;
+  } catch {
+    throw new TaskError("missing_step_value", `Step ${step} did not return JSON, so this tool cannot read a value from its response.`);
+  }
+}
+
+function stepValue(responses: string[], step: number, path: string) {
+  const value = path.split(".").reduce(valueAt, parsedResponse(responses, step));
+  if (value === undefined || value === null) throw new TaskError("missing_step_value", `The response of step ${step} has no value at ${path}, so this tool could not fill {step${step}.${path}}.`);
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, responses: string[], encode: (value: string) => string) {
   const missing = new Set<string>();
   const filled = pattern.replace(placeholder, (match, name: string) => {
+    const step = name.match(stepPlaceholderPattern);
+    if (step) return encode(stepValue(responses, Number(step[1]), step[2]));
     const value = Object.hasOwn(values, name) ? values[name] : undefined;
     if (value === undefined) {
       missing.add(name);
@@ -44,10 +65,10 @@ function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, e
   return filled;
 }
 
-function filledRequest(app: Website, request: TaskRequest, values: TaskInputs): FilledRequest {
-  const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, encodeURIComponent)).href;
+function filledRequest(app: Website, request: TaskRequest, values: TaskInputs, responses: string[]): FilledRequest {
+  const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, responses, encodeURIComponent)).href;
   const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
-  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, bodyEncoding);
+  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, responses, bodyEncoding);
   if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers), tokenHeaders: request.tokenHeaders };
 }
@@ -139,24 +160,28 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return `${method} ${url} returned ${response.status}\n${shortened(response.body)}`;
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${shortened(response.body)}` };
   const { status, text } = await readPageText(page, website, url);
   if (status >= 400) throw httpError(method, url, status);
-  return `${method} ${url} returned ${status}\n${shortened(text)}`;
+  return { body: text, summary: `${method} ${url} returned ${status}\n${shortened(text)}` };
 }
 
-async function readRequests(page: Page, website: string, requests: FilledRequest[]) {
+async function readRequests(page: Page, website: string, requests: RequestFiller[]) {
   await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
   requireOnWebsite(page, website);
+  const responses: string[] = [];
   const results = [];
-  for (const request of requests) {
+  for (const fill of requests) {
+    const request = fill(responses);
     if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
-    results.push(await readRequest(page, website, request));
+    const { body, summary } = await readRequest(page, website, request);
+    responses.push(body);
+    results.push(summary);
   }
   return results.join("\n\n");
 }
 
-async function runRequests(app: Website, requests: FilledRequest[]) {
+async function runRequests(app: Website, requests: RequestFiller[]) {
   if (!app.browserProfileId) throw signedOut();
   const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
   try {
@@ -191,7 +216,7 @@ async function logOutcome(name: string, attributes: Record<string, string | numb
 export function runTask(app: Website, task: Task, inputs: TaskInputs) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, () => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    return runRequests(app, task.requests.map((request) => filledRequest(app, request, values)));
+    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)));
   });
 }
 
@@ -204,5 +229,5 @@ export function addressOnWebsite(app: Website, url: string) {
 
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Page read", { appId: app.id }, () => runRequests(app, [{ method: "GET", url: address.href }]));
+  return logOutcome("Page read", { appId: app.id }, () => runRequests(app, [() => ({ method: "GET", url: address.href })]));
 }

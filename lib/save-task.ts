@@ -1,10 +1,12 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Capability, DiscoveredCapability, Task, TaskRequest, Website } from "./capabilities";
 import { addressOnWebsite } from "./run-task";
-import { bodyPlaceholderPattern, isAllowedRequest, paymentRefusal, requestPlaceholders } from "./task-request";
+import { bodyPlaceholderPattern, isAllowedRequest, paymentRefusal, requestPlaceholders, usesOnlyEarlierSteps } from "./task-request";
 import { changeApp } from "./workspace";
 
-export type PageTask = Omit<Capability, "requests"> & { method?: "GET" | "POST"; urlPattern: string; bodyPattern?: string; contentType?: string };
+type PageRequest = { method?: "GET" | "POST"; urlPattern: string; bodyPattern?: string; contentType?: string };
+
+export type PageTask = Omit<Capability, "requests"> & PageRequest & { earlierRequests?: PageRequest[] };
 
 export const connectionToolNames = ["read_page", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
 
@@ -21,10 +23,11 @@ const sameNames = (first: string[], second: string[]) => first.length === second
 
 const requestKey = (website: string, { method, urlPattern, bodyPattern = "" }: TaskRequest) => `${method.toUpperCase()} ${new URL(urlPattern.replace(/\{[^}]+\}/g, "{}"), website).href} ${bodyPattern.replace(bodyPlaceholderPattern, "{}")}`;
 
+const requestsKey = (website: string, requests: TaskRequest[]) => requests.map((request) => requestKey(website, request)).join("\n");
+
 function duplicateOf(website: string, tasks: Task[], capability: Capability) {
-  const keys = capability.requests.map((request) => requestKey(website, request));
-  return tasks.find((task) => toolName(task.name) === toolName(capability.name)
-    || task.requests.some((request) => keys.includes(requestKey(website, request))));
+  const key = requestsKey(website, capability.requests);
+  return tasks.find((task) => toolName(task.name) === toolName(capability.name) || requestsKey(website, task.requests) === key);
 }
 
 const withNewTasks = (app: Website, capabilities: Capability[]) => ({
@@ -53,20 +56,22 @@ export function unsavedCapabilities(app: Website, capabilities: DiscoveredCapabi
 }
 
 function rejectionReason(app: Website, capability: Capability) {
-  const [request] = capability.requests;
-  addressOnWebsite(app, request.urlPattern.replace(/\{[^}]+\}/g, "{}"));
+  for (const request of capability.requests) addressOnWebsite(app, request.urlPattern.replace(/\{[^}]+\}/g, "{}"));
   const nameProblem = taskNameProblem(capability.name);
   if (nameProblem) return nameProblem;
-  if (request.method === "GET" && request.bodyPattern !== undefined) return "Only a POST request can have a bodyPattern.";
-  if (!isAllowedRequest(request)) return paymentRefusal;
-  if (!sameNames([...new Set(requestPlaceholders(request))], capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern and bodyPattern needs exactly one input with the same name, and every input needs a placeholder.";
+  if (capability.requests.some((request) => request.method === "GET" && request.bodyPattern !== undefined)) return "Only a POST request can have a bodyPattern.";
+  if (!capability.requests.every(isAllowedRequest)) return paymentRefusal;
+  if (!usesOnlyEarlierSteps(capability.requests)) return "A {stepN.path} placeholder can only use the response of an earlier request in this tool, where step1 is the first request.";
+  if (!sameNames([...new Set(capability.requests.flatMap(requestPlaceholders))], capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern and bodyPattern, other than {stepN.path} placeholders, needs exactly one input with the same name, and every input needs a placeholder.";
   const duplicate = duplicateOf(app.url, app.tasks, capability);
   if (duplicate) return `${app.name} already has a tool with this name or page, ${duplicate.name}. Use that tool in a new chat, or choose another name and page.`;
 }
 
-export function saveTask(app: Website, { method = "GET", urlPattern, bodyPattern, contentType, ...pageTask }: PageTask) {
+const pageRequest = ({ method = "GET", urlPattern, bodyPattern, contentType }: PageRequest): TaskRequest => ({ method, urlPattern, ...(bodyPattern === undefined ? {} : { bodyPattern }), ...(contentType === undefined ? {} : { contentType }) });
+
+export function saveTask(app: Website, { method, urlPattern, bodyPattern, contentType, earlierRequests = [], ...pageTask }: PageTask) {
   return Sentry.startSpan({ name: "task.save", attributes: { "task.name": pageTask.name } }, async () => {
-    const capability = { ...pageTask, requests: [{ method, urlPattern, ...(bodyPattern === undefined ? {} : { bodyPattern }), ...(contentType === undefined ? {} : { contentType }) }] };
+    const capability = { ...pageTask, requests: [...earlierRequests, { method, urlPattern, bodyPattern, contentType }].map(pageRequest) };
     let found = false;
     await changeApp(app.id, (storedApp) => {
       found = true;

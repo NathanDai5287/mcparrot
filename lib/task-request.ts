@@ -1,7 +1,8 @@
 import type { TaskRequest } from "./capabilities";
 
 export const urlPlaceholderPattern = /\{([^}]+)\}/g;
-export const bodyPlaceholderPattern = /\{([A-Za-z_]\w*)\}/g;
+export const bodyPlaceholderPattern = /\{([A-Za-z_]\w*|step\d+(?:\.[\w-]+)+)\}/g;
+export const stepPlaceholderPattern = /^step(\d+)\.(.+)$/;
 const paymentWords = /\b(check ?out|payments?|pay|purchases?|place order|create order|submit order|order create)\b/;
 export const paymentRefusal = "MCParrot refuses tool requests that look like checkout or payment, so a tool can never place an order. Orders go only through the Pay with Link ordering tools.";
 
@@ -9,7 +10,14 @@ const replayedHeaderNames = ["accept", "apollographql-client-name", "apollograph
 
 export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name]) => replayedHeaderNames.includes(name.toLowerCase())));
 
-export const requestPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [...urlPattern.matchAll(urlPlaceholderPattern), ...bodyPattern.matchAll(bodyPlaceholderPattern)].map((match) => match[1]);
+const allPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [...urlPattern.matchAll(urlPlaceholderPattern), ...bodyPattern.matchAll(bodyPlaceholderPattern)].map((match) => match[1]);
+
+export const requestPlaceholders = (request: TaskRequest) => allPlaceholders(request).filter((name) => !stepPlaceholderPattern.test(name));
+
+export const usesOnlyEarlierSteps = (requests: TaskRequest[]) => requests.every((request, index) => allPlaceholders(request).every((name) => {
+  const step = name.match(stepPlaceholderPattern)?.[1];
+  return step === undefined || (Number(step) >= 1 && Number(step) <= index);
+}));
 
 export function isOnWebsite(address: string | URL, website: string) {
   const { protocol, hostname, port } = new URL(address);

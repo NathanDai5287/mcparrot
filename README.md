@@ -130,8 +130,9 @@ He accepted the trade-off that ChatGPT can read any page his account can see on 
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
-Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, `inputs` as a list of name, description, and example, and `returns`, which become one request in the same tool shape as a chosen tool.
-It rejects a URL pattern that is not on the app's website or one of its subdomains, a body on a GET request, a request that the checkout and payment guard refuses, placeholders in the URL pattern and body that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request, ignoring placeholder names, matches an existing tool.
+Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, an optional `earlierRequests` list of up to 9 requests with the same four request fields, `inputs` as a list of name, description, and example, and `returns`, which become the tool's requests in the same tool shape as a chosen tool, with the earlier requests first as steps 1, 2, and so on, and the main request last.
+Its description tells ChatGPT to use earlier requests with [step placeholders](#using-saved-tools) when a request needs a value, such as a cart ID, that an earlier JSON response returns.
+It rejects a URL pattern that is not on the app's website or one of its subdomains, a body on a GET request, a request that the checkout and payment guard refuses, a step placeholder that does not name an earlier request, placeholders other than step placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request list, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
 Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
 
@@ -170,10 +171,11 @@ Canvas is a useful example, but the same flow works on any website.
 
 Each capability shows a name, a plain description, the requests it uses as a method, GET or POST, and URL pattern, the inputs that can change with an example, and what it returns.
 Each capability is marked **New** or **Updates <tool name>**, where an update is a clearly better version of that saved tool.
-Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or request matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
+Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or request list matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
 A request matches another when its method, address, and body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
+A request list matches another when it has the same requests in the same order, so a tool "Add item to cart" that first gets the cart can sit beside a tool "Get cart" with only that request.
 Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or request breaks those rules, is skipped.
-Selecting a tool on the app page shows its inputs, its result, and each request's method, URL pattern, and body pattern.
+Selecting a tool on the app page shows its inputs, its result, and each request's step number, method, URL pattern, and body pattern, so a `{step1...}` placeholder points to a visible request.
 
 The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another discovery run.
 The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
@@ -239,12 +241,13 @@ The instruction asks for capabilities JSON only, explains that page requests ret
 It tells Claude that tools can use GET and POST requests, to prefer GraphQL queries for reading, that other POST requests and mutations are allowed except checkout and payment, and to ignore analytics, tracking, and advertising requests, such as third-party pixels.
 A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
 The instruction tells Claude to copy each body exactly, with the whole GraphQL query text, and never to shorten, rewrite, or invent query text.
+It explains step placeholders and tells Claude to use one, with the earlier request first, when a recorded request contains a value that also appears in an earlier recorded response sample.
 After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`, and the recorded `tokenHeaders` of any recorded request on the same host into each request on that host as `tokenHeaders`; Claude never sees them.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's website or its subdomains and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
-It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's website or its subdomains, have no body on a GET, pass the checkout and payment guard, and whose placeholders in URL patterns and bodies match their inputs one to one.
-It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
+It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's website or its subdomains, have no body on a GET, pass the checkout and payment guard, whose step placeholders name only earlier requests, and whose other placeholders in URL patterns and bodies match their inputs one to one.
+It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or request list matches a saved tool, and updates that equal their tool.
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
@@ -296,6 +299,10 @@ URL values are URL-encoded, and body values are escaped as JSON string content, 
 A request with a body sends its recorded content type, or `application/json` when none was recorded.
 A POST request never follows a redirect, so its body cannot reach another origin; after a redirected POST, the browser opens the website's origin again and treats the website as signed out when that lands on a sign-in page, and otherwise returns an error.
 Inputs that ChatGPT leaves out use the example value that discovery found.
+A tool's requests run in order, and a later request can use a value from an earlier request's JSON response through a step placeholder `{stepN.path.to.value}`, where `N` is the earlier request's position in the tool, starting at 1, and each dot-separated part is a key or an array position, such as `{step1.data.cart.id}` or `{step2.items.0.id}`.
+For example, a DoorDash tool "Add item to cart" can get the cart in its first request and send `{step1.data.cart.id}` in its second.
+A step placeholder is not a tool input, and it is filled and encoded the same way as an input, with a non-text value, such as a number or an object, written as JSON.
+When the earlier response is not JSON, is longer than 100,000 characters, or has no value at that path, the tool stops with an error that names the step and the path.
 When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
 Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
