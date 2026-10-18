@@ -19,13 +19,16 @@ if (!process.env.BROWSER_USE_API_KEY) {
 const client = new BrowserUse();
 const created = client.runs.create({ task });
 let finished = false;
+/** @type {Promise<void> | undefined} */
+let cancelling;
 
 /** @param {unknown} error */
 const errorMessage = (error) => (error instanceof Error ? error.message : String(error));
 
-async function cancelRun() {
+const cancelRun = () => (cancelling ??= cancel());
+
+async function cancel() {
   if (finished) return;
-  finished = true;
   let runId;
   try {
     runId = (await created).id;
