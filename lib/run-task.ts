@@ -1,7 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
 import { startBrowser, stopBrowser, withPage } from "./browser-use";
-import type { Task, Website } from "./capabilities";
+import type { Task, TaskRequest, Website } from "./capabilities";
+import { bodyPlaceholderPattern, isAllowedRequest, paymentRefusal, urlPlaceholderPattern } from "./task-request";
 
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
@@ -11,7 +12,9 @@ export const signedOutMessage = "The website is signed out. Open MCParrot, then 
 
 export type TaskInputs = Record<string, string | undefined>;
 
-type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "failed";
+type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "refused" | "failed";
+
+type FilledRequest = { method: string; url: string; body?: string; contentType?: string };
 
 class TaskError extends Error {
   constructor(readonly reason: Reason, message: string) {
@@ -21,20 +24,30 @@ class TaskError extends Error {
 
 const signedOut = () => new TaskError("signed_out", signedOutMessage);
 
-export const isReadingTask = (task: Task) => task.requests.length > 0 && task.requests.every((request) => request.method.toUpperCase() === "GET");
+export const isRunnableTask = (task: Task) => task.requests.length > 0 && task.requests.every(isAllowedRequest);
 
-function fillPattern(urlPattern: string, values: TaskInputs) {
+const jsonEscaped = (value: string) => JSON.stringify(value).slice(1, -1);
+
+function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, encode: (value: string) => string) {
   const missing = new Set<string>();
-  const filled = urlPattern.replace(/\{([^}]+)\}/g, (placeholder, name: string) => {
+  const filled = pattern.replace(placeholder, (match, name: string) => {
     const value = Object.hasOwn(values, name) ? values[name] : undefined;
     if (value === undefined) {
       missing.add(name);
-      return placeholder;
+      return match;
     }
-    return encodeURIComponent(value);
+    return encode(value);
   });
   if (missing.size) throw new TaskError("missing_input", `This tool needs a value for ${[...missing].join(", ")}.`);
   return filled;
+}
+
+function filledRequest(app: Website, request: TaskRequest, values: TaskInputs): FilledRequest {
+  const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, encodeURIComponent)).href;
+  const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
+  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, bodyEncoding);
+  if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
+  return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json" };
 }
 
 function looksSignedOut(address: string) {
@@ -62,20 +75,21 @@ function requireOnWebsite(page: Page, website: string) {
   if (new URL(page.url()).origin !== website) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
 }
 
-function fetchInPage(page: Page, url: string) {
-  return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": "GET" } }, async (span) => {
-    const response = await page.evaluate(async ({ address, limit, timeout }) => {
+function fetchInPage(page: Page, request: FilledRequest) {
+  return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": request.method } }, async (span) => {
+    const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType }, limit, timeout }) => {
       try {
-        const reply = await fetch(address, { credentials: "include", signal: AbortSignal.timeout(timeout) });
+        const reply = await fetch(address, { method, body: requestBody, headers: requestContentType ? { "content-type": requestContentType } : undefined, redirect: method === "GET" ? "follow" : "manual", credentials: "include", signal: AbortSignal.timeout(timeout) });
+        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, contentType: "", body: "" };
         const contentType = reply.headers.get("content-type") ?? "";
-        const html = contentType.includes("html") && reply.status < 400;
+        const html = method === "GET" && contentType.includes("html") && reply.status < 400;
         if (html) await reply.body?.cancel();
         const body = html ? "" : (await reply.text()).slice(0, limit + 1);
         return { failed: "", status: reply.status, url: reply.url, redirected: reply.redirected, contentType, body };
       } catch (error) {
         return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, contentType: "", body: "" };
       }
-    }, { address: url, limit: maximumResponseCharacters, timeout: requestTimeout });
+    }, { request, limit: maximumResponseCharacters, timeout: requestTimeout });
     span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
     return response;
   });
@@ -93,38 +107,47 @@ function readPageText(page: Page, website: string, url: string) {
   });
 }
 
-function httpError(url: string, status: number) {
-  return new TaskError("http_error", `GET ${withoutQuery(url)} returned ${status}`);
+function httpError(method: string, url: string, status: number) {
+  return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`);
 }
 
-async function readRequest(page: Page, website: string, url: string) {
-  const response = await fetchInPage(page, url);
-  if (response.failed === "timeout") throw new TaskError("timeout", `GET ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
+async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
+  await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+  if (looksSignedOut(page.url())) return signedOut();
+  return new TaskError("fetch_failed", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
+}
+
+async function readRequest(page: Page, website: string, request: FilledRequest) {
+  const { method, url } = request;
+  const response = await fetchInPage(page, request);
+  if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
+  if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
   if (response.redirected && new URL(response.url).origin !== website) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
-  if (response.status >= 400) throw httpError(url, response.status);
-  if (!response.failed && !response.contentType.includes("html")) return `GET ${url} returned ${response.status}\n${shortened(response.body)}`;
+  if (response.status >= 400) throw httpError(method, url, response.status);
+  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return `${method} ${url} returned ${response.status}\n${shortened(response.body)}`;
   const { status, text } = await readPageText(page, website, url);
-  if (status >= 400) throw httpError(url, status);
-  return `GET ${url} returned ${status}\n${shortened(text)}`;
+  if (status >= 400) throw httpError(method, url, status);
+  return `${method} ${url} returned ${status}\n${shortened(text)}`;
 }
 
-async function readRequests(page: Page, website: string, urls: string[]) {
+async function readRequests(page: Page, website: string, requests: FilledRequest[]) {
   await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
   requireOnWebsite(page, website);
   const results = [];
-  for (const url of urls) {
+  for (const request of requests) {
     if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
-    results.push(await readRequest(page, website, url));
+    results.push(await readRequest(page, website, request));
   }
   return results.join("\n\n");
 }
 
-async function readUrls(app: Website, urls: string[]) {
+async function runRequests(app: Website, requests: FilledRequest[]) {
   if (!app.browserProfileId) throw signedOut();
   const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
   try {
-    return await withPage(browser.cdpUrl!, (page) => readRequests(page, new URL(app.url).origin, urls));
+    return await withPage(browser.cdpUrl!, (page) => readRequests(page, new URL(app.url).origin, requests));
   } finally {
     await stopBrowser(browser.id).catch((error: Error) => Sentry.logger.warn("Browser stop failed", { appId: app.id, reason: sanitized(error.message) }));
   }
@@ -155,8 +178,7 @@ async function logOutcome(name: string, attributes: Record<string, string | numb
 export function runTask(app: Website, task: Task, inputs: TaskInputs) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, () => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    const urls = task.requests.map((request) => addressOnWebsite(app, fillPattern(request.urlPattern, values)).href);
-    return readUrls(app, urls);
+    return runRequests(app, task.requests.map((request) => filledRequest(app, request, values)));
   });
 }
 
@@ -169,5 +191,5 @@ export function addressOnWebsite(app: Website, url: string) {
 
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Page read", { appId: app.id }, () => readUrls(app, [address.href]));
+  return logOutcome("Page read", { appId: app.id }, () => runRequests(app, [{ method: "GET", url: address.href }]));
 }

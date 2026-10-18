@@ -70,6 +70,7 @@ function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolea
       <dl className="tool-facts">
         <dt>Inputs</dt><dd>{tool.inputs.length === 0 ? "None" : <ul>{tool.inputs.map((input) => <li key={input.name}><span className="tool-input-name">{input.name}</span> {input.description}</li>)}</ul>}</dd>
         <dt>Returns</dt><dd>{tool.returns}</dd>
+        <dt>Requests</dt><dd><ul>{tool.requests.map((request, index) => <li key={index}><span className="tool-input-name">{request.method}</span> {request.urlPattern}{request.bodyPattern && ` with body ${request.bodyPattern}`}</li>)}</ul></dd>
       </dl>
       <button className="delete-link" aria-label={`Delete ${tool.name}`} onClick={onDelete}>Delete tool</button>
     </div>}

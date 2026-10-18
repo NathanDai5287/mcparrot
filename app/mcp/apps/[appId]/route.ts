@@ -6,9 +6,10 @@ import { isOwner } from "../../../../lib/account";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { connectionAllowed } from "../../../../lib/connection";
 import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
-import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
+import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
+import { isGetRequest } from "../../../../lib/task-request";
 import { findApp } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -75,7 +76,7 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
 
 function appServer(app: Website, orderLimitUsd?: number) {
   const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
-  const tasks = app.tasks.filter(isReadingTask);
+  const tasks = app.tasks.filter(isRunnableTask);
   const usedNames = new Set(connectionToolNames);
   const names = new Map<Task, string>();
   for (const task of tasks) {
@@ -100,7 +101,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
-      annotations: { readOnlyHint: true },
+      annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     }, async (inputs) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs))));
   }
   const website = new URL(app.url).origin;
@@ -111,12 +112,15 @@ function appServer(app: Website, orderLimitUsd?: number) {
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("save_task", {
-    title: `Save a page as a tool for ${app.name}`,
-    description: `Save a new tool for ${app.name} that reads a page. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern, and give one input for each placeholder. The tool appears in a new chat.`,
+    title: `Save a tool for ${app.name}`,
+    description: `Save a new tool for ${app.name} that reads a page with GET or sends one POST request, such as a GraphQL query. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern and bodyPattern, and give one input for each placeholder. MCParrot refuses any request that looks like checkout or payment. The tool appears in a new chat.`,
     inputSchema: {
       name: z.string().describe("A short plain tool name, such as Read course syllabus."),
       description: z.string().describe("What the tool does, in one plain sentence."),
+      method: z.enum(["GET", "POST"]).optional().describe("GET to read a page, which is the default, or POST to send bodyPattern."),
       urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
+      bodyPattern: z.string().optional().describe("Only for POST: the request body, usually JSON, with {placeholders} inside string values, such as {\"query\":\"…\",\"variables\":{\"search\":\"{search}\"}}."),
+      contentType: z.string().optional().describe("Only for POST: the body's content type. It defaults to application/json."),
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder, with the value from the page you read as the example."),
       returns: z.string().describe("What the tool returns, in a few words."),
     },
