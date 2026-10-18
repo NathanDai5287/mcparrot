@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
+import { AssistantPanel } from "./assistant-panel";
 import type { Capability, Task, Website } from "../lib/capabilities";
 
 type Screen =
@@ -150,6 +151,11 @@ export default function Workspace() {
     navigate({ view: "app", app: savedApp });
   }
 
+  function updateApp(appId: string, changes: Partial<Website>) {
+    setApps((savedApps) => savedApps.map((app) => app.id === appId ? { ...app, ...changes } : app));
+    setScreen((current) => "app" in current && current.app.id === appId ? { ...current, app: { ...current.app, ...changes } } : current);
+  }
+
   const currentApp = "app" in screen ? screen.app : null;
 
   return (
@@ -175,7 +181,7 @@ export default function Workspace() {
             <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
               <span className="app-main"><span className="app-name">{app.name} {app.sample && <span className="badge">Sample</span>}</span><span className="website-address">{app.url}</span></span>
-              <span className="app-status">Not connected<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
+              <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
             </button>)}</div>
             <p className="preview-note">MCParrot stores apps and chosen tasks so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
           </>}
@@ -189,6 +195,7 @@ export default function Workspace() {
             <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
             <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
             {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span></div>)}</div>}
+            <AssistantPanel app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} />
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
                 <h2>Delete {screen.app.name}?</h2>
