@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@cursor/sdk", "playwright-core"],
   outputFileTracingIncludes: {
     "/api/discover": ["./node_modules/@cursor/**"],
+    "/api/image": ["./node_modules/@cursor/**"],
+    "/mcp/apps/*": ["./node_modules/@cursor/**"],
     "/**": ["./node_modules/playwright-core/**"],
   },
   headers: async () => [

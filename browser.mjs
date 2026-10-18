@@ -1,4 +1,5 @@
 // @ts-check
+import { constants } from "node:os";
 import { BrowserUse } from "browser-use-sdk/v4";
 
 const RUN_TIMEOUT_MS = 15 * 60 * 1000;
@@ -18,13 +19,16 @@ if (!process.env.BROWSER_USE_API_KEY) {
 const client = new BrowserUse();
 const created = client.runs.create({ task });
 let finished = false;
+/** @type {Promise<void> | undefined} */
+let cancelling;
 
 /** @param {unknown} error */
 const errorMessage = (error) => (error instanceof Error ? error.message : String(error));
 
-async function cancelRun() {
+const cancelRun = () => (cancelling ??= cancel());
+
+async function cancel() {
   if (finished) return;
-  finished = true;
   let runId;
   try {
     runId = (await created).id;
@@ -35,10 +39,12 @@ async function cancelRun() {
   }
 }
 
-process.once("SIGINT", async () => {
-  await cancelRun();
-  process.exit(130);
-});
+for (const signal of /** @type {const} */ (["SIGINT", "SIGTERM", "SIGHUP"])) {
+  process.once(signal, async () => {
+    await cancelRun();
+    process.exit(128 + constants.signals[signal]);
+  });
+}
 
 try {
   const run = await created;

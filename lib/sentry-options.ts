@@ -5,10 +5,11 @@ type StreamedSpanJSON = Parameters<NonNullable<Options["beforeSendSpan"]>>[0];
 
 const queryString = /\?[^\s#]*/g;
 const secretQueryValue = /((?:x-vercel-protection-bypass|token)=)[^&#\s"']*/gi;
+const absoluteUrlQuery = /(https?:\/\/[^\s?#"'<>]+)\?[^\s#"'<>]*/gi;
 const urlKey = /url|target|query|^next\./i;
 
 function scrub(value: unknown) {
-  return typeof value === "string" ? value.replace(secretQueryValue, "$1[Filtered]") : value;
+  return typeof value === "string" ? value.replace(absoluteUrlQuery, "$1").replace(secretQueryValue, "$1[Filtered]") : value;
 }
 
 function stripQuery(value: unknown) {
@@ -62,14 +63,23 @@ export const sentryOptions = {
     /^The website refused the request because its protection code/,
     /^No sign-in is waiting for a code/,
     /^MCParrot only uses pages on /,
+    /^This address (left|redirects off) the website /,
+    /^This tool needs a value for /,
     /^The website rejected the saved login/,
     /^Browser Use could not finish signing in/,
+    /^Signing in to the website took too long/,
+    /^Open MCParrot and select Sign in to website/,
+    /^MCParrot is already signing in/,
     /^MCParrot places orders only when Browser Use Pay with Link is in test mode/,
     /^MCParrot could not confirm that Browser Use Pay with Link/,
     /spending limit, so MCParrot did not place the order/,
     /^The total changed from /,
     /^Ordering is off for this app/,
     /^No order with this ID is waiting/,
+    /^MCParrot is already working on this order/,
+    /^An order is already in progress/,
+    /^This order is not ready to place/,
+    /^Browser Use could not read the checkout total again/,
     /already has a tool with this name or page/,
   ],
   dataCollection: {
