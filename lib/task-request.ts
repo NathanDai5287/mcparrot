@@ -16,7 +16,7 @@ export const replayedHeaders = (headers: Record<string, string> = {}) => Object.
 
 const isGraphqlDocument = (text: string) => graphqlDocument.test(text);
 
-const isGraphqlText = (text: string) => isGraphqlDocument(text) && (!/^\s*\{/.test(text) || text.replace(bodyPlaceholderPattern, "").includes("{"));
+const isGraphqlText = (text: string) => isGraphqlDocument(text) && (!/^\s*\{/.test(text) || /\{|\n\s*#/.test(text.replace(bodyPlaceholderPattern, "")));
 
 export type BodyPlace = { inString: boolean; inGraphql: boolean };
 
