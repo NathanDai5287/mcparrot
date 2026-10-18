@@ -98,7 +98,7 @@
       <section id="idea">
         <h2>How the product works</h2>
         <p>You create an app for one website, browse its pages, and review several suggested tasks from that session. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each saved reading task becomes one of those tools. The product is intended for many websites, not one fixed example.</p>
-        <p>During teaching, also called parroting, MCParrot Explorer records the data requests a website makes in a normal Chrome or Edge tab. Exploration does not use a cloud browser. You then sign in once in a Browser Use cloud browser that you see in a popup. During later assistant use, no visible website browser opens: each task runs in a hidden Browser Use browser that keeps your sign-in.</p>
+        <p>During teaching, also called parroting, MCParrot Explorer records the pages you open and the data requests they make in a normal Chrome or Edge tab. Exploration does not use a cloud browser. You then sign in once in a Browser Use cloud browser that you see in a popup. During later assistant use, no visible website browser opens: each task runs in a hidden Browser Use browser that keeps your sign-in.</p>
         <div class="table-wrap">
           <table>
             <caption>One website, several tasks</caption>
@@ -131,13 +131,14 @@
       <section id="recording">
         <h2>What the extension records</h2>
         <p>The extension records only in the tab it opens for you. While it records, your browser shows a bar that says MCParrot Explorer is debugging the browser. It keeps each data request the page makes: its type, its full address, whether it worked, the kind of answer, and a short sample of that answer. Long text is cut to 80 characters, lists keep only 2 items, and each sample stays small.</p>
-        <p>It skips pictures, fonts, styles, scripts, and media. It skips common tracking services and sign-in pages. It never copies passwords, cookies, message headers, or what your browser sends to the website. Similar requests are kept once, up to 150 for each app.</p>
+        <p>You chose to also record each whole page you open, such as a course syllabus, because some pages arrive in one piece and never make a separate data request. For a page, the extension keeps its address, whether it worked, and the first 3,000 characters of the text you see on it, not the page’s code. Composer can then suggest tasks that read a page, such as “Read course syllabus” for any course.</p>
+        <p>It skips pictures, fonts, styles, scripts, and media. It skips common tracking services and sign-in pages. It never copies passwords, cookies, message headers, or what your browser sends to the website. Similar requests and pages are kept once, up to 150 for each app.</p>
         <p>Recording stops when you select <strong>Stop exploring</strong>, close the tab, close the debugging bar, or restart the browser. Recorded requests stay in the extension until you select <strong>Delete recorded requests</strong>, delete the app, or remove the extension. Apps keep stable addresses, so Back and Forward work. The extension works with the production website and with the local test website on your computer.</p>
       </section>
 
       <section id="composer">
         <h2>What Composer sees</h2>
-        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and their short samples to Cursor Composer 2.5 Fast through the Cursor SDK. Composer works in an empty folder, so it cannot read our project files, and it only replies with the list of tasks. You chose real short samples because they help Composer make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Composer until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
+        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and pages and their short samples to Cursor Composer 2.5 Fast through the Cursor SDK. Composer works in an empty folder, so it cannot read our project files, and it only replies with the list of tasks. You chose real short samples because they help Composer make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Composer until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
         <p>Only you can use this feature, because Vercel asks you to sign in before you can open the website. If Composer is not set up, does not start, or does not finish, the page shows a clear error message.</p>
       </section>
 
@@ -155,6 +156,7 @@
       <section id="connections">
         <h2>Connecting ChatGPT</h2>
         <p>Each website app gets its own private connection link, which gives ChatGPT that app’s reading tasks. This link is a <span class="badge badge--gap">gap</span> until your live ChatGPT test passes. You chose to build only these app connections first. A separate MCParrot connection that would let ChatGPT manage your apps is <span class="badge badge--aspirational">aspirational</span>.</p>
+        <p>Each connection also has a tool called “Read a page on” your app’s name. ChatGPT gives it a page address on that website, such as a syllabus link you paste, and MCParrot opens the page with your saved sign-in in a hidden browser and returns its text. It refuses addresses on any other website. It uses the same length limit and the same sign-in recovery as tasks. You chose this trade-off: ChatGPT can read any page your account can see on that website, not only the tasks you chose, but it cannot change anything.</p>
         <ol class="flow">
           <li><h3>Copy the link</h3><p>On the app page, select <strong>Copy link</strong>.</p></li>
           <li><h3>Open the plugin directory</h3><p>In ChatGPT, open Settings, then Plugins, and select <strong>Browse directory</strong>.</p></li>
@@ -171,8 +173,8 @@
         <h2>Using your assistant</h2>
         <ol class="flow">
           <li><h3>Ask for a result</h3><p class="example">“Use Course portal to find my assignments due this week.”</p><p>ChatGPT chooses a saved task and supplies its inputs. Inputs it leaves out use the example value that Composer found.</p></li>
-          <li><h3>MCParrot runs the task</h3><p>A hidden Browser Use browser opens the website with your saved sign-in and repeats the task’s requests inside the website page. You never see this browser.</p></li>
-          <li><h3>Get the result</h3><p>ChatGPT receives the website’s answer, shortened if it is very long, and nobody clicks through the website pages again.</p></li>
+          <li><h3>MCParrot runs the task</h3><p>A hidden Browser Use browser opens the website with your saved sign-in and repeats the task’s requests inside the website page. When an answer is a whole page, the browser opens that page and keeps only the text you would see. You never see this browser.</p></li>
+          <li><h3>Get the result</h3><p>ChatGPT receives the website’s answer, and nobody clicks through the website pages again. You chose a limit of 100,000 characters for each answer, so long lists, such as all your courses, arrive whole.</p></li>
         </ol>
         <p>If the website has signed you out and you saved a login, MCParrot signs in again for you, as <a href="#reconnect">recovering an expired sign-in</a> explains. Without a saved login, ChatGPT shows a message that tells you to save a login or select <strong>Sign in to website</strong> in MCParrot, and then you ask again. Tasks only read information in this first version, so tasks that would change website data do not appear in ChatGPT. Some websites need special codes that only their own page adds, so some saved tasks can fail. Your assistant can combine tasks to answer new requests, but one browsing session cannot prove support for every website feature.</p>
       </section>
@@ -181,7 +183,7 @@
         <h2>Equal controls for agents</h2>
         <p>Your agent is your assistant when it acts for you. Everything you can do in MCParrot must also be possible through your agent. For example, you can create a website app yourself, or you can ask your agent to create it with the same details. Both paths must give the same information and respect the same permissions. This rule covers actions and information, not the screen layout or moving between tabs.</p>
         <p>The exploration controls follow this same rule: an agent must be able to start and stop exploration, list or delete recorded requests, find what a site can do, and save chosen tasks. These matching agent controls remain aspirational.</p>
-        <p>The rule applies to app management, task teaching, testing, sign-in, connections, progress, and recovery. We check both paths before we mark a feature shipped. Today, ChatGPT can run an app’s saved tasks, but it cannot manage MCParrot, which is a <span class="badge badge--gap">gap</span> listed on the <a href="status.html#gaps">status page</a>.</p>
+        <p>The rule applies to app management, task teaching, testing, sign-in, connections, progress, and recovery. We check both paths before we mark a feature shipped. Today, ChatGPT can run an app’s saved tasks and read its pages, but it cannot manage MCParrot, and the workspace has no button to run a task or read a page, which is a <span class="badge badge--gap">gap</span> listed on the <a href="status.html#gaps">status page</a>.</p>
         <aside class="note">
           <strong class="note-label">You still control personal verification</strong>
           <p>Your agent could request exploration, but you still need the extension and your selected browser tab. You browse the website yourself. You still receive Duo’s text-message code on your phone and complete any other personal verification. You chose to type verification codes in the ChatGPT chat. Passwords never go into ChatGPT; you enter them only in MCParrot’s <strong>Save login</strong> form.</p>
@@ -211,7 +213,7 @@
         <ul>
           <li>Saved tasks become tools without a test, so we must check that each one works for you.</li>
           <li>Pages you never visited remain unsupported unless discovered and tested separately.</li>
-          <li>Some pages return a whole document instead of separate data messages, so their tasks need another tested method.</li>
+          <li>Pages that fill in their content only after you click something can come back with part of their text missing.</li>
           <li>Some website messages may work only inside the original browser.</li>
           <li>A changed website may need another recording.</li>
           <li>We must measure speed before we say the product is faster.</li>

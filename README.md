@@ -51,7 +51,8 @@ The UI and MCP must call the same underlying operations with matching inputs, pe
 Neither interface may bypass the other's authorization or user verification requirements.
 
 This rule covers both managing MCParrot and running taught website tasks.
-Each website app's connection runs its saved reading tasks through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
+Each website app's connection runs its saved reading tasks and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
+Running a task and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
 The table maps each frontend capability to its aspirational management MCP equivalent.
 
 | Frontend capability | Aspirational management MCP equivalent |
@@ -84,7 +85,7 @@ Nathan scoped the first version to app connections only, so the management conne
 
 | Connection | Scope | Use |
 | --- | --- | --- |
-| One connection per website app | Only that app's saved reading tasks | Run saved website tasks from ChatGPT |
+| One connection per website app | That app's saved reading tasks, and reading any page on its website | Run saved website tasks and read website pages from ChatGPT |
 | MCParrot management (aspirational) | The owner's website apps and task lifecycle | Create apps, manage tasks, start teaching, check status, and request recovery |
 
 For example, Canvas and YouTube each have their own connection.
@@ -97,6 +98,12 @@ The route uses the official MCP TypeScript SDK's Streamable HTTP transport in st
 Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
+
+Each connection also has a read-only `read_page` tool, titled "Read a page on <app name>", whose one input `url` is a full address or a path on the app's website.
+It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a task does, as [using saved tasks](#using-saved-tasks) describes, with the same length limit, signed-out check, and automatic sign-in.
+It rejects any address on another origin with an error that names the allowed website, before it starts a browser.
+Nathan chose this tool so that ChatGPT can answer from pages that no saved task covers, such as a syllabus link he pastes.
+He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tasks he chose; it still cannot change anything, because it only opens pages.
 
 Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
@@ -138,11 +145,14 @@ Testing tasks with changed inputs before they become tools remains aspirational,
 MCParrot Explorer is an unpacked Chrome and Edge extension that records only in the tab it opens for exploration.
 It attaches the browser's debugging interface to that tab, so the browser shows a bar saying that the extension is debugging the browser.
 It records data requests, such as fetch and XHR requests and other JSON or XML responses, with their method, full URL, status, response content type, and a short response sample.
+Nathan chose to also record each whole page that loads in the tab, such as a server-rendered Canvas syllabus, because those pages never make a separate data request.
+A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts and sign-in, session, and token paths.
 It never records request or response headers, cookies, request bodies, or authorization values, and it replaces query values whose names suggest a secret, such as a token or key.
 
 Each sample keeps at most 80 characters per text value and 2 items per list, up to about 3 KB per response.
-Requests that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
+A page sample keeps the first 3,000 characters of its visible text, with spaces collapsed.
+Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
@@ -156,14 +166,16 @@ The extension is not published in an extension store, and website policies can d
 
 Composer's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
 Unvisited pages and actions remain unavailable unless separately explored and tested.
-Some pages return HTML or use browser state rather than a separate data response; those tasks still need a tested execution path.
+Discovery can suggest page-reading tasks, such as "Read course syllabus" with a `{courseId}` input, from recorded pages.
+Pages that build their content only after later user actions, rather than when they load, can still return incomplete text.
 Saved tasks become tools without a separate test, so a tool can fail when its request cannot be reused; checking each task before it becomes a tool is aspirational.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
 
 ## Discovery data sent to Composer
 
-Discovery sends the recorded requests, including their truncated response samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
+Discovery sends the recorded requests and pages, including their truncated samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
 The agent runs in an empty temporary folder and receives an instruction to use no tools and reply only with capabilities JSON.
+The instruction explains that page requests return the page's text and asks for page-reading tasks where a page's text is useful, in the same capability shape as data tasks.
 Nathan chose short real-value samples because they make Composer's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
@@ -210,10 +222,12 @@ The user can also save a login on the app page, so MCParrot signs in again by it
 When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
 It opens the app's website address, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
 Inputs that ChatGPT leaves out use the example value that discovery found.
-The tool returns each request's address, status, and response body, shortened to 20,000 characters, and the server then stops the browser.
+When a response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON, stay as they are.
+The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
+Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 
-The task treats the website as signed out when the website address lands on a sign-in page, a request returns 401 or 403, or a request redirects to a sign-in page.
+The task treats the website as signed out when the website address lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
 When the app has a saved login, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 Without a saved login, the task fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
 Tasks run only GET requests in this first version, because the first milestone reads website data and never changes it.
@@ -293,10 +307,10 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Part | Choice | Purpose |
 | --- | --- | --- |
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
-| Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
+| Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record pages, data requests, and short samples in one opened tab |
 | Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each task in a hidden browser, and sign in again with the saved login |
-| Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests with the website's own cookies |
+| Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
 | Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, Browser Use profile IDs, encrypted saved logins, and pending sign-ins |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
@@ -342,14 +356,14 @@ MCParrot keeps every trace and every session because it has one user, and it sen
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, and one `task.request` for each request a task runs |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, and each task run's outcome, including whether the website was signed out |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, one `task.request` for each request a task or `read_page` runs, and one `page.read` with the text size for each HTML page opened as text |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, and each task run's and `read_page` call's outcome, including whether the website was signed out |
 | Session Replay | Recordings of dashboard sessions, with all text and inputs masked |
 | AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
 Spans carry only non-secret attributes, such as the app ID, task name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
-MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses.
+MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses; `read_page` logs carry only the app ID, the result size, and any failure reason, never the page text.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
