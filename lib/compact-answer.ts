@@ -2,7 +2,7 @@ const answerCharacters = 20_000;
 const stringCharacters = 2_000;
 const tableRows = 3;
 const sharedColumnShare = 0.6;
-const noiseKey = /^__typename$|tracking|analytics|telemetry|experiment|logging/i;
+const noiseKey = /^__typename$|tracking(?![-_]?(?:number|url|link|code|status|id))|analytics|telemetry|experiment|logging/i;
 const markup = /<\/?[a-z][\w:-]*(\s[^<>]*)?\/?>/i;
 const namedEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
 
