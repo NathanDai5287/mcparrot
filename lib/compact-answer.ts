@@ -56,14 +56,43 @@ function table(items: unknown[]) {
   const constant = columns.filter((column) => rows.every((row) => column in row && JSON.stringify(row[column]) === JSON.stringify(rows[0][column])));
   const varying = constant.length < columns.length ? columns.filter((column) => !constant.includes(column)) : columns;
   const shared = varying === columns ? [] : [`every row: ${constant.map((column) => `${column}=${cell(rows[0][column])}`).join("; ")}`];
-  return [...shared, ...[varying, ...rows.map((row) => varying.map((column) => row[column]))].map((line) => line.map(cell).join(" | "))].join("\n");
+  return { lines: [...shared, ...[varying, ...rows.map((row) => varying.map((column) => row[column]))].map((line) => line.map(cell).join(" | "))], headLines: shared.length + 1 };
 }
 
-function rendered(value: unknown): string {
-  if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${rendered(item)}`).join(",")}}`;
-  if (!Array.isArray(value)) return JSON.stringify(value);
+type Rendered = { text: string; tables: { start: number; lineEnds: number[]; headLines: number }[] };
+
+function render(value: unknown, out: Rendered) {
+  if (isRecord(value)) {
+    out.text += "{";
+    Object.entries(value).forEach(([key, item], index) => {
+      out.text += `${index ? "," : ""}${JSON.stringify(key)}:`;
+      render(item, out);
+    });
+    out.text += "}";
+    return;
+  }
+  if (!Array.isArray(value)) {
+    out.text += String(JSON.stringify(value));
+    return;
+  }
   const rows = table(value);
-  return rows === undefined ? `[${value.map(rendered).join(",")}]` : `[\n${rows}\n]`;
+  out.text += "[";
+  if (rows === undefined) value.forEach((item, index) => {
+    if (index) out.text += ",";
+    render(item, out);
+  });
+  else {
+    const start = out.text.length;
+    out.tables.push({ start, lineEnds: rows.lines.map((line) => (out.text += `\n${line}`).length), headLines: rows.headLines });
+    out.text += "\n";
+  }
+  out.text += "]";
+}
+
+function rendered(value: unknown) {
+  const out: Rendered = { text: "", tables: [] };
+  render(value, out);
+  return out;
 }
 
 function compactBody(body: string, keepFields: string[]) {
@@ -72,11 +101,17 @@ function compactBody(body: string, keepFields: string[]) {
     const filtered = keepFields.length ? compacted(picked(parsed, keepFields.map(fieldPath))) : undefined;
     return rendered(filtered !== undefined && isPresent(filtered) ? filtered : compacted(parsed));
   } catch {
-    return markup.test(body) ? plainText(body) : body;
+    return { text: markup.test(body) ? plainText(body) : body, tables: [] };
   }
 }
 
+const narrowRequest = "fullAnswer will not show more. Ask the user to narrow the request.";
+
 export function compactAnswer(body: string, keepFields: string[] = []) {
-  const text = compactBody(body, keepFields);
-  return text.length > answerCharacters ? `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters]` : text;
+  const { text, tables } = compactBody(body, keepFields);
+  if (text.length <= answerCharacters) return text;
+  const cutTable = tables.find(({ start, lineEnds }) => start <= answerCharacters && lineEnds.at(-1)! > answerCharacters);
+  if (!cutTable) return `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters were cut. ${narrowRequest}]`;
+  const shownLines = cutTable.lineEnds.filter((end) => end <= answerCharacters);
+  return `${text.slice(0, shownLines.at(-1) ?? cutTable.start)}\n[showing ${Math.max(0, shownLines.length - cutTable.headLines)} of ${cutTable.lineEnds.length - cutTable.headLines} rows; the rest were cut. ${narrowRequest}]`;
 }
