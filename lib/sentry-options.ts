@@ -58,6 +58,8 @@ export const sentryOptions = {
   ignoreErrors: [
     /Unsupported protocol version: 2026-07-28/,
     /^The website is signed out\./,
+    /^The website blocked the automated browser/,
+    /^The website refused the request because its protection code/,
     /^No sign-in is waiting for a code/,
     /^MCParrot only uses pages on /,
     /^The website rejected the saved login/,

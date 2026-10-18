@@ -7,14 +7,23 @@ import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, 
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
+const networkQuietTimeout = 5_000;
+const shortPageWait = 2_000;
+const pageLoadTimeout = requestTimeout - networkQuietTimeout - shortPageWait;
+const shortPageCharacters = 200;
+const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your humanity|kpsdk|kasada|akamai/i;
+const csrfRefusal = /forgery|invalid authenticity token|csrf[^<\n]{0,40}(fail|invalid|missing|mismatch|expired)|(invalid|missing|bad)[^<\n]{0,20}csrf/i;
 const csrfCookieNames = ["csrf_token", "csrftoken", "xsrf-token", "_csrf", "csrf-token"];
 const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
 export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
 
+export const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
+export const csrfRefusedMessage = "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
+
 export type TaskInputs = Record<string, string | undefined>;
 
-type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "failed";
+type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "failed";
 
 type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
 
@@ -27,6 +36,12 @@ class TaskError extends Error {
 }
 
 const signedOut = () => new TaskError("signed_out", signedOutMessage);
+
+function refusal(body: string, mitigated: boolean) {
+  if (mitigated || botChallenge.test(body)) return new TaskError("blocked", blockedMessage);
+  if (csrfRefusal.test(body)) return new TaskError("csrf_refused", csrfRefusedMessage);
+  return signedOut();
+}
 
 export const isRunnableTask = (task: Task) => task.requests.length > 0 && task.requests.every(isAllowedRequest);
 
@@ -114,14 +129,14 @@ function fetchInPage(page: Page, request: FilledRequest) {
         const credentials = Object.keys(tokens).length && new URL(address).origin !== location.origin ? "omit" : "include";
         const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...csrfHeaders };
         const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" ? "follow" : "manual", credentials, signal: AbortSignal.timeout(timeout) });
-        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, contentType: "", body: "" };
+        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "" };
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
         if (html) await reply.body?.cancel();
         const body = html ? "" : (await reply.text()).slice(0, limit + 1);
-        return { failed: "", status: reply.status, url: reply.url, redirected: reply.redirected, contentType, body };
+        return { failed: "", status: reply.status, url: reply.url, redirected: reply.redirected, mitigated: reply.headers.has("cf-mitigated"), contentType, body };
       } catch (error) {
-        return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, contentType: "", body: "" };
+        return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "" };
       }
     }, { request, csrfCookieNames, csrfPageSelectors, limit: maximumResponseCharacters, timeout: requestTimeout });
     span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
@@ -129,13 +144,23 @@ function fetchInPage(page: Page, request: FilledRequest) {
   });
 }
 
+const visibleText = (page: Page) => page.evaluate((limit) => document.body.innerText.slice(0, limit + 1), maximumResponseCharacters);
+
+async function settledText(page: Page) {
+  await page.waitForLoadState("networkidle", { timeout: networkQuietTimeout }).catch(() => undefined);
+  const text = await visibleText(page);
+  if (text.length >= shortPageCharacters) return text;
+  await page.waitForTimeout(shortPageWait);
+  return visibleText(page);
+}
+
 function readPageText(page: Page, website: string, url: string) {
   return Sentry.startSpan({ name: "page.read" }, async (span) => {
-    const navigation = await page.goto(url, { waitUntil: "load", timeout: requestTimeout });
+    const navigation = await page.goto(url, { waitUntil: "load", timeout: pageLoadTimeout });
     requireOnWebsite(page, website);
     const status = navigation?.status() ?? 200;
-    if (status === 401 || status === 403) throw signedOut();
-    const text = await page.evaluate((limit) => document.body.innerText.slice(0, limit + 1), maximumResponseCharacters);
+    if (status === 401 || status === 403) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
+    const text = await settledText(page);
     span.setAttribute("page.text.size", text.length);
     return { status, text };
   });
@@ -156,7 +181,8 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
   if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
-  if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
+  if (response.redirected && looksSignedOut(response.url)) throw signedOut();
+  if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);

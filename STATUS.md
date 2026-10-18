@@ -176,6 +176,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Running a tool and reading a page with `read_page` work only through ChatGPT; the dashboard has no matching control.
 - `read_page` lets ChatGPT read any page Nathan's account can see on the app's website, not only chosen tools, which Nathan accepted; it only opens pages, so it changes nothing unless opening a page on that website has side effects, such as a sign-out link.
 - Pages that build their content only after later user actions can return incomplete text from page-reading tools and `read_page`.
+- Tool runs and `read_page` wait for a page's network requests to stop, and they report a 401 or 403 bot check or refused CSRF code with its own message instead of signed out; on October 18, 2026, a throwaway local Chrome check sorted a Cloudflare-style challenge, a Django CSRF failure, and a plain sign-in page correctly and read the text of a JavaScript-built page, but no live website has shown these cases yet.
 - ChatGPT saves tools with `save_task` without asking Nathan, which he accepted, so unwanted tools stay until he deletes them on the app page.
 - Anyone with an app's connection link can run that app's tools, read its website's pages with the saved sign-in, and save tools to it until the user selects **Regenerate link**.
 - While Vercel Authentication protects production, the older owner links carry the bypass secret, which opens the whole site, and Vercel blocks the new token links, so token links work only after Nathan turns Vercel Authentication off.
