@@ -241,10 +241,10 @@
       <div class="slide-inner title">
         <div>
           <h1>Teach ChatGPT any website <em>you sign in to</em>.</h1>
-          <p class="lede">Browse a website once. MCParrot learns what it can do, and ChatGPT uses it for you in a signed-in Browser Use cloud browser.</p>
+          <p class="lede">Browse a website once. ChatGPT can use it for you from then on.</p>
           <div class="title-meta">
             <span><strong>LA Hacks 2026</strong></span>
-            <span>Applied Intelligence track</span>
+            <span>Applied Intelligence</span>
             <span>Best Use of Browser Use</span>
           </div>
         </div>
@@ -254,24 +254,21 @@
 
     <section class="slide" aria-roledescription="slide" aria-label="The problem" data-section="Pitch · 2 minutes">
       <div class="slide-inner problem">
-        <h2>Your assistant is locked out of the websites you use most.</h2>
+        <h2>ChatGPT can’t get into your accounts.</h2>
         <div>
-          <span class="trail-label">To find one due date today</span>
+          <span class="trail-label">One due date today</span>
           <ol class="trail">
-            <li>bcourses.berkeley.edu</li>
             <li>Sign in</li>
             <li>Duo code</li>
-            <li>Dashboard</li>
             <li>ENGIN 125</li>
             <li>Assignments</li>
             <li>Scroll…</li>
           </ol>
         </div>
         <div class="ask">
-          <span class="trail-label" style="margin:0">What you want instead</span>
+          <span class="trail-label" style="margin:0">What you want</span>
           <span class="ask-bubble">Which ENGIN 125 assignments are due?</span>
         </div>
-        <p class="problem-why">ChatGPT cannot sign in as you, and Canvas, Gradescope, and Ed give it no doorway into your account. <strong>These websites already have the data. They just need an agent with a real browser and your sign-in.</strong></p>
       </div>
     </section>
 
@@ -281,31 +278,28 @@
         <div class="flow">
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><circle cx="12" cy="14.25" r="2.4"/></svg></span>
-            <h3>Record a website</h3>
-            <p>Use the site normally with MCParrot Explorer, our Chrome extension. It records the site’s own data requests and leaves out passwords, cookies, and sign-in pages.</p>
-            <span class="badge badge--gap">gap: live recording demo</span>
+            <h3>1. Browse the site</h3>
+            <p>Our Chrome extension records what the site asks its server for.</p>
           </div>
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
-            <h3>Claude finds tools</h3>
-            <p>Claude Opus 5.5, through the Cursor SDK, reads the recording and suggests tools such as “List assignments in a course.” You keep the ones you want.</p>
-            <span class="badge badge--shipped">shipped</span>
+            <h3>2. Claude finds tools</h3>
+            <p>“List my assignments.” “Read the syllabus.” You keep the ones you want.</p>
           </div>
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg></span>
-            <h3>ChatGPT uses them</h3>
-            <p>Add the app’s private MCP link to ChatGPT. Each tool call runs in a cloud browser that is already signed in as you.</p>
-            <span class="badge badge--shipped">shipped</span>
+            <h3>3. ChatGPT uses them</h3>
+            <p>Through one private link, signed in as you.</p>
           </div>
         </div>
         <div class="engine">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M2.5 8.5h19"/><path d="M5.5 6.25h.01M8 6.25h.01"/><path d="M8 14.5l2.5 2 5.5-5"/></svg>
-          <p><strong>Underneath: Browser Use.</strong> Each app keeps its own persistent Browser Use profile, so it stays signed in between calls without MCParrot storing a single cookie.</p>
+          <p><strong>Every step on the real website runs in a Browser Use cloud browser</strong> that remembers your sign-in.</p>
         </div>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Live result: Gradescope and Ed together" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="Live: Gradescope and Ed together" data-section="Pitch · 2 minutes">
       <div class="slide-inner shot-layout">
         <figure class="shot">
           <div class="shot-frame">
@@ -314,42 +308,42 @@
             <span class="pin" style="--x: 15.5%; --y: 47%" aria-hidden="true">2</span>
             <span class="pin" style="--x: 38%; --y: 74.8%" aria-hidden="true">3</span>
           </div>
-          <figcaption>A real ChatGPT conversation with two MCParrot connections.</figcaption>
+          <figcaption>Real ChatGPT conversation.</figcaption>
         </figure>
         <div class="shot-side">
           <h2>Two websites, one question.</h2>
           <ol class="notes">
-            <li><span>The <strong>Gradescope</strong> connection reads the score: <span class="num">74/101</span>.</span></li>
-            <li><span>The <strong>Ed</strong> connection finds the staff announcement. The statistics were only in a picture, so <code>view_image</code> had Claude read it: mean <span class="num">52.14</span>, deviation <span class="num">27.1</span>.</span></li>
-            <li><span>ChatGPT combines both: <span class="num">0.81</span> standard deviations above the mean.</span></li>
+            <li><span>Score from <strong>Gradescope</strong>: <span class="num">74/101</span></span></li>
+            <li><span>Class stats from a picture on <strong>Ed</strong>, read by Claude</span></li>
+            <li><span>ChatGPT puts them together</span></li>
           </ol>
         </div>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Live result: signing in again with a text-message code" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="Live: signing back in with a text-message code" data-section="Pitch · 2 minutes">
       <div class="slide-inner shot-layout square">
         <figure class="shot">
           <div class="shot-frame">
-            <img src="images/pitch-canvas-verification.jpg" width="1940" height="1884" alt="ChatGPT conversation: asked which ENGIN 125 assignments are due, ChatGPT says Canvas sent a verification code to the phone and asks for it; after the user types the code, which is blurred, it lists the assignments with due dates and status." loading="lazy">
+            <img src="images/pitch-canvas-verification.jpg" width="1940" height="1884" alt="ChatGPT conversation: asked which ENGIN 125 assignments are due, ChatGPT says Canvas sent a verification code to the phone and asks for it; after the user types the code, it lists the assignments with due dates and status." loading="lazy">
             <span class="pin" style="--x: 35%; --y: 28.4%" aria-hidden="true">1</span>
             <span class="pin" style="--x: 77%; --y: 38.6%" aria-hidden="true">2</span>
             <span class="pin" style="--x: 74%; --y: 59.6%" aria-hidden="true">3</span>
           </div>
-          <figcaption>A real ChatGPT conversation. The one-time code is blurred.</figcaption>
+          <figcaption>Real ChatGPT conversation. The code has expired.</figcaption>
         </figure>
         <div class="shot-side">
           <h2>Signed out? It signs back in.</h2>
           <ol class="notes">
-            <li><span>Canvas had signed out. A <strong>Browser Use agent</strong> signed in with the saved login, and Canvas texted a code.</span></li>
-            <li><span>ChatGPT asked for the code, and Nathan typed it in the chat. The agent finished signing in.</span></li>
-            <li><span>The tool ran and returned the ENGIN 125 assignments, with no setup in between.</span></li>
+            <li><span>A <strong>Browser Use agent</strong> signs in with your saved login</span></li>
+            <li><span>You type the texted code right in ChatGPT</span></li>
+            <li><span>Then it lists the assignments</span></li>
           </ol>
         </div>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Live result: an agent fills a DoorDash cart but does not pay" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="Live: shopping and paying when you say so" data-section="Pitch · 2 minutes">
       <div class="slide-inner shot-layout square">
         <figure class="shot">
           <div class="shot-frame">
@@ -357,40 +351,35 @@
             <span class="pin" style="--x: 29.5%; --y: 12.7%" aria-hidden="true">1</span>
             <span class="pin" style="--x: 25.5%; --y: 42.6%" aria-hidden="true">2</span>
             <span class="pin" style="--x: 90.8%; --y: 30%" aria-hidden="true">3</span>
-            <span class="pin" style="--x: 46%; --y: 78.6%" aria-hidden="true">4</span>
           </div>
-          <figcaption>A real ChatGPT conversation. The delivery address is hidden.</figcaption>
+          <figcaption>Real ChatGPT conversation. The delivery address is hidden.</figcaption>
         </figure>
         <div class="shot-side">
-          <h2>It fills the cart. It does not pay.</h2>
+          <h2>It shops. It pays only when you say so.</h2>
           <ol class="notes">
-            <li><span>Nathan asks for a pizza in his DoorDash cart, but no order yet.</span></li>
-            <li><span>A <strong>Browser Use agent</strong> builds the cart in his signed-in DoorDash, stops at checkout, and reports the <span class="num">$19.00</span> total.</span></li>
-            <li><span>Nothing is placed or paid. Paying needs his approval of the exact total and a one-time Pay with Link card in test mode <span class="badge badge--gap">gap: payment</span></span></li>
-            <li><span>A follow-up question reads the saved cards on the account.</span></li>
+            <li><span>“Add it to my cart. Don’t order yet.”</span></li>
+            <li><span>A <strong>Browser Use agent</strong> builds the cart: <span class="num">$19.00</span></span></li>
+            <li><span>Nothing is paid until you confirm. Then checkout uses <strong>Stripe Pay with Link</strong>, within your spending limit.</span></li>
           </ol>
         </div>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Hard problems we solved" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="What makes it hard" data-section="Pitch · 2 minutes">
       <div class="slide-inner">
         <h2>Three hard parts.</h2>
         <div class="hard">
           <div>
-            <h3>Replay the website, not the screen</h3>
-            <p>Tools call the website’s own data requests inside your signed-in page. Sign-in tokens are read from local storage by name at run time, and CSRF codes come fresh from the page, so no secret is saved in a tool.</p>
-            <p class="proof"><strong>Ed, Gradescope, Canvas</strong>working from ChatGPT</p>
+            <h3>Act like the website</h3>
+            <p class="proof"><strong>Its own requests</strong>sent from inside your signed-in browser, with no password saved</p>
           </div>
           <div>
-            <h3>Fit the answer in ChatGPT</h3>
-            <p>Raw website answers are huge. MCParrot strips empty values, keeps only the fields Claude chose, and writes long lists as tables. ChatGPT cannot see pictures, so Claude reads them.</p>
-            <p class="proof"><strong class="num">73–80%</strong>fewer tokens on sample Ed and DoorDash data</p>
+            <h3>Keep answers small</h3>
+            <p class="proof"><strong class="num">73–80%</strong>fewer tokens for ChatGPT to read</p>
           </div>
           <div>
-            <h3>Stay signed in, and stay fast</h3>
-            <p>One persistent Browser Use profile per app, an agent that signs back in, and a warm browser that stays open between calls instead of starting a new one each time.</p>
-            <p class="proof"><strong class="num">3.2–3.6 s → 2.5 s</strong>for a simple page, in a timed test</p>
+            <h3>Stay signed in, and fast</h3>
+            <p class="proof"><strong class="num">2.5 s</strong>for a simple page with a warm browser</p>
           </div>
         </div>
       </div>
@@ -398,17 +387,13 @@
 
     <section class="slide" aria-roledescription="slide" aria-label="What we learned and what comes next" data-section="Pitch · 2 minutes">
       <div class="slide-inner split">
-        <div>
-          <p class="learned">What we learned: most websites are <em>already APIs</em>. The hard part is signing in as the person and keeping the answer small.</p>
-        </div>
+        <p class="learned">Most websites are <em>already APIs</em>. The hard part is signing in as you.</p>
         <div>
           <h3 style="margin-bottom:.8rem">What comes next</h3>
           <ul class="next-list">
-            <li>Test each tool with new values before ChatGPT can use it <span class="badge badge--aspirational">aspirational</span></li>
-            <li>Let ChatGPT set up apps and tools by itself through a management connection <span class="badge badge--aspirational">aspirational</span></li>
-            <li>Real payments, once Pay with Link has a test mode we can prove <span class="badge badge--gap">gap</span></li>
+            <li>Test each tool before ChatGPT can use it <span class="badge badge--aspirational">aspirational</span></li>
+            <li>Let ChatGPT set up new websites by itself <span class="badge badge--aspirational">aspirational</span></li>
           </ul>
-          <p class="footnote">Every claim here matches our public <a href="status.html">status page</a>.</p>
         </div>
       </div>
     </section>
@@ -417,7 +402,6 @@
       <div class="slide-inner close">
         <img src="/logo.svg" alt="">
         <h2>Questions?</h2>
-        <p class="lede" style="margin-top:0">Add a website from the marketplace, or teach MCParrot a new one.</p>
         <div class="links">
           <a href="https://mcparrot.vercel.app">mcparrot.vercel.app</a>
           <a href="https://mcparrot.vercel.app/marketplace">Marketplace</a>
@@ -429,26 +413,23 @@
 
     <section class="slide" aria-roledescription="slide" aria-label="Backup: what Browser Use does" data-section="Backup for questions">
       <div class="slide-inner split">
-        <div>
-          <h2>Browser Use is the part that touches the web.</h2>
-          <p class="lede">MCParrot decides what should happen. Browser Use cloud browsers and agents do it on the real website, as you.</p>
-        </div>
+        <h2>Browser Use does four jobs.</h2>
         <ul class="jobs">
           <li>
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
-            <div><h3>Sign in once, in a live view <span class="badge badge--gap">gap: live demo</span></h3><p>You sign in yourself, Duo included, and the app’s profile remembers it.</p></div>
+            <div><h3>Sign in once</h3><p>You sign in yourself in a live view, Duo included.</p></div>
           </li>
           <li>
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
-            <div><h3>Run every tool call <span class="badge badge--shipped">shipped</span></h3><p>A hidden browser on your profile replays the tool’s requests from inside the signed-in page.</p></div>
+            <div><h3>Run every tool</h3><p>A hidden browser on your saved profile.</p></div>
           </li>
           <li>
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M20 4.5v4h-4"/></svg></span>
-            <div><h3>Sign back in by itself <span class="badge badge--shipped">shipped</span></h3><p>An agent types the saved login through secret bindings, so the model never sees the password, and relays codes through ChatGPT.</p></div>
+            <div><h3>Sign back in</h3><p>An agent types your login without the AI ever seeing the password.</p></div>
           </li>
           <li>
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M3 10.5h18"/><path d="M7 15h3"/></svg></span>
-            <div><h3>Check out with Pay with Link <span class="badge badge--gap">gap: test mode only</span></h3><p>After you approve the total, an agent pays with a one-time Link card. It stays off until Link test mode is available.</p></div>
+            <div><h3>Check out</h3><p>An agent pays with a one-time Pay with Link card after you confirm.</p></div>
           </li>
         </ul>
       </div>
@@ -458,19 +439,19 @@
       <div class="slide-inner">
         <h2>How the pieces connect.</h2>
         <div class="arch-row" style="margin-top:clamp(1.5rem,3.5vw,2.5rem)">
-          <div class="node"><h3>ChatGPT</h3><p>One connector per app</p></div>
-          <div class="wire"><span>MCP, private link</span></div>
-          <div class="node node--core"><h3>MCParrot on Vercel</h3><p>Next.js, one MCP route per app at <code>/mcp/apps/&lt;id&gt;</code></p></div>
-          <div class="wire"><span>Playwright over CDP</span></div>
-          <div class="node"><h3>Browser Use</h3><p>Cloud browser on the app’s persistent profile</p></div>
+          <div class="node"><h3>ChatGPT</h3><p>One connector per website</p></div>
+          <div class="wire"><span>MCP link</span></div>
+          <div class="node node--core"><h3>MCParrot</h3><p>Next.js on Vercel</p></div>
+          <div class="wire"><span>Playwright</span></div>
+          <div class="node"><h3>Browser Use</h3><p>Cloud browser with your saved profile</p></div>
           <div class="wire"><span></span></div>
           <div class="node"><h3>The website</h3><p>Its own data requests</p></div>
         </div>
         <div class="arch-under">
-          <div class="node"><h3>MCParrot Explorer</h3><p>Chrome extension that records a browsing session</p></div>
-          <div class="node"><h3>Claude Opus 5.5</h3><p>Through the Cursor SDK: finds tools, reads pictures</p></div>
-          <div class="node"><h3>Upstash Redis</h3><p>Apps, tools, encrypted logins, warm browser IDs</p></div>
-          <div class="node"><h3>Clerk and Sentry</h3><p>Google sign-in per person; errors, traces, and logs</p></div>
+          <div class="node"><h3>Chrome extension</h3><p>Records one browsing session</p></div>
+          <div class="node"><h3>Claude Opus 5.5</h3><p>Finds tools and reads pictures, through the Cursor SDK</p></div>
+          <div class="node"><h3>Upstash Redis</h3><p>Apps, tools, and encrypted logins</p></div>
+          <div class="node"><h3>Clerk and Sentry</h3><p>Accounts, and error and timing reports</p></div>
         </div>
       </div>
     </section>
@@ -478,28 +459,24 @@
     <section class="slide" aria-roledescription="slide" aria-label="Backup: recording safely" data-section="Backup for questions">
       <div class="slide-inner">
         <h2>Recording without leaking secrets.</h2>
-        <p class="lede">Explorer uses Chrome’s debugger permission to see the requests a page makes, with no host permissions. Claude only ever sees redacted samples.</p>
         <div class="two-col">
           <div>
             <h3>Kept</h3>
             <ul class="plain-list">
-              <li>Data requests, with samples cut to 400 characters per value and 5 items per list</li>
-              <li>Request bodies up to 30,000 characters, so GraphQL queries stay whole</li>
-              <li>Request headers that are not secret, and the visible text of whole pages</li>
-              <li>The <em>name</em> of a sign-in header and its local storage key, never the value</li>
+              <li>What each page asks the server for, with short answer samples</li>
+              <li>Request headers that are not secret</li>
+              <li>The <em>name</em> of a sign-in token, never its value</li>
             </ul>
           </div>
           <div>
             <h3>Dropped</h3>
             <ul class="plain-list drop">
-              <li>Cookies and the <code>authorization</code> header</li>
-              <li>Values under secret names such as <code>token</code> and <code>password</code></li>
-              <li>JWTs and <code>Bearer</code> values, wherever they appear</li>
-              <li>Real sign-in pages, such as <code>login</code>, <code>oauth</code>, and <code>2fa</code></li>
+              <li>Cookies and passwords</li>
+              <li>Anything that looks like a sign-in token</li>
+              <li>Sign-in pages</li>
             </ul>
           </div>
         </div>
-        <p class="footnote">Explorer 0.8.0 passed these rules in a local test browser. A live recording with 0.8.0 is a gap on the status page.</p>
       </div>
     </section>
 
@@ -508,39 +485,36 @@
         <h2>What a tool does when ChatGPT calls it.</h2>
         <div class="two-col">
           <ul class="plain-list">
-            <li><strong>Stays on the website.</strong> A tool may call any host under the site’s registrable domain, so <code>us.edstem.org</code> works for <code>edstem.org</code>, and nothing else.</li>
-            <li><strong>Reads sign-in tokens at run time.</strong> Ed sends <code>X-Token</code> from local storage, so the tool reads it inside the page by name. It never reaches a tool, a log, or Claude.</li>
-            <li><strong>Gets a fresh CSRF code.</strong> Before a POST, it reads the code from the page’s meta tag, hidden input, or CSRF cookie.</li>
+            <li><strong>Stays on the website.</strong> Any address under the same domain, such as <code>us.edstem.org</code> for <code>edstem.org</code>.</li>
+            <li><strong>Reads the sign-in token at run time.</strong> Ed keeps one in the browser’s local storage; the tool reads it inside the page, so it is never saved.</li>
           </ul>
           <ul class="plain-list">
-            <li><strong>Chains steps.</strong> A placeholder such as <code>{step1.cartId}</code> fills a later request from an earlier answer.</li>
-            <li><strong>Refuses to pay.</strong> One guard blocks any request that looks like checkout or payment, in tools and in tools ChatGPT saves.</li>
-            <li><strong>Reports honestly.</strong> Signed out, bot checks, and refused CSRF codes each get their own message.</li>
+            <li><strong>Passes the anti-forgery check.</strong> Many sites need a fresh one-time code from their own page on each change (a CSRF token). The tool reads it from the page first.</li>
+            <li><strong>Chains steps.</strong> One request can use a value from an earlier answer, such as a cart ID.</li>
           </ul>
         </div>
-        <p class="footnote">Running tools from ChatGPT is shipped. Token headers, CSRF codes, and step placeholders pass local tests, and their first live runs on real websites are gaps on the status page.</p>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Backup: smaller answers" data-section="Backup for questions">
       <div class="slide-inner">
-        <h2>Smaller answers, better answers.</h2>
-        <p class="lede">ChatGPT reads every token a tool returns. Claude picks the fields worth keeping when it finds the tool, and long lists become tables.</p>
+        <h2>Smaller answers.</h2>
+        <p class="lede">Claude picks the fields worth keeping, and long lists become tables.</p>
         <div class="bars">
           <div class="bar-group">
             <h3>30 Ed discussion threads</h3>
-            <div class="bar-row"><span>Compacted</span><div class="bar-track"><div class="bar-fill num" style="--w: 100%">9,301</div></div></div>
+            <div class="bar-row"><span>Raw, cleaned</span><div class="bar-track"><div class="bar-fill num" style="--w: 100%">9,301</div></div></div>
             <div class="bar-row"><span>As a table</span><div class="bar-track"><div class="bar-fill num" style="--w: 61.7%">5,735</div></div></div>
             <div class="bar-row"><span>Claude’s fields only</span><div class="bar-track"><div class="bar-fill final num" style="--w: 20.4%">1,896</div></div></div>
           </div>
           <div class="bar-group">
             <h3>DoorDash home feed</h3>
-            <div class="bar-row"><span>Compacted</span><div class="bar-track"><div class="bar-fill num" style="--w: 89.9%">8,362</div></div></div>
+            <div class="bar-row"><span>Raw, cleaned</span><div class="bar-track"><div class="bar-fill num" style="--w: 89.9%">8,362</div></div></div>
             <div class="bar-row"><span>As a table</span><div class="bar-track"><div class="bar-fill num" style="--w: 59.3%">5,515</div></div></div>
             <div class="bar-row"><span>Claude’s fields only</span><div class="bar-track"><div class="bar-fill final num" style="--w: 23.9%">2,227</div></div></div>
           </div>
         </div>
-        <p class="footnote">GPT tokens, measured by a test script on made-up sample data. Claude-chosen fields are a gap until a live discovery returns them.</p>
+        <p class="footnote">Tokens ChatGPT reads, measured on sample data.</p>
       </div>
     </section>
 
@@ -549,70 +523,55 @@
         <h2>Pictures and speed.</h2>
         <div class="two-col">
           <div>
-            <h3>ChatGPT cannot see pictures from a connector</h3>
+            <h3>ChatGPT can’t see connector pictures</h3>
             <ul class="plain-list">
-              <li>ChatGPT drops MCP image results; OpenAI support confirmed it in April 2026.</li>
-              <li><code>view_image</code> opens the picture in the signed-in browser, shrinks it to 1,600 pixels, and has Claude Opus 5.5 copy its words and numbers.</li>
-              <li>That is how ChatGPT read the Ed exam statistics in the Gradescope and Ed example.</li>
+              <li>So the tool opens the picture in your signed-in browser.</li>
+              <li>Claude reads its words and numbers and sends text back.</li>
             </ul>
           </div>
           <div>
-            <h3>A warm browser between calls</h3>
+            <h3>A warm browser</h3>
             <ul class="plain-list">
-              <li>The app’s browser stays open for up to 7 minutes and serves each call in a new tab.</li>
-              <li>A simple page: <span class="num">3.2–3.6 s</span> cold, <span class="num">2.5 s</span> warm. A larger page: <span class="num">4.8–5.6 s</span> cold, about <span class="num">4 s</span> warm.</li>
-              <li>Sign-in, codes, and deleting the app close it first, so an old sign-in never overwrites a new one.</li>
+              <li>The browser stays open for 7 minutes between calls.</li>
+              <li>A simple page: about <span class="num">3.4 s</span> cold, <span class="num">2.5 s</span> warm.</li>
             </ul>
           </div>
         </div>
-        <p class="footnote">Timings come from a test script with a throwaway profile. The warm browser and reading pictures from the app page are gaps on the status page.</p>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Backup: signing in and paying safely" data-section="Backup for questions">
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: paying safely" data-section="Backup for questions">
       <div class="slide-inner">
-        <h2>Signing in and paying, safely.</h2>
+        <h2>Paying safely.</h2>
         <div class="two-col">
-          <div>
-            <h3>Signing back in <span class="badge badge--shipped">shipped</span></h3>
-            <ul class="plain-list">
-              <li>The saved login is encrypted with AES-256-GCM and reaches the agent only as secret bindings.</li>
-              <li>One sign-in at a time per app, never the same rejected password twice, and a ten-minute pause after a failure.</li>
-              <li>A text-message code goes from you, through ChatGPT, to the waiting browser.</li>
-              <li>“Continue with Google” reuses the profile’s Google session, with no Google password <span class="badge badge--gap">gap</span></li>
-            </ul>
-          </div>
-          <div>
-            <h3>Ordering <span class="badge badge--gap">gap</span></h3>
-            <ul class="plain-list">
-              <li>An agent fills the cart and stops; ChatGPT shows items, fees, and the total.</li>
-              <li>Only after you approve does an agent pay with a one-time Pay with Link card.</li>
-              <li>The server refuses above your limit, if the total changed by a cent, or whenever Link is not in test mode.</li>
-              <li>Browser Use said Link test mode is not realistically available, so live payment stays blocked.</li>
-            </ul>
-          </div>
+          <ul class="plain-list">
+            <li>You confirm the exact total in ChatGPT first.</li>
+            <li>A one-time Pay with Link card, so the agent never sees your real card.</li>
+            <li>The server refuses above your spending limit.</li>
+          </ul>
+          <ul class="plain-list">
+            <li>It checks the total again before paying and stops if it changed.</li>
+            <li>Ordinary tools can never pay: a guard blocks any checkout or payment request.</li>
+          </ul>
         </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Backup: accounts, sharing, and Sentry" data-section="Backup for questions">
       <div class="slide-inner">
-        <h2>Many people, shared recipes.</h2>
+        <h2>Sharing, and what Sentry caught.</h2>
         <div class="two-col">
           <div>
-            <h3>Accounts and the marketplace</h3>
+            <h3>Marketplace</h3>
             <ul class="plain-list">
-              <li>Each person signs in with Google through Clerk and gets their own apps <span class="badge badge--gap">gap: live checks</span></li>
-              <li>Each app’s ChatGPT link holds a secret, and MCParrot stores only its SHA&#8209;256 hash.</li>
-              <li>The marketplace shares an app’s tools, not its logins, profile, or link: a recipe, not a key <span class="badge badge--shipped">shipped</span></li>
+              <li>Share a website’s tools, never your login: a recipe, not a key.</li>
+              <li>Everyone signs in with their own Google account.</li>
             </ul>
           </div>
           <div>
-            <h3>Sentry changed what we built <span class="badge badge--shipped">shipped</span></h3>
+            <h3>Sentry changed what we built</h3>
             <ul class="plain-list">
-              <li>A missing Playwright file on Vercel led to a build tracing fix.</li>
-              <li>The Cursor SDK writing to a read-only folder led to a writable home folder.</li>
-              <li>ChatGPT’s newer MCP protocol version led to a documented fallback.</li>
+              <li>Three errors on the live site led to three fixes.</li>
             </ul>
           </div>
         </div>
