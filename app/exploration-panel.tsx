@@ -1,11 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Capability, CapturedRequest } from "../lib/capabilities";
 
 type Exploration = { recording: boolean; requests: CapturedRequest[] };
 type Choice = Capability & { selected: boolean };
 const emptyExploration: Exploration = { recording: false, requests: [] };
+const connectionToolNames = ["read_page", "save_task", "submit_verification_code"];
+const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+const isText = (value: unknown) => typeof value === "string";
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+
+function isCapability(value: unknown): value is Capability {
+  return isObject(value) && isText(value.name) && isText(value.description) && isText(value.returns)
+    && Array.isArray(value.inputs) && value.inputs.every((input) => isObject(input) && isText(input.name) && isText(input.example))
+    && Array.isArray(value.requests) && value.requests.length > 0 && value.requests.every((request) => isObject(request) && isText(request.method) && isText(request.urlPattern));
+}
+
+function nameProblem(name: string, otherNames: string[]) {
+  const tool = toolName(name);
+  if (!tool) return "Give this task a name with letters or numbers.";
+  if (connectionToolNames.includes(tool)) return "MCParrot already uses this name. Choose another name.";
+  if (otherNames.some((other) => toolName(other) === tool)) return "Another task already uses this name. Choose another name.";
+  return "";
+}
 
 export function requestExtension(action: string, appId: string, websiteUrl?: string): Promise<Exploration> {
   return new Promise((resolve, reject) => {
@@ -27,25 +45,28 @@ export function requestExtension(action: string, appId: string, websiteUrl?: str
   });
 }
 
-function CapabilityChoice({ choice, onChange }: { choice: Choice; onChange: (changes: Partial<Choice>) => void }) {
+function CapabilityChoice({ choice, problem, problemId, onChange }: { choice: Choice; problem: string; problemId: string; onChange: (changes: Partial<Choice>) => void }) {
   const inputs = choice.inputs.map((input) => `${input.name} (for example, ${input.example})`).join(", ");
   return <div className="capability">
     <label className="capability-pick"><input type="checkbox" checked={choice.selected} onChange={(event) => onChange({ selected: event.target.checked })} />Keep this task</label>
-    <input aria-label="Task name" value={choice.name} maxLength={80} onChange={(event) => onChange({ name: event.target.value })} />
+    <input aria-label="Task name" value={choice.name} maxLength={80} aria-invalid={problem ? true : undefined} aria-describedby={problem ? problemId : undefined} onChange={(event) => onChange({ name: event.target.value })} />
+    {problem && <p className="pilot-error" id={problemId}>{problem}</p>}
     <textarea aria-label="Task description" value={choice.description} rows={2} maxLength={500} onChange={(event) => onChange({ description: event.target.value })} />
     <p className="field-help">Inputs: {inputs || "none"} · Returns: {choice.returns}</p>
     <p className="field-help">Uses {choice.requests.map((request) => `${request.method} ${request.urlPattern}`).join(", ")}</p>
   </div>;
 }
 
-export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId: string; websiteUrl: string; active: boolean; onSave: (tasks: Capability[]) => void }) {
+export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave }: { appId: string; websiteUrl: string; taskNames: string[]; active: boolean; onSave: (tasks: Capability[]) => Promise<boolean> }) {
   const [state, setState] = useState(emptyExploration);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState<"" | "exploration" | "discovery">("");
   const [choices, setChoices] = useState<Choice[]>([]);
   const [error, setError] = useState("");
+  const working = useRef(false);
 
   async function run(work: typeof busy, operation: () => Promise<void>) {
+    working.current = true;
     setBusy(work);
     setError("");
     try {
@@ -53,6 +74,7 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Something went wrong. Try again.");
     } finally {
+      working.current = false;
       setBusy("");
     }
   }
@@ -66,7 +88,17 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
     const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ websiteUrl, requests: state.requests }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "Discovery failed. Try again.");
-    setChoices(result.capabilities.map((capability: Capability) => ({ ...capability, selected: true })));
+    if (!Array.isArray(result.capabilities)) throw new Error("Discovery returned a reply MCParrot could not read. Try again.");
+    const capabilities: Capability[] = result.capabilities.filter(isCapability);
+    setChoices(capabilities.map((capability) => ({ ...capability, selected: true })));
+    const skipped = result.capabilities.length - capabilities.length;
+    if (skipped) setError(`MCParrot skipped ${skipped} suggested ${skipped === 1 ? "task" : "tasks"} it could not read.`);
+  });
+
+  const clearRequests = () => run("exploration", async () => {
+    setState(await requestExtension("clear", appId, websiteUrl));
+    setConnected(true);
+    setChoices([]);
   });
 
   function changeChoice(index: number, changes: Partial<Choice>) {
@@ -74,10 +106,16 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
   }
 
   const chosen = choices.filter((choice) => choice.selected);
+  const problems = choices.map((choice) => choice.selected ? nameProblem(choice.name, [...taskNames, ...chosen.filter((other) => other !== choice).map((other) => other.name)]) : "");
+  const namesValid = problems.every((problem) => !problem);
+
+  async function save() {
+    if (await onSave(chosen.map(({ selected, ...capability }) => capability))) setChoices([]);
+  }
 
   useEffect(() => {
     if (!active) return;
-    const refresh = () => { void operate("status"); };
+    const refresh = () => { if (!working.current) void operate("status"); };
     window.addEventListener("focus", refresh);
     refresh();
     return () => window.removeEventListener("focus", refresh);
@@ -110,14 +148,14 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
       <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to Cursor Composer.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
-        <button className="button" disabled={busy !== ""} onClick={() => operate("clear")}>Delete recorded requests</button>
+        <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>
       </div>
     </div>}
     {choices.length > 0 && <div className="pilot-candidates">
       <h3>Choose the tasks to keep</h3>
-      <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} onChange={(changes) => changeChoice(index, changes)} />)}</div>
-      <p className="field-help">Saving replaces this app’s current tasks. Reading tasks become tools in this app’s ChatGPT connection.</p>
-      <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0} onClick={() => onSave(chosen.map(({ selected, ...capability }) => capability))}>Save {chosen.length} {chosen.length === 1 ? "task" : "tasks"}</button></div>
+      <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} problem={problems[index]} problemId={`${appId}-task-name-${index}`} onChange={(changes) => changeChoice(index, changes)} />)}</div>
+      <p className="field-help">Saving adds these tasks and skips ones that match an existing task. Reading tasks become tools in this app’s ChatGPT connection.</p>
+      <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0 || !namesValid} onClick={save}>Save {chosen.length} {chosen.length === 1 ? "task" : "tasks"}</button>{!namesValid && <span className="field-help">Fix the task names above to save.</span>}</div>
     </div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
   </section>;

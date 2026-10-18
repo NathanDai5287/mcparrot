@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
 import type { Capability, Website } from "../lib/capabilities";
@@ -20,6 +20,8 @@ function screenPath(screen: Screen) {
   if (screen.view === "explore") return `${appPath}/explore`;
   return appPath;
 }
+
+const focusOnMount = (node: HTMLElement | null) => node?.focus();
 
 function screenAtPath(apps: Website[]): Screen {
   const path = window.location.pathname.replace(/\/$/, "");
@@ -45,7 +47,7 @@ function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }
 }
 
 function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return <header className="page-header"><div><h1>{title}</h1><p>{description}</p></div>{action}</header>;
+  return <header className="page-header"><div><h1 tabIndex={-1}>{title}</h1><p>{description}</p></div>{action}</header>;
 }
 
 function BackButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
@@ -64,8 +66,8 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
       <label htmlFor="app-name">App name</label>
       <input id="app-name" name="name" placeholder="For example, Course portal" required maxLength={80} pattern=".*\S.*" autoFocus />
       <label htmlFor="website-url">Website address</label>
-      <input id="website-url" name="url" type="url" placeholder="https://your-website.com" required aria-describedby="url-help" />
-      <p className="field-help" id="url-help">Use the address you normally visit in your browser.</p>
+      <input id="website-url" name="url" type="url" pattern="https?://.+" placeholder="https://your-website.com" required aria-describedby="url-help" />
+      <p className="field-help" id="url-help">Use the address you normally visit in your browser, starting with https:// or http://.</p>
       <div className="form-actions"><button className="button primary" type="submit">Create app</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
     </form>
   );
@@ -77,6 +79,15 @@ export default function Workspace() {
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState(false);
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const focusHeading = useRef(false);
+  const restoreDeleteFocus = useRef(false);
+  const deleteAppButton = useCallback((node: HTMLButtonElement | null) => {
+    if (!node || !restoreDeleteFocus.current) return;
+    restoreDeleteFocus.current = false;
+    node.focus();
+  }, []);
   const [connectionSecret, setConnectionSecret] = useState<string>();
 
   useEffect(() => {
@@ -95,10 +106,18 @@ export default function Workspace() {
     const restoreScreen = () => {
       setScreen(screenAtPath(apps));
       setDeletingAppId(null);
+      setDeleteError("");
     };
     window.addEventListener("popstate", restoreScreen);
     return () => window.removeEventListener("popstate", restoreScreen);
   }, [apps]);
+
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    const headings = document.querySelectorAll<HTMLElement>("#main-content h1");
+    [...headings].find((heading) => !heading.closest("[hidden]"))?.focus();
+  }, [screen]);
 
   function navigate(nextScreen: Screen, replace = false) {
     const path = screenPath(nextScreen);
@@ -106,21 +125,30 @@ export default function Workspace() {
       if (replace) window.history.replaceState(null, "", path);
       else window.history.pushState(null, "", path);
     }
+    focusHeading.current = true;
     setScreen(nextScreen);
     setDeletingAppId(null);
+    setDeleteError("");
   }
 
   async function deleteApp(app: Website) {
+    setDeleteBusy(true);
+    setDeleteError("");
     await requestExtension("clear", app.id).catch(() => undefined);
-    await fetch(`/api/login?appId=${app.id}`, { method: "DELETE" }).catch(() => undefined);
-    await changeWorkspace({ operation: "deleteApp", appId: app.id });
+    const login = await fetch(`/api/login?appId=${encodeURIComponent(app.id)}`, { method: "DELETE" }).catch(() => null);
+    const savedApps = login?.ok ? await changeWorkspace({ operation: "deleteApp", appId: app.id }) : null;
+    setDeleteBusy(false);
+    if (!savedApps) {
+      setDeleteError(login?.ok ? "MCParrot could not delete this app. Try again." : "MCParrot could not delete this app’s saved login, so it kept the app. Try again.");
+      return;
+    }
     navigate({ view: "apps" }, true);
   }
 
   async function changeWorkspace(change: WorkspaceOperation) {
     const response = await fetch("/api/workspace", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
     setStorageError(!response?.ok);
-    if (!response?.ok) return apps;
+    if (!response?.ok) return null;
     const { apps: savedApps }: { apps: Website[] } = await response.json();
     setApps(savedApps);
     setScreen((current) => "app" in current ? { ...current, app: savedApps.find((app) => app.id === current.app.id) ?? current.app } : current);
@@ -128,14 +156,16 @@ export default function Workspace() {
   }
 
   async function createApp(name: string, url: string) {
+    if (!URL.canParse(url) || !["http:", "https:"].includes(new URL(url).protocol)) return;
     const app: Website = { id: crypto.randomUUID(), name, url, tasks: [] };
-    const savedApps = await changeWorkspace({ operation: "createApp", app });
+    const savedApps = await changeWorkspace({ operation: "createApp", app }) ?? apps;
     navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
   }
 
   async function saveTasks(app: Website, capabilities: Capability[]) {
     const savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities });
-    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
+    navigate({ view: "app", app: (savedApps ?? apps).find((savedApp) => savedApp.id === app.id) ?? app });
+    return savedApps !== null;
   }
 
   function updateApp(appId: string, changes: Partial<Website>) {
@@ -181,20 +211,21 @@ export default function Workspace() {
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
             <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
             <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
-            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" onClick={() => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: task.id })}>Delete</button></div>)}</div>}
-            <AssistantPanel app={screen.app} connectionSecret={connectionSecret} onChange={(changes) => updateApp(screen.app.id, changes)} />
+            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" aria-label={`Delete ${task.name}`} onClick={() => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: task.id })}>Delete</button></div>)}</div>}
+            <AssistantPanel key={screen.app.id} app={screen.app} connectionSecret={connectionSecret} onChange={(changes) => updateApp(screen.app.id, changes)} />
             <section className="app-settings">
-              {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
-                <h2>Delete {screen.app.name}?</h2>
+              {deletingAppId !== screen.app.id ? <button className="delete-link" ref={deleteAppButton} onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
+                <h2 tabIndex={-1} ref={focusOnMount}>Delete {screen.app.name}?</h2>
                 <p>This removes this app and its tasks from MCParrot and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
-                <div className="form-actions"><button className="button danger" onClick={() => deleteApp(screen.app)}>Delete app and tasks</button><button className="button" onClick={() => setDeletingAppId(null)}>Keep app</button></div>
+                <div className="form-actions"><button className="button danger" disabled={deleteBusy} onClick={() => deleteApp(screen.app)}>{deleteBusy ? "Deleting…" : "Delete app and tasks"}</button><button className="button" disabled={deleteBusy} onClick={() => { restoreDeleteFocus.current = true; setDeletingAppId(null); setDeleteError(""); }}>Keep app</button></div>
+                {deleteError && <p className="pilot-error" role="alert">{deleteError}</p>}
               </div>}
             </section>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
             <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tasks to keep." />
-            <ExplorationPanel appId={app.id} websiteUrl={app.url} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
+            <ExplorationPanel appId={app.id} websiteUrl={app.url} taskNames={app.tasks.map((task) => task.name)} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
             <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tasks become tools in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
 
