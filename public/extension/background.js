@@ -4,18 +4,20 @@ const maximumStringLength = 80;
 const maximumArrayItems = 2;
 const maximumSampleLength = 3000;
 const maximumTextSampleLength = 400;
-const maximumUrlLength = 1000;
+const maximumUrlLength = 2000;
 const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
 const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
-const secretParameterWords = new Set(["token", "key", "apikey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "code", "state", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse"]);
+const secretParameterWords = new Set(["token", "key", "apikey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "code", "state", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
 const secretKeyWords = new Set(["auth", "session", "refresh", "access"]);
 const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|bearer|cookie|credential|signature/i;
 const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const bearerText = /\bbearer\s+[\w\-.~+/]+=*/gi;
-const secretAssignmentText = /\b([\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|session[_-]?id|sessionid|credential|signature)[\w-]*)(["']?\s*[:=]\s*["']?)([^\s"'&,;}]+)/gi;
+const secretName = "[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|session[_-]?id|sessionid|credential|signature|authorization)[\\w-]*";
+const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
+const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
 const longValueText = /[\w+=\-~]{32,}/g;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
 const pendingRequests = new Map();
@@ -55,11 +57,11 @@ function isHighEntropy(text) {
 }
 
 function looksSecret(text) {
-  return /^\s*bearer\s/i.test(text) || new RegExp(`^${jwtText.source}$`).test(text) || isHighEntropy(text);
+  return /^\s*(bearer|basic)\s/i.test(text) || new RegExp(`^${jwtText.source}$`).test(text) || isHighEntropy(text);
 }
 
 function redactText(text) {
-  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretAssignmentText, "$1$2redacted").replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
+  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretElementText, "$1redacted$3").replace(secretAssignmentText, (_, name, separator, value) => `${name}${separator}${/^["']/.test(value) ? `${value[0]}redacted${value[0]}` : "redacted"}`).replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
 }
 
 function redact(value, key = "") {
@@ -102,7 +104,7 @@ function isSecretSegment(segment) {
 }
 
 function pathPattern(url) {
-  return url.pathname.split("/").map((segment) => /^\d+$|^[0-9a-f-]{32,36}$/i.test(segment) || isSecretSegment(segment) ? "{id}" : segment).join("/").slice(0, maximumUrlLength);
+  return url.pathname.split("/").map((segment) => /^\d+$|^[0-9a-f-]{32,36}$/i.test(segment) || isSecretSegment(segment) ? "{id}" : segment).join("/");
 }
 
 function rememberRequest({ requestId, request }) {
@@ -123,17 +125,20 @@ const explorationKey = (appId) => `explorations:${appId}`;
 
 async function readRequests(appId) {
   const key = explorationKey(appId);
-  const { [key]: exploration } = await chrome.storage.local.get(key);
-  return exploration?.requests ?? [];
+  const { [key]: exploration, explorations: legacy } = await chrome.storage.local.get([key, "explorations"]);
+  return exploration?.requests ?? legacy?.[appId] ?? [];
 }
 
 async function tidyStorage() {
   const stored = await chrome.storage.local.get(null);
   const now = Date.now();
-  if (stored.explorations) {
-    await chrome.storage.local.set(Object.fromEntries(Object.entries(stored.explorations).map(([appId, requests]) => [explorationKey(appId), { recordedAt: now, requests }])));
-    await chrome.storage.local.remove("explorations");
+  const legacy = stored.explorations;
+  for (const appId of Object.keys(legacy ?? {})) {
+    await chrome.storage.local.set({ [explorationKey(appId)]: { recordedAt: now, requests: legacy[appId] } });
+    delete legacy[appId];
+    await chrome.storage.local.set({ explorations: legacy });
   }
+  if (legacy) await chrome.storage.local.remove("explorations");
   const { active } = await chrome.storage.session.get("active");
   const expired = Object.entries(stored).filter(([key, value]) => key.startsWith("explorations:") && key !== explorationKey(active?.appId) && !(now - (value?.recordedAt ?? 0) < retentionDays * 86400000)).map(([key]) => key);
   if (expired.length) await chrome.storage.local.remove(expired);
@@ -206,13 +211,18 @@ async function stopRecording(tabId) {
 }
 
 async function operate({ action, appId, websiteUrl }) {
-  await tidyStorage();
+  await tidyStorage().catch(() => {});
   if (action === "start") await startRecording(appId, websiteUrl);
   if (action === "status" || action === "start") return status(appId);
   const { active } = await chrome.storage.session.get("active");
   if (active && (action === "stop" || active.appId === appId)) await stopRecording(active.tabId);
   if (action === "clear") {
     await chrome.storage.local.remove(explorationKey(appId));
+    const { explorations: legacy } = await chrome.storage.local.get("explorations");
+    if (legacy?.[appId]) {
+      delete legacy[appId];
+      await chrome.storage.local.set({ explorations: legacy });
+    }
     await chrome.storage.session.remove("saveError");
   }
   return status(appId);
