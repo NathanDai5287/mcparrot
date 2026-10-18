@@ -5,6 +5,7 @@ const maximumArrayItems = 2;
 const maximumSampleLength = 3000;
 const maximumTextSampleLength = 400;
 const maximumUrlLength = 2000;
+const maximumBodyLength = 2000;
 const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
@@ -88,6 +89,18 @@ function sampleOf(text) {
   }
 }
 
+function bodyOf(text) {
+  try {
+    return JSON.stringify(redact(JSON.parse(text))).slice(0, maximumBodyLength);
+  } catch {
+    return redactText(text.slice(0, maximumBodyLength * 2)).slice(0, maximumBodyLength);
+  }
+}
+
+function contentTypeOf(headers = {}) {
+  return Object.entries(headers).find(([name]) => name.toLowerCase() === "content-type")?.[1]?.slice(0, 200);
+}
+
 function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
@@ -113,7 +126,17 @@ function rememberRequest({ requestId, request }) {
   if (!url.protocol.startsWith("http") || analyticsHost.test(url.hostname) || isAuthenticationPath(url.pathname)) return;
   const pattern = url.origin + pathPattern(url);
   if (pattern.length > maximumUrlLength) return;
-  pendingRequests.set(requestId, { method: request.method, url: withoutSecrets(request.url), pattern });
+  const captured = { method: request.method, url: withoutSecrets(request.url), pattern };
+  if (request.method === "GET") return pendingRequests.set(requestId, captured);
+  const requestContentType = contentTypeOf(request.headers);
+  pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), postData: request.postData, hasPostData: request.hasPostData });
+}
+
+async function requestBody(tabId, requestId, { postData, hasPostData }) {
+  if (postData !== undefined) return postData;
+  if (!hasPostData) return undefined;
+  const result = await chrome.debugger.sendCommand({ tabId }, "Network.getRequestPostData", { requestId }).catch(() => undefined);
+  return result?.postData;
 }
 
 function rememberResponse({ requestId, type, response }) {
@@ -161,8 +184,10 @@ async function recordRequest(tabId, requestId) {
   const request = pendingRequests.get(requestId);
   pendingRequests.delete(requestId);
   if (!request?.contentType) return;
+  const { postData, hasPostData, ...captured } = request;
+  const sentBody = await requestBody(tabId, requestId, { postData, hasPostData });
   const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
-  await save(tabId, { ...request, sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
+  await save(tabId, { ...captured, ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
 }
 
 async function recordPage(tabId) {

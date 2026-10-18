@@ -43,7 +43,7 @@ The product has two separate phases: teaching a tool, and using the saved tool l
 
 MCP means Model Context Protocol.
 It is a standard that lets an assistant discover and call tools from another application.
-Each saved reading tool, whose requests all use GET, is served as an MCP tool with defined inputs and results.
+Each saved tool, whose requests all use GET or POST and pass the [checkout and payment guard](#tool-methods-and-the-payment-guard), is served as an MCP tool with defined inputs and results.
 The assistant can combine saved tools to answer a new request.
 Nathan chose Tools on October 17, 2026 as the name for what a user saves and ChatGPT runs.
 The code, the stored data, workspace operations such as `addTasks`, and MCP tool names such as `save_task` still say task, so existing ChatGPT connections keep working.
@@ -57,7 +57,7 @@ The UI and MCP must call the same underlying operations with matching inputs, pe
 Neither interface may bypass the other's authorization or user verification requirements.
 
 This rule covers both managing MCParrot and running taught website tools.
-Each website app's connection runs its saved reading tools and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
+Each website app's connection runs its saved tools and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
 Running a tool and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
 Ordering has both paths: the app page's **Test order** box and the app connection's ordering tools call the same operations, and `check_order` reports the Pay with Link status that the app page shows.
 Both paths enforce the same account rules: each operation reaches only the apps of its user, and ordering only the owner's apps, as [accounts and ownership](#accounts-and-ownership) describes.
@@ -101,7 +101,7 @@ Nathan scoped the first version to app connections only, so the management conne
 
 | Connection | Scope | Use |
 | --- | --- | --- |
-| One connection per website app | That app's saved reading tools, and reading any page on its website | Run saved website tools and read website pages from ChatGPT |
+| One connection per website app | That app's saved tools, and reading any page on its website | Run saved website tools and read website pages from ChatGPT |
 | MCParrot management (aspirational) | The owner's website apps and tool lifecycle | Create apps, manage tools, start teaching, check status, and request recovery |
 
 For example, Canvas and YouTube each have their own connection.
@@ -111,12 +111,13 @@ Users who manage apps only through the UI do not need the management connection,
 
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
-Each saved tool whose requests all use GET becomes one read-only MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter.
+Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter.
+A tool whose requests all use GET has the annotation `readOnlyHint: true`, and a tool with any POST request has `readOnlyHint: false`, `destructiveHint: false`, and `openWorldHint: true`, because a POST request can change website data.
 The MCP tool name is the saved tool's name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
 Each tool in a connection needs its own name, so saving rejects or skips a tool whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another tool in the app.
 If stored tools still share a tool name, the connection adds the first 8 characters of the later tool's ID to its name, uses `task_` and the tool's whole ID when that name is also taken, skips the tool only when both names are taken, and writes a warning log either way.
-Tools that use other methods stay off the connection, because the first version only reads website data.
+Tools that use other methods, or with a request that the guard refuses, stay off the connection.
 The route answers only POST requests; GET and DELETE return 405.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 When the app's **Ordering** switch is on, the connection also lists `prepare_order`, `check_order`, `place_order`, and `cancel_order`, as [ordering with Pay with Link](#ordering-with-pay-with-link) describes.
@@ -127,10 +128,10 @@ It rejects any address on another origin with an error that names the allowed we
 Nathan chose this tool so that ChatGPT can answer from pages that no saved tool covers, such as a syllabus link he pastes.
 He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tools he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
 
-Each connection also has a `save_task` tool, titled "Save a page as a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
-Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`.
-Its inputs are `name`, `description`, `urlPattern`, `inputs` as a list of name, description, and example, and `returns`, which become one GET request in the same tool shape as a chosen tool.
-It rejects a URL pattern on another origin, placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or URL pattern, ignoring placeholder names, matches an existing tool.
+Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
+Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
+Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, `inputs` as a list of name, description, and example, and `returns`, which become one request in the same tool shape as a chosen tool.
+It rejects a URL pattern on another origin, a body on a GET request, a request that the checkout and payment guard refuses, placeholders in the URL pattern and body that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
 Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
 
@@ -167,10 +168,12 @@ Canvas is a useful example, but the same flow works on any website.
 6. Select **Find what this site can do** to send the recorded requests and the app's saved tools to Claude Opus 5.5 and receive a list of capabilities that are new or that improve a saved tool.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select the save button, which shows the number of ticked tools, such as **Save 3 tools**.
 
-Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
+Each capability shows a name, a plain description, the requests it uses as a method, GET or POST, and URL pattern, the inputs that can change with an example, and what it returns.
 Each capability is marked **New** or **Updates <tool name>**, where an update is a clearly better version of that saved tool.
-Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
-Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or URL pattern breaks those rules, is skipped.
+Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or request matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
+A request matches another when its address and its body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
+Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or request breaks those rules, is skipped.
+Selecting a tool on the app page shows its inputs, its result, and each request's method, URL pattern, and body pattern.
 
 The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another discovery run.
 The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
@@ -178,7 +181,7 @@ An update that the user renamed before saving no longer equals its tool, so it a
 Select **Find what this site can do** again to replace the saved result with a new run.
 An app holds at most 500 tools, and the workspace holds at most 100 apps.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
-MCParrot stores chosen tools with the app, and each saved reading tool appears in the app's connection right away.
+MCParrot stores chosen tools with the app, and each saved tool appears in the app's connection right away.
 Testing tools with changed inputs before they appear in ChatGPT remains aspirational, as the [status page](STATUS.md) records.
 
 ### Recording in the explore tab
@@ -190,21 +193,24 @@ Nathan chose to also record each whole page that loads in the tab, such as a ser
 A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts.
 It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `session`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
-It never records request or response headers, cookies, or request bodies.
-It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
-A value looks like a secret when it is a JWT, a `Bearer` or `Basic` value, or a long random-looking string, and text samples also lose values after secret names such as `password=` or `api_key:`.
-This redaction matches patterns, so a secret in another form, such as a short code or a value under an ordinary key, can still appear in a sample.
+For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 2,000 characters, and the value of the request's `Content-Type` header as `requestContentType`.
+It never records any other request header, any response header, or cookies.
+It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
+A value looks like a secret when it is a JWT, a `Bearer` or `Basic` value, or a long random-looking string, and text samples and request bodies also lose values after secret names such as `password=` or `api_key:`.
+A JSON request body keeps its whole structure, such as a GraphQL query, and only loses its secret-looking values; it is not shortened like a response sample.
+This redaction matches patterns, so a secret in another form, such as a short code or a value under an ordinary key, can still appear in a sample or a request body.
 
 Each sample keeps at most 80 characters per text value and 2 items per list, up to about 3 KB per response.
 A page sample keeps the first 3,000 characters of its visible text, with spaces collapsed.
 Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.4.0, asks only for the `storage` and `debugger` permissions and no host permissions.
+The extension, version 0.5.0, asks only for the `storage` and `debugger` permissions and no host permissions.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
 To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
+Version 0.4.0 does not record request bodies, so discovery cannot suggest POST tools from its recordings until the user loads version 0.5.0 and explores again.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
@@ -215,7 +221,8 @@ Unvisited pages and actions remain unavailable unless separately explored and te
 Discovery can suggest page-reading tools, such as "Read course syllabus" with a `{courseId}` input, from recorded pages.
 Pages that build their content only after later user actions, rather than when they load, can still return incomplete text.
 Saved tools appear in ChatGPT without a separate test, so a tool can fail when its request cannot be reused; checking each tool before it appears in ChatGPT is aspirational.
-The first milestone supports reading only, and discovery must not automatically submit changes to website data.
+Discovery can suggest POST requests, including GraphQL mutations, but never one that the [checkout and payment guard](#tool-methods-and-the-payment-guard) refuses, and discovery itself never sends any request to the website.
+A placeholder in a body sits inside a JSON string value, so a website that expects a number there, such as a latitude, can reject the filled body.
 
 ## Discovery data sent to Claude
 
@@ -225,16 +232,18 @@ The dashboard sends only the app ID and the recordings; the server reads the app
 The agent runs with its tools disabled by configuration, in an empty temporary folder, and inside the SDK's sandbox; when the server does not support the sandbox, it runs again without it.
 The server deletes the temporary folders after each run and stops waiting after 50 seconds with a timeout error.
 The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tools where a page's text is useful, in the same capability shape as data tools.
+It tells Claude that tools can use GET and POST requests, to prefer GraphQL queries for reading, that other POST requests and mutations are allowed except checkout and payment, and to ignore analytics, tracking, and advertising requests, such as third-party pixels.
+A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
-The route accepts at most 2 MB and 150 requests, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys, JWTs, long random-looking strings, and values after labels such as `password:` again.
-It keeps at most 50 replied capabilities, and only those whose requests all use GET on the app's own origin and whose placeholders match their inputs one to one.
+The route accepts at most 2 MB and 150 requests, cuts each request body to 2,000 characters and each request content type to 200, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
+It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's own origin, have no body on a GET, pass the checkout and payment guard, and whose placeholders in URL patterns and bodies match their inputs one to one.
 It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
-The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers other than the request content type, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
@@ -276,9 +285,11 @@ The user can also choose on the app page how MCParrot signs in again by itself w
 3. Receive the results without opening the website yourself.
 
 When ChatGPT calls a tool, the server starts a Browser Use cloud browser with the app's profile and connects to it over the Chrome DevTools Protocol with Playwright.
-It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the tool's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
+It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the tool's URL patterns and body patterns from the tool inputs, and runs each request with `fetch` inside the page with its method, its body, and the website's own cookies.
+URL values are URL-encoded, and body values are escaped as JSON string content, so a quote in an input cannot change the body's structure.
+A request with a body sends its recorded content type, or `application/json` when none was recorded.
 Inputs that ChatGPT leaves out use the example value that discovery found.
-When a response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON, stay as they are.
+When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
 Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's origin returns an error instead of its text.
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
@@ -287,7 +298,6 @@ The whole call must finish within the route's 300-second Vercel function limit.
 The tool treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
 When the app signs in again automatically, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 Otherwise, the tool fails with a message that tells the user to open MCParrot and select **Sign in to website** on the app or choose how it signs in again automatically.
-Tools run only GET requests in this first version, because the first milestone reads website data and never changes it.
 
 Assistants can combine taught tools in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
@@ -296,6 +306,17 @@ An unsupported action needs further discovery; a successful example does not est
 Some requests depend on short-lived tokens in headers rather than cookies, and some websites block reuse of a recorded request.
 Those tools fail when they run, and they need a separate browser path or must stay unused.
 Measure speed against an agent navigating the website before you claim an improvement.
+
+### Tool methods and the payment guard
+
+Nathan decided on October 17, 2026, that tools may use GET and POST requests, not only GET, because many websites, such as DoorDash, read and act through POST GraphQL requests to addresses such as `/graphql/<operation>` with JSON bodies.
+He accepted the risk that a POST tool can change data in his website account.
+MCParrot keeps exactly one guard on tool requests: it refuses any request whose URL path, body, or GraphQL operation name looks like checkout or payment.
+The guard splits names such as `placeOrder` into words and refuses the words checkout, check out, payment, pay, purchase, place order, create order, submit order, and order create, so `cart/checkout`, `order/create`, and `createOrderFromCart` are all refused.
+Discovery, `save_task`, the connection's tool list, and every tool run apply the guard, and a run checks the request again after it fills the inputs.
+The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
+The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address or body contains one of the words, such as a query for a payment history, is refused.
+`read_page` only opens pages with GET, so the guard does not apply to it.
 
 ## Reconnecting expired sessions
 
@@ -369,7 +390,7 @@ Nathan decided that ChatGPT and the dashboard can place food and shopping orders
 Link issues a one-time card for each payment that the user approves, so MCParrot stores no card number or security code.
 DoorDash is the first live target, and Nathan's hard requirement is that ordering must never charge his real card.
 So MCParrot places an order only while the Link connection is in test mode, as [payment safety rules](#payment-safety-rules) describes.
-Ordering is the first path that changes website data, and it runs through Browser Use agent runs, not through saved tools, which still only read.
+Ordering runs through Browser Use agent runs, not through saved tools, which the [checkout and payment guard](#tool-methods-and-the-payment-guard) keeps away from checkout and payment.
 This ordering path is a gap until a live check passes, as the [status page](STATUS.md) records.
 
 ### Ordering settings
@@ -498,7 +519,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record pages, data requests, and short samples in one opened tab |
 | Capability discovery | Claude Opus 5.5 at low effort in fast mode through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login or the profile's Google session |
-| Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
+| Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET and POST requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
 | Accounts | Clerk from the Vercel Marketplace, with Google sign-in | Give each user their own workspace and identify the owner |
 | Persistent storage | Upstash Redis from the Vercel Marketplace | Store each user's apps and tools, owner keys, Browser Use profile IDs, encrypted saved logins, pending sign-ins, last discovery results, and marketplace listings |
@@ -534,7 +555,7 @@ The password never returns to the dashboard, never appears in MCP results, and n
 `/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public tool definitions, logs, traces, documentation, and source control.
-Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips headers other than the request content type, cookies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values in samples and request bodies, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
 That redaction matches patterns, so a secret in another form can still reach the recording and Claude, which the [status page](STATUS.md) lists as a gap.
 Recordings stay only in the extension, which deletes them after 30 days.
 

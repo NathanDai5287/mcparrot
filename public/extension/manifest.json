@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MCParrot Explorer",
-  "version": "0.4.0",
-  "description": "Record the pages you open and the data requests they make in the tab you open from MCParrot, with short samples and no headers or cookies.",
+  "version": "0.5.0",
+  "description": "Record the pages you open and the data requests they make in the tab you open from MCParrot, with short samples, redacted request bodies, and no headers or cookies.",
   "permissions": ["storage", "debugger"],
   "minimum_chrome_version": "102",
   "background": { "service_worker": "background.js" },
