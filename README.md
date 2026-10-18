@@ -143,7 +143,7 @@ Canvas is a useful example, but the same flow works on any website.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
-Saving replaces the app's current tasks, including tasks that ChatGPT saved, and the app page lists them with a **Delete** button for each.
+Saving adds the ticked capabilities to the app's current tasks, skipping any whose name or URL pattern matches an existing task by the same rule as `save_task`, and the app page lists them with a **Delete** button for each.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
 MCParrot stores chosen tasks with the app, and each saved reading task becomes a tool in the app's connection right away.
 Testing tasks with changed inputs before they become tools remains aspirational, as the [status page](STATUS.md) records.
@@ -305,9 +305,11 @@ Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read
 MCParrot has one owner for now, because Vercel Authentication lets only Nathan reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
 The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
-The dashboard reads the workspace through `/api/workspace` when it opens and saves the whole workspace after each change.
-`save_task` adds a task to the stored workspace on the server, so an open dashboard shows it only after a reload, and a change made in a dashboard opened before the save overwrites it, which the [status page](STATUS.md) lists as a gap.
-The first time it finds no stored workspace, it copies apps that an earlier version saved in this browser's local storage.
+The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
+Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, or delete one task.
+The server reads the current workspace from Redis, changes only that app or task, writes it back, and returns the updated apps, which the dashboard then shows.
+`/api/sign-in` stores the app's profile ID and sign-in time, and `/api/login` stores or clears its login-saved time, in the same way.
+So a task that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
 Operation status for tasks that outlast one request remains aspirational.
 
