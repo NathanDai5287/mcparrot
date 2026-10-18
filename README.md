@@ -304,7 +304,7 @@ When the session expires, MCParrot can sign in again by itself during the ChatGP
 The choice is **Off**, **With Google**, or **With email and password**, and the user picks it on the app page.
 With email and password, the user only types a text-message code in the ChatGPT chat when the website asks for one.
 When the choice is off, or email and password has no saved login, the tool returns an error that tells the user to select **Sign in to website** in MCParrot or choose how the app signs in again.
-Both ways are gaps until Nathan's live tests pass, as the [status page](STATUS.md) records.
+Signing in again with a saved login is shipped, while the text-message code step and Google re-sign-in are gaps until Nathan's live tests pass, as the [status page](STATUS.md) records.
 
 ### Choosing how to sign in again
 
