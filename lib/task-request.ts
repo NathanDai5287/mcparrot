@@ -1,3 +1,4 @@
+import { getDomain } from "tldts";
 import type { TaskRequest } from "./capabilities";
 
 export const urlPlaceholderPattern = /\{([^}]+)\}/g;
@@ -6,9 +7,14 @@ export const stepPlaceholderPattern = /^step(\d+)\.(.+)$/;
 const paymentWords = /\b(check ?out|payments?|pay|purchases?|place order|create order|submit order|order create)\b/;
 export const paymentRefusal = "MCParrot refuses tool requests that look like checkout or payment, so a tool can never place an order. Orders go only through the Pay with Link ordering tools.";
 
-const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "client-identifier", "github-verified-fetch", "notion-client-version", "x-apollo-operation-name", "x-channel-id", "x-client-identifier", "x-experience-id", "x-notion-active-user-header", "x-requested-with", "x-restli-protocol-version"];
+const browserHeaderNames = new Set(["accept-charset", "accept-encoding", "access-control-request-headers", "access-control-request-method", "connection", "content-length", "content-type", "cookie", "cookie2", "date", "dnt", "expect", "host", "keep-alive", "origin", "referer", "set-cookie", "te", "trailer", "transfer-encoding", "upgrade", "user-agent", "via"]);
+const browserHeaderPrefix = /^(sec-|proxy-|:)/;
+const secretHeaderName = /token|secret|passw|api-?key|private-?key|cookie|authorization|csrf|xsrf/i;
+const secretHeaderValue = /^\s*(bearer|basic)\s|^eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*$/i;
 
-export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name]) => replayedHeaderNames.includes(name.toLowerCase())));
+const isReplayedHeader = (name: string, value: string) => !browserHeaderNames.has(name.toLowerCase()) && !browserHeaderPrefix.test(name.toLowerCase()) && !secretHeaderName.test(name) && !secretHeaderValue.test(value);
+
+export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name, value]) => isReplayedHeader(name, value)));
 
 const allPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [...urlPattern.matchAll(urlPlaceholderPattern), ...bodyPattern.matchAll(bodyPlaceholderPattern)].map((match) => match[1]);
 
@@ -22,8 +28,8 @@ export const usesOnlyEarlierSteps = (requests: TaskRequest[]) => requests.every(
 export function isOnWebsite(address: string | URL, website: string) {
   const { protocol, hostname, port } = new URL(address);
   const site = new URL(website);
-  const siteHostname = site.hostname.replace(/^www\./, "");
-  return protocol === site.protocol && port === site.port && (hostname === siteHostname || hostname.endsWith(`.${siteHostname}`));
+  const domain = getDomain(hostname, { allowPrivateDomains: true });
+  return protocol === site.protocol && port === site.port && (hostname === site.hostname || (domain !== null && domain === getDomain(site.hostname, { allowPrivateDomains: true })));
 }
 
 function decodedOnce(text: string) {
