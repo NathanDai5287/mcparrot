@@ -1,4 +1,7 @@
+// @ts-check
 import { BrowserUse } from "browser-use-sdk/v4";
+
+const RUN_TIMEOUT_MS = 15 * 60 * 1000;
 
 const task = process.argv.slice(2).join(" ").trim();
 
@@ -13,8 +16,45 @@ if (!process.env.BROWSER_USE_API_KEY) {
 }
 
 const client = new BrowserUse();
-const run = await client.runs.create({ task });
-console.log(`Run started: ${run.id}`);
+const created = client.runs.create({ task });
+let finished = false;
 
-const result = await client.runs.waitForCompletion(run.id);
-console.log(result.result);
+/** @param {unknown} error */
+const errorMessage = (error) => (error instanceof Error ? error.message : String(error));
+
+async function cancelRun() {
+  if (finished) return;
+  finished = true;
+  let runId;
+  try {
+    runId = (await created).id;
+    await client.runs.cancel(runId);
+    console.error(`Run cancelled: ${runId}`);
+  } catch (error) {
+    if (runId) console.error(`Could not cancel run ${runId}: ${errorMessage(error)}`);
+  }
+}
+
+process.once("SIGINT", async () => {
+  await cancelRun();
+  process.exit(130);
+});
+
+try {
+  const run = await created;
+  console.log(`Run started: ${run.id}`);
+
+  const result = await client.runs.waitForCompletion(run.id, { timeout: RUN_TIMEOUT_MS });
+  finished = true;
+  if (result.status === "completed") {
+    console.log(result.result);
+  } else {
+    console.error(`Run ${result.status}: ${run.id}`);
+    process.exitCode = 1;
+  }
+} catch (error) {
+  console.error(errorMessage(error));
+  process.exitCode = 1;
+} finally {
+  await cancelRun();
+}
