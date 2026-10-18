@@ -175,6 +175,8 @@ async function googleSignIn(app: SigningInApp, googleEmail: string | undefined, 
   throw new Error(timedOut ? signInTimedOutMessage : signInFailedMessage);
 }
 
+const usesPassword = (app: Website) => automaticSignInOf(app).method === "password";
+
 async function waitingForCode(appId: string) {
   const pending = await readPendingSignIn(appId);
   if (!pending) return false;
@@ -248,7 +250,7 @@ async function signInAgain(app: Website, deadline: number) {
 
 export async function readSigningIn(app: Website, read: (app: Website) => Promise<string>) {
   const deadline = Date.now() + callBudgetMilliseconds;
-  if (await waitingForCode(app.id)) return codeSentMessage;
+  if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
   try {
     return await read(app);
   } catch (error) {
@@ -260,7 +262,7 @@ export async function readSigningIn(app: Website, read: (app: Website) => Promis
 }
 
 export const submitVerificationCode = (app: Website, code: string) => withSignInLock(app.id, async () => {
-  const pending = await readPendingSignIn(app.id);
+  const pending = usesPassword(app) && await readPendingSignIn(app.id);
   if (!pending) throw new Error(noPendingSignInMessage);
   let outcome = "failed";
   try {

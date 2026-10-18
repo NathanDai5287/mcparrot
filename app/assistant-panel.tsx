@@ -171,25 +171,21 @@ const automaticSignInChoices = [
 ] as const;
 
 function AutomaticSignInChoice({ app, onChange, onSave }: { app: Website; onChange: (changes: AppChanges) => void; onSave: SaveAutomaticSignIn }) {
-  const [method, setMethod] = useState(automaticSignInOf(app).method);
-  const [busy, setBusy] = useState(false);
+  const [savingMethod, setSavingMethod] = useState<AutomaticSignIn["method"] | null>(null);
   const [error, setError] = useState("");
+  const current = automaticSignInOf(app);
+  const method = savingMethod ?? current.method;
 
   async function choose(nextMethod: AutomaticSignIn["method"]) {
-    const previousMethod = method;
-    const current = automaticSignInOf(app);
-    setMethod(nextMethod);
-    setBusy(true);
+    setSavingMethod(nextMethod);
     setError("");
     const saved = await onSave(nextMethod === current.method ? current : { method: nextMethod });
-    setBusy(false);
-    if (saved) return;
-    setMethod(previousMethod);
-    setError("MCParrot could not save this choice. Try again.");
+    setSavingMethod(null);
+    if (!saved) setError("MCParrot could not save this choice. Try again.");
   }
 
   return <div className="automatic-sign-in">
-    <fieldset disabled={busy}>
+    <fieldset disabled={!!savingMethod}>
       <legend>Sign in again automatically</legend>
       {automaticSignInChoices.map((choice) => <label className="automatic-sign-in-choice" key={choice.method}><input type="radio" name={`automatic-sign-in-${app.id}`} checked={method === choice.method} onChange={() => choose(choice.method)} />{choice.label}</label>)}
     </fieldset>
