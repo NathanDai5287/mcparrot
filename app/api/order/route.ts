@@ -36,7 +36,9 @@ function invalidActionMessage(error: z.ZodError) {
 export async function GET(request: Request) {
   const userId = await signedInUserId();
   if (!await isOwner(userId)) return ownerOnly();
-  const app = await ownedApp(userId, new URL(request.url).searchParams.get("appId") ?? "");
+  const appId = appIdSchema.safeParse(new URL(request.url).searchParams.get("appId"));
+  if (!appId.success) return Response.json({ error: "MCParrot could not read this order request. Reload the page and try again." }, { status: 400 });
+  const app = await ownedApp(userId, appId.data);
   if (!app) return appNotFound();
   const [link, checked] = await Promise.all([readLinkStatus(), checkOrder(app).then((order) => ({ order, error: undefined }), (error: unknown) => ({ order: undefined, error }))]);
   const linkView = link ? { connected: link.isConnected, mode: link.mode ?? null, hasConnection: !!link.connectionId } : null;

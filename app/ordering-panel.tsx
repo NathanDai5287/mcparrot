@@ -53,6 +53,7 @@ function OrderingSettings({ app, onSave }: { app: Website; onSave: (ordering: Or
     const saved = await onSave({ enabled: fields.get("enabled") === "on", limitUsd: Number(fields.get("limitUsd")) });
     setBusy(false);
     if (!saved) setError("MCParrot could not save the ordering settings. Try again.");
+    else if (typeof saved === "object" && "error" in saved && typeof saved.error === "string") setError(saved.error);
   }
 
   return <form className="editor" onSubmit={save}>
