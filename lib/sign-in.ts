@@ -5,7 +5,7 @@ import { BrowserUseError, type RunCreateBody, type SecretBinding } from "browser
 import type { Page } from "playwright-core";
 import { z } from "zod";
 import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, withPage } from "./browser-use";
-import type { Website } from "./capabilities";
+import { automaticSignInOf, type Website } from "./capabilities";
 import { readLogin, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
 import { findApp, updateStoredApp } from "./workspace";
@@ -23,13 +23,16 @@ const codeRejectedMessage = "The website rejected that code. Ask the user for a 
 const signInFinishedMessage = "Sign-in finished. Run the original tool again.";
 const passwordRejectedMessage = "The website rejected the saved login. Open MCParrot, replace the login for this app, then try again.";
 const signInFailedMessage = "Browser Use could not finish signing in. Open MCParrot and select Sign in to website on this app, then try again.";
+const googleNeedsUserMessage = "Open MCParrot and select Sign in to website on this app, then try again.";
 const noPendingSignInMessage = "No sign-in is waiting for a code. Run the original tool again to start signing in.";
 const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original tool again.";
 const signInTimedOutMessage = "Signing in to the website took too long. Wait a few minutes, then try again, or open MCParrot and select Sign in to website on this app.";
-const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, signInInProgressMessage, signInTimedOutMessage]);
+const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, signInInProgressMessage, signInTimedOutMessage]);
 
-const SignInResult = z.object({ outcome: z.enum(["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"]) });
+const passwordOutcomes = ["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"] as const;
+const googleOutcomes = ["signed_in", "needs_user", "failed"] as const;
 type PendingSignIn = { sessionId: string; browserId: string; cdpUrl: string };
+type SigningInApp = Website & { browserProfileId: string };
 
 const trustDeviceStep = `If the website asks whether to trust this browser or device, choose no, for example "No, other people use this device".`;
 const finishSteps = (website: string) => `When ${website} shows its signed-in page, finish with outcome signed_in. If anything else stops sign-in, finish with outcome failed.`;
@@ -45,6 +48,18 @@ ${finishSteps(website)}`;
 const codeTask = (website: string) => `Type the secret verification_code into the passcode field on the open verification page and submit it.
 If the page says the code is wrong or expired, request a new text-message (SMS) passcode, then finish with outcome code_rejected.
 ${trustDeviceStep}
+${finishSteps(website)}`;
+
+const googleAccountStep = (googleEmail?: string) => googleEmail
+  ? `When Google shows its account chooser, select the account ${googleEmail}. If that account is not shown, finish with outcome needs_user.`
+  : "When Google shows its account chooser, select the only account shown. If it shows more than one account, finish with outcome needs_user.";
+
+const googleSignInTask = (website: string, googleEmail?: string) => `Open ${website} and sign in with Google.
+If the website already shows a signed-in page, finish with outcome signed_in.
+Open the website's sign-in page and select "Continue with Google" or "Sign in with Google".
+${googleAccountStep(googleEmail)}
+If Google asks you to confirm or continue to ${website}, select Continue.
+Never type anything on a Google page. If Google asks for an email, a password, a code, a phone number, or to verify that it's you, finish with outcome needs_user at once.
 ${finishSteps(website)}`;
 
 const pendingKey = (appId: string) => `pending-sign-in:${appId}`;
@@ -65,10 +80,11 @@ async function frameHosts(page: Page) {
   return [...new Set(hosts.filter(Boolean))];
 }
 
-function runSignInAgent(spanName: string, body: RunCreateBody, waitMilliseconds: number) {
+function runSignInAgent(spanName: string, body: RunCreateBody, waitMilliseconds: number, outcomes: readonly [string, ...string[]] = passwordOutcomes) {
+  const SignInResult = z.object({ outcome: z.enum(outcomes) });
   return Sentry.startSpan({ name: spanName }, async (span) => {
     let run: { id: string; sessionId: string } | undefined;
-    let outcome: z.infer<typeof SignInResult>["outcome"] = "failed";
+    let outcome = "failed";
     let timedOut = false;
     try {
       run = await browserUse().runs.create({ ...body, keepAlive: pendingSignInSeconds, maxCostUsd: agentRunMaxCostUsd, outputSchema: z.toJSONSchema(SignInResult) });
@@ -103,7 +119,23 @@ async function profileId(app: Website) {
   return id;
 }
 
-async function signIn(app: Website & { browserProfileId: string }, login: Login, hash: string, waitMilliseconds: number) {
+async function agentBrowser(appId: string, sessionId?: string) {
+  if (!sessionId) return { lookupFailed: false };
+  try {
+    return { browser: await sessionBrowser(sessionId), lookupFailed: false };
+  } catch (error) {
+    Sentry.logger.warn("Sign-in browser lookup failed", { appId, reason: errorReason(error) });
+    return { lookupFailed: true };
+  }
+}
+
+async function finishSignedIn(appId: string, browserId: string | undefined, lookupFailed: boolean) {
+  if (lookupFailed) throw new Error(signInFailedMessage);
+  if (browserId) await stopSavingProfile(browserId);
+  await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
+}
+
+async function signIn(app: SigningInApp, login: Login, hash: string, waitMilliseconds: number) {
   Sentry.logger.info("Automatic sign-in started", { appId: app.id });
   const { sessionId, outcome, timedOut } = await runSignInAgent("browser_use.agent_sign_in", {
     task: signInTask(app.url),
@@ -111,33 +143,35 @@ async function signIn(app: Website & { browserProfileId: string }, login: Login,
     secretBindings: [secret("username", login.username, login.hosts), secret("password", login.password, login.hosts)],
   }, waitMilliseconds);
   Sentry.logger.info("Automatic sign-in finished", { appId: app.id, outcome });
-  let browser: Awaited<ReturnType<typeof sessionBrowser>> | undefined;
-  let lookupFailed = false;
-  if (sessionId) {
-    try {
-      browser = await sessionBrowser(sessionId);
-    } catch (error) {
-      lookupFailed = true;
-      Sentry.logger.warn("Sign-in browser lookup failed", { appId: app.id, reason: errorReason(error) });
-    }
-  }
+  const { browser, lookupFailed } = await agentBrowser(app.id, sessionId);
   if (outcome === "code_sent" && browser) {
     await Redis.fromEnv().set(pendingKey(app.id), { sessionId, browserId: browser.id, cdpUrl: browser.cdpUrl }, { ex: pendingSignInSeconds });
     return codeSentMessage;
   }
   const browserId = browser?.id;
-  if (outcome === "signed_in") {
-    if (lookupFailed) throw new Error(signInFailedMessage);
-    if (browserId) await stopSavingProfile(browserId);
-    await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
-    return;
-  }
+  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed);
   if (browserId) await ignoreErrors(() => stopBrowser(browserId));
   if (outcome === "password_rejected") {
     await Redis.fromEnv().set(rejectedKey(app.id), hash);
     throw new Error(passwordRejectedMessage);
   }
   await Redis.fromEnv().set(cooldownKey(app.id), hash, { ex: failedCooldownSeconds });
+  throw new Error(timedOut ? signInTimedOutMessage : signInFailedMessage);
+}
+
+async function googleSignIn(app: SigningInApp, googleEmail: string | undefined, attempt: string, waitMilliseconds: number) {
+  Sentry.logger.info("Automatic Google sign-in started", { appId: app.id });
+  const { sessionId, outcome, timedOut } = await runSignInAgent("browser_use.agent_google_sign_in", {
+    task: googleSignInTask(app.url, googleEmail),
+    browserSettings: { profileId: app.browserProfileId },
+  }, waitMilliseconds, googleOutcomes);
+  Sentry.logger.info("Automatic Google sign-in finished", { appId: app.id, outcome });
+  const { browser, lookupFailed } = await agentBrowser(app.id, sessionId);
+  const browserId = browser?.id;
+  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed);
+  if (browserId) await ignoreErrors(() => stopBrowser(browserId));
+  await Redis.fromEnv().set(cooldownKey(app.id), attempt, { ex: failedCooldownSeconds });
+  if (outcome === "needs_user") throw new Error(googleNeedsUserMessage);
   throw new Error(timedOut ? signInTimedOutMessage : signInFailedMessage);
 }
 
@@ -168,23 +202,49 @@ export async function withLock<T>(key: string, busyMessage: string, work: () => 
 
 const withSignInLock = <T>(appId: string, work: () => Promise<T>) => withLock(lockKey(appId), signInInProgressMessage, work);
 
-const signInOnce = (app: Website, login: Login, deadline: number) => withSignInLock(app.id, async () => {
-  const redis = Redis.fromEnv();
+const guardedSignIn = <T>(app: Website, work: () => Promise<T>) => withSignInLock(app.id, async () => {
   try {
-    if (await waitingForCode(app.id)) return codeSentMessage;
-    const hash = loginHash(app, login);
-    if (await redis.get(rejectedKey(app.id)) === hash) throw new Error(passwordRejectedMessage);
-    if (await redis.get(cooldownKey(app.id)) === hash) throw new Error(signInFailedMessage);
-    const waitMilliseconds = Math.min(agentWaitMilliseconds, deadline - Date.now() - afterAgentMilliseconds);
-    if (waitMilliseconds < afterAgentMilliseconds) throw new Error(signInTimedOutMessage);
-    const signingInApp = { ...app, browserProfileId: await profileId(app) };
-    return await signIn(signingInApp, login, hash, waitMilliseconds) ?? signingInApp;
+    return await work();
   } catch (error) {
     if (userMessages.has((error as Error).message)) throw error;
     Sentry.logger.warn("Automatic sign-in failed", { appId: app.id, reason: errorReason(error) });
     throw new Error(signInFailedMessage);
   }
 });
+
+async function agentWaitWithin(appId: string, attempt: string, deadline: number) {
+  if (await Redis.fromEnv().get(cooldownKey(appId)) === attempt) throw new Error(signInFailedMessage);
+  const waitMilliseconds = Math.min(agentWaitMilliseconds, deadline - Date.now() - afterAgentMilliseconds);
+  if (waitMilliseconds < afterAgentMilliseconds) throw new Error(signInTimedOutMessage);
+  return waitMilliseconds;
+}
+
+const signInOnce = (app: Website, login: Login, deadline: number) => guardedSignIn(app, async () => {
+  if (await waitingForCode(app.id)) return codeSentMessage;
+  const hash = loginHash(app, login);
+  if (await Redis.fromEnv().get(rejectedKey(app.id)) === hash) throw new Error(passwordRejectedMessage);
+  const waitMilliseconds = await agentWaitWithin(app.id, hash, deadline);
+  const signingInApp = { ...app, browserProfileId: await profileId(app) };
+  return await signIn(signingInApp, login, hash, waitMilliseconds) ?? signingInApp;
+});
+
+const googleSignInOnce = (app: Website, googleEmail: string | undefined, deadline: number) => guardedSignIn(app, async () => {
+  const { browserProfileId } = app;
+  if (!browserProfileId) throw new Error(googleNeedsUserMessage);
+  const attempt = JSON.stringify(["google", googleEmail ?? ""]);
+  const waitMilliseconds = await agentWaitWithin(app.id, attempt, deadline);
+  const signingInApp = { ...app, browserProfileId };
+  await googleSignIn(signingInApp, googleEmail, attempt, waitMilliseconds);
+  return signingInApp;
+});
+
+async function signInAgain(app: Website, deadline: number) {
+  const automaticSignIn = automaticSignInOf(app);
+  if (automaticSignIn.method === "google") return googleSignInOnce(app, automaticSignIn.googleEmail, deadline);
+  const login = automaticSignIn.method === "password" ? await readLogin(app.id) : null;
+  if (!login) throw new Error(signedOutMessage);
+  return signInOnce(app, login, deadline);
+}
 
 export async function readSigningIn(app: Website, read: (app: Website) => Promise<string>) {
   const deadline = Date.now() + callBudgetMilliseconds;
@@ -194,9 +254,7 @@ export async function readSigningIn(app: Website, read: (app: Website) => Promis
   } catch (error) {
     if ((error as Error).message !== signedOutMessage) throw error;
   }
-  const login = await readLogin(app.id);
-  if (!login) throw new Error(signedOutMessage);
-  const signedIn = await signInOnce(app, login, deadline);
+  const signedIn = await signInAgain(app, deadline);
   if (typeof signedIn === "string") return signedIn;
   return deadline - Date.now() < rereadMilliseconds ? signInFinishedMessage : read(signedIn);
 }

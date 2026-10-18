@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { Website } from "../lib/capabilities";
+import { automaticSignInOf, type AutomaticSignIn, type Website } from "../lib/capabilities";
 import { SetupCard } from "./setup-card";
 
 type AppChanges = Partial<Pick<Website, "browserProfileId" | "signedInAt" | "loginSavedAt">>;
+type SaveAutomaticSignIn = (automaticSignIn: AutomaticSignIn) => Promise<unknown>;
 type SignInBrowser = { appId: string; browserId: string; liveUrl: string; startedAt: number };
 
 const signInMinutes = 15;
@@ -34,7 +35,7 @@ function openSignInWindow(url?: string) {
   return popup;
 }
 
-function SignInSection({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
+function SignInSection({ app, onChange, onAutomaticSignIn }: { app: Website; onChange: (changes: AppChanges) => void; onAutomaticSignIn: SaveAutomaticSignIn }) {
   const [browser, setBrowser] = useState<SignInBrowser | null>(() => storedSignInBrowser(app.id));
   const popupRef = useRef<Window | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,11 +86,12 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
       : <p>{status} Your assistant runs tools in a hidden Browser Use browser that keeps this sign-in.</p>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
     {browser ? <div className="login-actions"><button className="button primary" disabled={busy} onClick={() => stopSignIn(browser, true)}>{busy ? "Saving sign-in…" : "Done signing in"}</button><button className="button" disabled={busy} onClick={() => { popupRef.current = openSignInWindow(browser.liveUrl) ?? popupRef.current; }}>Open the sign-in window</button><button className="button" disabled={busy} onClick={() => stopSignIn(browser, false)}>Cancel</button></div>
-      : <div className="login-actions"><button className="button" disabled={busy} onClick={startSignIn}>{busy ? "Opening browser…" : "Sign in to website"}</button></div>}
+      : <div className="login-actions"><button className="button primary" disabled={busy} onClick={startSignIn}>{busy ? "Opening browser…" : "Sign in to website"}</button></div>}
+    <AutomaticSignInChoice app={app} onChange={onChange} onSave={onAutomaticSignIn} />
   </SetupCard>;
 }
 
-function LoginSection({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
+function LoginForm({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
   const [replacing, setReplacing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -122,21 +124,81 @@ function LoginSection({ app, onChange }: { app: Website; onChange: (changes: App
     onChange({ loginSavedAt: undefined });
   }
 
-  return <SetupCard title="Saved login" status={app.loginSavedAt ? "Saved" : "Not saved"}>
-    {app.loginSavedAt && !replacing ? <>
-      <p>Login saved. When the website signs out, MCParrot signs in again with it and asks you in ChatGPT for any text-message code.</p>
-      {error && <p className="pilot-error" role="alert">{error}</p>}
-      <div className="login-actions"><button className="button" disabled={busy} onClick={() => { setError(""); setReplacing(true); }}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
-    </> : <form className="editor" onSubmit={saveLogin}>
-      <p>Save your username and password for {app.name} so MCParrot can sign in again when the website signs out. MCParrot encrypts them and never shows the password again.</p>
-      <label htmlFor={`login-username-${app.id}`}>Username</label>
-      <input id={`login-username-${app.id}`} name="username" autoComplete="off" required />
-      <label htmlFor={`login-password-${app.id}`}>Password</label>
-      <input id={`login-password-${app.id}`} name="password" type="password" autoComplete="new-password" required />
-      {error && <p className="pilot-error" role="alert">{error}</p>}
-      <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Saving login…" : "Save login"}</button>{replacing && <button className="button" type="button" onClick={() => { setError(""); setReplacing(false); }}>Cancel</button>}</div>
-    </form>}
-  </SetupCard>;
+  return app.loginSavedAt && !replacing ? <>
+    <p>Login saved. When the website signs out, MCParrot signs in again with it and asks you in ChatGPT for any text-message code.</p>
+    {error && <p className="pilot-error" role="alert">{error}</p>}
+    <div className="login-actions"><button className="button" disabled={busy} onClick={() => { setError(""); setReplacing(true); }}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
+  </> : <form className="editor" onSubmit={saveLogin}>
+    <p>Save your username and password for {app.name}. MCParrot encrypts them and never shows the password again.</p>
+    <label htmlFor={`login-username-${app.id}`}>Username</label>
+    <input id={`login-username-${app.id}`} name="username" autoComplete="off" required />
+    <label htmlFor={`login-password-${app.id}`}>Password</label>
+    <input id={`login-password-${app.id}`} name="password" type="password" autoComplete="new-password" required />
+    {error && <p className="pilot-error" role="alert">{error}</p>}
+    <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Saving login…" : "Save login"}</button>{replacing && <button className="button" type="button" onClick={() => { setError(""); setReplacing(false); }}>Cancel</button>}</div>
+  </form>;
+}
+
+function GoogleAccountForm({ app, onSave }: { app: Website; onSave: SaveAutomaticSignIn }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const current = automaticSignInOf(app);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const googleEmail = String(new FormData(event.currentTarget).get("googleEmail")).trim();
+    setBusy(true);
+    setError("");
+    const saved = await onSave(googleEmail ? { method: "google", googleEmail } : { method: "google" });
+    setBusy(false);
+    if (!saved) setError("MCParrot could not save the Google account. Check the email, then try again.");
+  }
+
+  return <form className="editor" onSubmit={save}>
+    <p>When the website signs out, MCParrot selects Continue with Google in its browser and chooses your Google account. It never types a Google password or code. If Google asks you to verify, select Sign in to website again.</p>
+    <label htmlFor={`google-email-${app.id}`}>Google account email (optional)</label>
+    <input id={`google-email-${app.id}`} name="googleEmail" type="email" maxLength={320} autoComplete="off" defaultValue={current.method === "google" ? current.googleEmail : ""} aria-describedby={`google-email-help-${app.id}`} />
+    <p className="field-help" id={`google-email-help-${app.id}`}>Add it when Google shows more than one account.</p>
+    {error && <p className="pilot-error" role="alert">{error}</p>}
+    <div className="form-actions"><button className="button" type="submit" disabled={busy}>{busy ? "Saving…" : "Save Google account"}</button></div>
+  </form>;
+}
+
+const automaticSignInChoices = [
+  { method: "off", label: "Off" },
+  { method: "google", label: "With Google" },
+  { method: "password", label: "With email and password" },
+] as const;
+
+function AutomaticSignInChoice({ app, onChange, onSave }: { app: Website; onChange: (changes: AppChanges) => void; onSave: SaveAutomaticSignIn }) {
+  const [method, setMethod] = useState(automaticSignInOf(app).method);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function choose(nextMethod: AutomaticSignIn["method"]) {
+    const previousMethod = method;
+    const current = automaticSignInOf(app);
+    setMethod(nextMethod);
+    setBusy(true);
+    setError("");
+    const saved = await onSave(nextMethod === current.method ? current : { method: nextMethod });
+    setBusy(false);
+    if (saved) return;
+    setMethod(previousMethod);
+    setError("MCParrot could not save this choice. Try again.");
+  }
+
+  return <div className="automatic-sign-in">
+    <fieldset disabled={busy}>
+      <legend>Sign in again automatically</legend>
+      {automaticSignInChoices.map((choice) => <label className="automatic-sign-in-choice" key={choice.method}><input type="radio" name={`automatic-sign-in-${app.id}`} checked={method === choice.method} onChange={() => choose(choice.method)} />{choice.label}</label>)}
+    </fieldset>
+    {error && <p className="pilot-error" role="alert">{error}</p>}
+    {method === "off" && <p>When the website signs out, select Sign in to website again.</p>}
+    {method === "google" && <GoogleAccountForm app={app} onSave={onSave} />}
+    {method === "password" && <LoginForm app={app} onChange={onChange} />}
+    <p className="field-help">Email and password works only on a normal sign-in form, not on Continue with Google.</p>
+  </div>;
 }
 
 function ConnectionSteps({ app }: { app: Website }) {
@@ -205,10 +267,9 @@ function ConnectionSection({ app, onApps }: { app: Website; onApps: (apps: Websi
   </SetupCard>;
 }
 
-export function AssistantPanel({ app, onChange, onApps }: { app: Website; onChange: (changes: AppChanges) => void; onApps: (apps: Website[]) => void }) {
+export function AssistantPanel({ app, onChange, onAutomaticSignIn, onApps }: { app: Website; onChange: (changes: AppChanges) => void; onAutomaticSignIn: SaveAutomaticSignIn; onApps: (apps: Website[]) => void }) {
   return <>
-    <SignInSection key={app.id} app={app} onChange={onChange} />
-    <LoginSection app={app} onChange={onChange} />
+    <SignInSection key={app.id} app={app} onChange={onChange} onAutomaticSignIn={onAutomaticSignIn} />
     <ConnectionSection app={app} onApps={onApps} />
   </>;
 }

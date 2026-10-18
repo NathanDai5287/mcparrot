@@ -294,7 +294,7 @@ export default function Workspace() {
                 <ToolList key={screen.app.id} app={screen.app} onDelete={(toolId) => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: toolId })} />
               </section>
               <aside className="setup-rail" aria-label="Setup">
-                <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onApps={showApps} />
+                <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onAutomaticSignIn={(automaticSignIn) => changeWorkspace({ operation: "setAutomaticSignIn", appId: screen.app.id, automaticSignIn })} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
                 {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
               </aside>

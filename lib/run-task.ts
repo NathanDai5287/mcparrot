@@ -7,7 +7,7 @@ const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
-export const signedOutMessage = "The website is signed out. Open MCParrot, then save a login for this app or select Sign in to website, then try again.";
+export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
 
 export type TaskInputs = Record<string, string | undefined>;
 
