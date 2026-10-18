@@ -282,25 +282,29 @@ export default function Workspace() {
   }
 
   async function saveTasks(app: Website, capabilities: DiscoveredCapability[]): Promise<SaveResult> {
-    const skipped: string[] = [];
+    const saved: string[] = [];
     let savedApp: Website | undefined = app;
     for (const { updatesTaskId, ...capability } of capabilities) {
       if (!updatesTaskId) continue;
-      const saved = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
-      if (!saved.apps) return { error: saved.error };
-      savedApp = saved.apps.find((candidate) => candidate.id === app.id);
-      if (!savedAs(savedApp?.tasks.find((task) => task.id === updatesTaskId), capability)) skipped.push(capability.name);
+      const result = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
+      if (!result.apps) return { error: result.error, saved };
+      savedApp = result.apps.find((candidate) => candidate.id === app.id);
+      if (savedAs(savedApp?.tasks.find((task) => task.id === updatesTaskId), capability)) saved.push(capability.name);
     }
     const newCapabilities = capabilities.filter((capability) => !capability.updatesTaskId);
+    let addedTasks: Task[] = [];
     if (newCapabilities.length) {
       const earlierTaskIds = new Set(savedApp?.tasks.map((task) => task.id));
-      const saved = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
-      if (!saved.apps) return { error: saved.error };
-      savedApp = saved.apps.find((candidate) => candidate.id === app.id);
-      const addedTasks = savedApp?.tasks.filter((task) => !earlierTaskIds.has(task.id)) ?? [];
-      for (const capability of newCapabilities) if (!addedTasks.some((task) => savedAs(task, capability))) skipped.push(capability.name);
+      const result = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
+      if (!result.apps) return { error: result.error, saved };
+      savedApp = result.apps.find((candidate) => candidate.id === app.id);
+      addedTasks = savedApp?.tasks.filter((task) => !earlierTaskIds.has(task.id)) ?? [];
     }
     if (!savedApp) return { error: "This app no longer exists. It may have been deleted." };
+    const finalApp = savedApp;
+    const skipped = capabilities.filter((capability) => capability.updatesTaskId
+      ? !savedAs(finalApp.tasks.find((task) => task.id === capability.updatesTaskId), capability)
+      : !addedTasks.some((task) => savedAs(task, capability))).map((capability) => capability.name);
     if (skipped.length) return { skipped };
     navigate({ view: "app", app: savedApp });
     return {};

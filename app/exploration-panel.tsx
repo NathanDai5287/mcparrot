@@ -5,7 +5,7 @@ import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabil
 
 type Exploration = { recording: boolean; requests: CapturedRequest[]; activeAppId?: string | null; saveError?: string };
 type Choice = DiscoveredCapability & { selected: boolean };
-export type SaveResult = { error?: string; skipped?: string[] };
+export type SaveResult = { error?: string; skipped?: string[]; saved?: string[] };
 const emptyExploration: Exploration = { recording: false, requests: [] };
 const connectionToolNames = ["read_page", "view_image", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
 const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
@@ -67,9 +67,11 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   const [discoveredAt, setDiscoveredAt] = useState("");
   const [error, setError] = useState("");
   const working = useRef(false);
+  const generation = useRef(0);
 
   async function run(work: typeof busy, operation: () => Promise<void>) {
     working.current = true;
+    generation.current++;
     setBusy(work);
     setError("");
     try {
@@ -114,9 +116,10 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   });
 
   async function showLastDiscovery() {
+    const started = generation.current;
     const response = await fetch(`/api/discover?appId=${encodeURIComponent(appId)}`).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
-    if (working.current) return;
+    if (working.current || generation.current !== started) return;
     try {
       if (!response?.ok) throw new Error(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
       if (result.discovery) showDiscovery(result.discovery);
@@ -132,6 +135,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   });
 
   function changeChoice(index: number, changes: Partial<Choice>) {
+    generation.current++;
     setChoices(choices.map((choice, position) => position === index ? { ...choice, ...changes } : choice));
   }
 
@@ -149,6 +153,8 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
       const one = skipped.length === 1;
       throw new Error(`MCParrot did not save ${skipped.join(", ")}, because ${one ? "its" : "their"} name or requests match another tool in this app. Rename ${one ? "it" : "them"}, or untick ${one ? "it" : "them"}.`);
     }
+    const saved = result.saved ?? [];
+    if (saved.length) setChoices(choices.filter((choice) => !(choice.selected && saved.includes(choice.name))));
     if (result.error !== undefined) throw new Error(result.error || "MCParrot could not save these tools. Try again.");
     setChoices([]);
   });
