@@ -13,23 +13,25 @@ const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
 const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "client-identifier", "github-verified-fetch", "notion-client-version", "x-apollo-operation-name", "x-channel-id", "x-client-identifier", "x-experience-id", "x-notion-active-user-header", "x-requested-with", "x-restli-protocol-version"];
 const tokenHeaderName = /auth|token|jwt|session|api-?key/i;
-const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify", "idp", "passcode"]);
+const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify", "idp", "passcode"]);
 const authenticationHost = /^(login|logon|signin|auth|sso|idp)\.|\.(okta|oktapreview|auth0)\.com$/i;
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
-const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
+const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
 const exactSecretParameters = new Set(["code", "key"]);
-const secretKeyWords = new Set(["auth", "session", "refresh", "access", "passcode", "pwd", "otp"]);
+const secretKeyWords = new Set(["auth", "refresh", "access", "passcode", "pwd", "otp"]);
+const sessionSecretNames = new Set(["session", "sessionid", "sessiontoken", "sessionkey", "sid", "jsessionid", "phpsessid"]);
 const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|bearer|cookie|credential|signature/i;
 const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const bearerText = /\bbearer\s+[\w\-.~+/]+=*/gi;
-const secretName = "[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|session[_-]?id|sessionid|credential|signature|authorization)[\\w-]*";
+const secretName = "(?:[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|credential|signature|authorization)[\\w-]*|(?<![\\w-])(?:session[_-]?id|jsessionid|phpsessid)(?![\\w-]))";
 const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|<[^<>\\s]*>|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
 const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
 const longValueText = /[\w+=\-~]{32,}/g;
 const secretStringArgumentText = new RegExp(`\\b(${secretName})(\\s*:\\s*)"[^"]*"`, "gi");
 const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
-const localStorageKeysOf = (values) => `(() => { const keys = Object.keys(localStorage); return ${JSON.stringify(values)}.map((value) => keys.find((key) => localStorage.getItem(key) === value) ?? ""); })()`;
+const maximumTokenFieldDepth = 3;
+const tokenSourcesOf = (values) => `(${findLocalStorageTokens})(${JSON.stringify(values)}, ${maximumTokenFieldDepth})`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
 
@@ -52,8 +54,12 @@ function isAuthenticationPath(pathname) {
   return hasWord(wordsOf(pathname), authenticationWords);
 }
 
+function isSessionSecretName(name) {
+  return sessionSecretNames.has(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+}
+
 function isSecretKey(key) {
-  return secretKeyText.test(key) || hasWord(wordsOf(key), secretKeyWords);
+  return secretKeyText.test(key) || hasWord(wordsOf(key), secretKeyWords) || isSessionSecretName(key);
 }
 
 function isHighEntropy(text) {
@@ -118,18 +124,49 @@ function replayedHeaders(headers = {}) {
   return Object.fromEntries(Object.entries(headers).filter(([name, value]) => replayedHeaderNames.includes(name.toLowerCase()) && value.length <= maximumHeaderLength && !looksSecret(value)));
 }
 
+function findLocalStorageTokens(values, maximumDepth) {
+  const parsed = (text) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  };
+  const pathTo = (data, token, depth) => {
+    if (data === token) return [];
+    if (depth === maximumDepth || !data || typeof data !== "object") return undefined;
+    for (const [field, item] of Object.entries(data)) {
+      const path = pathTo(item, token, depth + 1);
+      if (path) return [field, ...path];
+    }
+    return undefined;
+  };
+  const sourceOf = (value, key, text) => {
+    const [, prefix = "", token = value] = value.match(/^((?:bearer|token|jwt)\s+)(\S.*)$/i) ?? [];
+    if (text === value) return { key };
+    if (text === token) return { key, prefix };
+    const path = pathTo(parsed(text), token, 0);
+    return path?.length ? { key, prefix, path: path.join(".") } : undefined;
+  };
+  const stored = Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]);
+  return values.map((value) => stored.map(([key, text]) => sourceOf(value, key, text)).find(Boolean));
+}
+
 async function tokenHeadersOf(tabId, tokenValues = []) {
   if (!tokenValues.length) return [];
-  const evaluation = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: localStorageKeysOf(tokenValues.map(([, value]) => value)), returnByValue: true }).catch(() => undefined);
-  const keys = evaluation?.result?.value ?? [];
-  return tokenValues.flatMap(([name], index) => keys[index] ? [{ header: name.toLowerCase(), fromLocalStorage: keys[index] }] : []);
+  const evaluation = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: tokenSourcesOf(tokenValues.map(([, value]) => value)), returnByValue: true }).catch(() => undefined);
+  const sources = evaluation?.result?.value ?? [];
+  return tokenValues.flatMap(([name], index) => {
+    const source = sources[index];
+    return source ? [{ header: name.toLowerCase(), fromLocalStorage: source.key, ...(source.prefix ? { prefix: source.prefix } : {}), ...(source.path ? { path: source.path } : {}) }] : [];
+  });
 }
 
 function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
   url.pathname = url.pathname.split("/").map((segment) => isSecretSegment(segment) ? "redacted" : segment).join("/");
-  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || exactSecretParameters.has(name.toLowerCase()) || looksSecret(value)) url.searchParams.set(name, "redacted");
+  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || isSessionSecretName(name) || exactSecretParameters.has(name.toLowerCase()) || looksSecret(value)) url.searchParams.set(name, "redacted");
   return url.href.slice(0, maximumUrlLength);
 }
 

@@ -7,7 +7,7 @@ import { AssistantPanel } from "./assistant-panel";
 import { ImagePanel } from "./image-panel";
 import { OrderingPanel } from "./ordering-panel";
 import { PublishPanel } from "./publish-panel";
-import type { DiscoveredCapability, Task, Website } from "../lib/capabilities";
+import type { DiscoveredCapability, Task, TokenHeader, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
 
 type Screen =
@@ -62,6 +62,8 @@ function AppStatus({ app }: { app: Website }) {
   </ul>;
 }
 
+const tokenHeaderText = ({ header, fromLocalStorage, prefix, path }: TokenHeader) => `${header} as ${prefix ?? ""}local storage ${fromLocalStorage}${path ? ` field ${path}` : ""}`;
+
 function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolean; onToggle: () => void; onDelete: () => void }) {
   const detailsId = `tool-${tool.id}`;
   return <li className="tool">
@@ -72,7 +74,7 @@ function ToolItem({ tool, open, onToggle, onDelete }: { tool: Task; open: boolea
         <dt>Inputs</dt><dd>{tool.inputs.length === 0 ? "None" : <ul>{tool.inputs.map((input) => <li key={input.name}><span className="tool-input-name">{input.name}</span> {input.description}</li>)}</ul>}</dd>
         <dt>Returns</dt><dd>{tool.returns}</dd>
         <dt>Answer fields</dt><dd>{tool.keepFields?.length ? tool.keepFields.join(", ") : "All"}</dd>
-        <dt>Requests</dt><dd><ul>{tool.requests.map((request, index) => <li key={index}><span className="tool-input-name">Step {index + 1}: {request.method}</span> {request.urlPattern}{request.bodyPattern && ` with body ${request.bodyPattern}`}</li>)}</ul></dd>
+        <dt>Requests</dt><dd><ul>{tool.requests.map((request, index) => <li key={index}><span className="tool-input-name">Step {index + 1}: {request.method}</span> {request.urlPattern}{request.bodyPattern && ` with body ${request.bodyPattern}`}{request.tokenHeaders?.length ? `, sending ${request.tokenHeaders.map(tokenHeaderText).join(", ")}` : null}</li>)}</ul></dd>
       </dl>
       <button className="delete-link" aria-label={`Delete ${tool.name}`} onClick={onDelete}>Delete tool</button>
     </div>}
