@@ -118,7 +118,18 @@ export const publishApp = (userId: string, app: Website, description: string) =>
 
 const removeListings = (...listingIds: string[]) => stored((redis) => redis.multi().del(...listingIds.flatMap((id) => [listingKey(id), summaryKey(id)])).srem(marketplaceKey, ...listingIds).exec());
 
-export const removeAppListing = (app: Website) => removeListings(listingIdFor(app.id), ...(app.listing ? [app.listing.id] : []));
+const appListingIds = (app: Website) => [listingIdFor(app.id), ...(app.listing ? [app.listing.id] : [])];
+
+export const removeAppListing = (app: Website) => removeListings(...appListingIds(app));
+
+const ownerSchema = z.object({ ownerId: z.string() });
+
+export const removeOwnedAppListing = (userId: string, app: Website) => withAppLock(app.id, async () => {
+  const listingIds = appListingIds(app);
+  const listings = await stored((redis) => redis.mget<unknown[]>(...listingIds.map(listingKey)));
+  const owned = listingIds.filter((_, index) => ownerSchema.safeParse(listings[index]).data?.ownerId === userId);
+  if (owned.length) await removeListings(...owned);
+});
 
 export const unpublishApp = (app: Website) => withAppLock(app.id, async () => {
   await removeAppListing(app);
