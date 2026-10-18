@@ -2,7 +2,7 @@
 
 import { UserButton } from "@clerk/nextjs";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ExplorationPanel, requestExtension, type SaveResult } from "./exploration-panel";
+import { ExplorationPanel, requestExtension, type SaveResult, type SkippedTool } from "./exploration-panel";
 import { AssistantPanel, stopStoredSignIn } from "./assistant-panel";
 import { ImagePanel } from "./image-panel";
 import { OrderingPanel } from "./ordering-panel";
@@ -17,11 +17,13 @@ type Screen =
   | { view: "app"; app: Website }
   | { view: "explore"; app: Website };
 
-type WorkspaceResult = { apps: Website[]; error?: undefined } | { apps?: undefined; error: string };
+type WorkspaceResult = { apps: Website[]; skipped?: SkippedTool[]; error?: undefined } | { apps?: undefined; error: string };
 
 const storageWarning = "MCParrot cannot reach its storage, so your apps may not load or save. Reload the page to try again.";
 const signedOutWarning = "Your MCParrot sign-in has ended. Reload the page to sign in again.";
 const shownErrorStatuses = [403, 404, 409, 413, 503];
+const goToSignIn = () => window.location.assign(`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+const skippedTools = (value: unknown): SkippedTool[] => Array.isArray(value) ? value.filter((tool): tool is SkippedTool => typeof tool?.name === "string" && typeof tool.reason === "string") : [];
 
 const requestsText = (requests: TaskRequest[]) => requests.map(({ method, urlPattern, bodyPattern = "" }) => `${method} ${urlPattern} ${bodyPattern}`).join("\n");
 const savedAs = (task: Task | undefined, capability: Capability) => task?.name === capability.name && requestsText(task.requests) === requestsText(capability.requests);
@@ -190,6 +192,7 @@ export default function Workspace() {
 
   useEffect(() => {
     fetch("/api/workspace").then(async (response) => {
+      if (response.status === 401) return goToSignIn();
       const workspace: { apps?: Website[] | null; isOwner?: boolean } | null = await response.json().catch(() => null);
       if (!response.ok || !workspace || !(workspace.apps === null || Array.isArray(workspace.apps))) {
         setWarning(response.status === 404 && !workspace ? signedOutWarning : storageWarning);
@@ -253,11 +256,15 @@ export default function Workspace() {
 
   async function changeWorkspace(change: WorkspaceOperation): Promise<WorkspaceResult> {
     const response = await fetch("/api/workspace", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
-    const result: { apps?: unknown; error?: unknown } | null = await response?.json().catch(() => null) ?? null;
+    const result: { apps?: unknown; skipped?: unknown; error?: unknown } | null = await response?.json().catch(() => null) ?? null;
     if (response?.ok && Array.isArray(result?.apps)) {
       setWarning("");
       showApps(result.apps);
-      return { apps: result.apps };
+      return { apps: result.apps, skipped: skippedTools(result.skipped) };
+    }
+    if (response?.status === 401) {
+      goToSignIn();
+      return { error: signedOutWarning };
     }
     if (response?.status === 404 && !result) {
       setWarning(signedOutWarning);
@@ -286,6 +293,8 @@ export default function Workspace() {
   async function saveTasks(app: Website, capabilities: DiscoveredCapability[]): Promise<SaveResult> {
     let savedApp: Website | undefined = app;
     const replaced: DiscoveredCapability[] = [];
+    const reasons = new Map<string, string>();
+    const rememberReasons = (skipped: SkippedTool[] = []) => skipped.forEach((tool) => reasons.set(tool.name, tool.reason ?? ""));
     const stillSaved = (capability: DiscoveredCapability) => !!savedApp && savedAs(savedApp.tasks.find((task) => task.id === capability.updatesTaskId), capability);
     const savedUpdates = () => replaced.filter(stillSaved).map((capability) => capability.name);
     for (const update of capabilities) {
@@ -294,6 +303,7 @@ export default function Workspace() {
       const result = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
       if (!result.apps) return { error: result.error, saved: savedUpdates() };
       savedApp = result.apps.find((candidate) => candidate.id === app.id);
+      rememberReasons(result.skipped);
       replaced.push(update);
     }
     const newCapabilities = capabilities.filter((capability) => !capability.updatesTaskId);
@@ -303,10 +313,11 @@ export default function Workspace() {
       const result = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
       if (!result.apps) return { error: result.error, saved: savedUpdates() };
       savedApp = result.apps.find((candidate) => candidate.id === app.id);
+      rememberReasons(result.skipped);
       addedTasks = savedApp?.tasks.filter((task) => !earlierTaskIds.has(task.id)) ?? [];
     }
     if (!savedApp) return { error: "This app no longer exists. It may have been deleted." };
-    const skipped = capabilities.filter((capability) => capability.updatesTaskId ? !stillSaved(capability) : !addedTasks.some((task) => savedAs(task, capability))).map((capability) => capability.name);
+    const skipped = capabilities.filter((capability) => capability.updatesTaskId ? !stillSaved(capability) : !addedTasks.some((task) => savedAs(task, capability))).map((capability) => ({ name: capability.name, reason: reasons.get(capability.name) }));
     if (skipped.length) return { skipped };
     navigate({ view: "app", app: savedApp });
     return {};

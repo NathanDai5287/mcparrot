@@ -5,11 +5,14 @@ import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabil
 
 type Exploration = { recording: boolean; requests: CapturedRequest[]; activeAppId?: string | null; saveError?: string };
 type Choice = DiscoveredCapability & { selected: boolean };
-export type SaveResult = { error?: string; skipped?: string[]; saved?: string[] };
+export type SkippedTool = { name: string; reason?: string };
+export type SaveResult = { error?: string; skipped?: SkippedTool[]; saved?: string[] };
 const emptyExploration: Exploration = { recording: false, requests: [] };
 const connectionToolNames = ["read_page", "view_image", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
 const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 const isText = (value: unknown) => typeof value === "string";
+const skippedReason = "Its name or requests match another tool in this app, or MCParrot cannot save its requests.";
+let extensionAnswered = false;
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
 function isCapability(value: unknown): value is DiscoveredCapability {
@@ -32,13 +35,14 @@ export function requestExtension(action: string, appId: string, websiteUrl?: str
     const id = crypto.randomUUID();
     const timeout = window.setTimeout(() => {
       window.removeEventListener("message", receive);
-      reject(new Error("Enable MCParrot Explorer, then reload this page."));
-    }, 3000);
+      reject(new Error(extensionAnswered ? "MCParrot Explorer did not answer in time. Select Refresh to check it again." : "Enable MCParrot Explorer, then reload this page."));
+    }, extensionAnswered ? 15_000 : 3_000);
     function receive(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
       if (event.data?.channel !== "mcparrot-explorer-response" || event.data.id !== id) return;
       window.clearTimeout(timeout);
       window.removeEventListener("message", receive);
+      extensionAnswered = true;
       if (event.data.error) reject(new Error(event.data.error));
       else resolve(event.data.state);
     }
@@ -150,9 +154,8 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
     const result = await onSave(chosen.map(({ selected, ...capability }) => capability));
     const skipped = result.skipped ?? [];
     if (skipped.length) {
-      setChoices(chosen.filter((choice) => skipped.includes(choice.name)));
-      const one = skipped.length === 1;
-      throw new Error(`MCParrot did not save ${skipped.join(", ")}, because ${one ? "its" : "their"} name or requests match another tool in this app. Rename ${one ? "it" : "them"}, or untick ${one ? "it" : "them"}.`);
+      setChoices(chosen.filter((choice) => skipped.some((tool) => tool.name === choice.name)));
+      throw new Error(`${skipped.map((tool) => `MCParrot did not save ${tool.name}. ${tool.reason || skippedReason}`).join(" ")} Change or untick ${skipped.length === 1 ? "it" : "them"}, then save again.`);
     }
     const saved = result.saved ?? [];
     if (saved.length) setChoices(choices.filter((choice) => !(choice.selected && saved.includes(choice.name))));

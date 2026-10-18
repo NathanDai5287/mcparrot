@@ -86,10 +86,11 @@ function SignInSection({ app, onChange, onAutomaticSignIn }: { app: Website; onC
     const response = await fetch(`/api/sign-in?browserId=${encodeURIComponent(signInBrowser.browserId)}&appId=${encodeURIComponent(app.id)}${finished ? "" : "&finished=false"}`, { method: "DELETE" }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
     setBusy(false);
-    if (!finished && response?.status === 404) {
+    if (response?.status === 404) {
       popupRef.current?.close();
       popupRef.current = null;
       saveBrowser(null);
+      if (finished) setError("The sign-in browser had already closed, so MCParrot could not save the sign-in. Select Sign in to website to try again.");
       return;
     }
     if (!response?.ok) {
