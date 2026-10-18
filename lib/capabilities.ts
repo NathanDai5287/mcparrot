@@ -18,6 +18,8 @@ export type Discovery = { discoveredAt: string; capabilities: DiscoveredCapabili
 
 export type Ordering = { enabled: boolean; limitUsd: number };
 
+export type AutomaticSignIn = { method: "off" } | { method: "password" } | { method: "google"; googleEmail?: string };
+
 export type Website = {
   id: string;
   name: string;
@@ -26,6 +28,7 @@ export type Website = {
   browserProfileId?: string;
   signedInAt?: string;
   loginSavedAt?: string;
+  automaticSignIn?: AutomaticSignIn;
   ordering?: Ordering;
   connectionTokenHash?: string;
   listing?: { id: string; publishedAt: string; description: string };
@@ -54,6 +57,14 @@ export const orderingSchema = z.object({
   enabled: z.boolean(),
   limitUsd: z.number().positive().max(maxOrderLimitUsd),
 }) satisfies z.ZodType<Ordering>;
+
+export const automaticSignInSchema = z.discriminatedUnion("method", [
+  z.object({ method: z.literal("off") }),
+  z.object({ method: z.literal("password") }),
+  z.object({ method: z.literal("google"), googleEmail: z.email("Enter a Google account email, or leave it empty.").max(320).optional() }),
+]) satisfies z.ZodType<AutomaticSignIn>;
+
+export const automaticSignInOf = (app: Website): AutomaticSignIn => app.automaticSignIn ?? { method: app.loginSavedAt ? "password" : "off" };
 
 export const taskSchema = capabilitySchema.extend({ id: z.string().min(1).max(80) }) satisfies z.ZodType<Task>;
 

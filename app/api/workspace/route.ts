@@ -63,6 +63,7 @@ async function apply(userId: string, change: WorkspaceOperation) {
     if (!await isOwner(userId)) throw new OwnerOnly("Only the MCParrot owner can turn on ordering.");
     return changeApp(app.id, (storedApp) => ({ ...storedApp, ordering: change.ordering }));
   }
+  if (change.operation === "setAutomaticSignIn") return changeApp(app.id, (storedApp) => ({ ...storedApp, automaticSignIn: change.automaticSignIn }));
   return changeApp(app.id, (storedApp) => ({ ...storedApp, tasks: storedApp.tasks.filter((task) => task.id !== change.taskId) }));
 }
 

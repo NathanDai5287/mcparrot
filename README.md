@@ -79,6 +79,7 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Delete one tool | `delete_task` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
+| Choose how the app signs in again automatically | `set_automatic_sign_in` |
 | Create or regenerate the app's connection link | `regenerate_connection_link` |
 | Turn ordering on or off and set its spending limit | `set_ordering` |
 | Publish, update, or unpublish the app on the marketplace | `publish_app`, `unpublish_app` |
@@ -266,7 +267,7 @@ The user's normal browser and the Browser Use browser have separate sign-ins, so
 MCParrot stores the profile ID and the sign-in time with the app, and the app page and app list show whether the app is signed in.
 If the popup is blocked, select **Open the sign-in window** on the app page.
 The server route `/api/sign-in` starts and stops these browsers with `BROWSER_USE_API_KEY`, which never reaches the browser.
-The user can also save a login on the app page, so MCParrot signs in again by itself when the website signs out, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
+The user can also choose on the app page how MCParrot signs in again by itself when the website signs out, with Google or with a saved login, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 
 ## Using saved tools
 
@@ -284,8 +285,8 @@ Nathan chose the 100,000-character limit so that long lists, such as all of a us
 The whole call must finish within the route's 300-second Vercel function limit.
 
 The tool treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
-When the app has a saved login, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
-Without a saved login, the tool fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
+When the app signs in again automatically, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
+Otherwise, the tool fails with a message that tells the user to open MCParrot and select **Sign in to website** on the app or choose how it signs in again automatically.
 Tools run only GET requests in this first version, because the first milestone reads website data and never changes it.
 
 Assistants can combine taught tools in new ways without another recording.
@@ -299,14 +300,38 @@ Measure speed against an agent navigating the website before you claim an improv
 ## Reconnecting expired sessions
 
 During normal use, tools run without another sign-in while the website session is valid.
-When the session expires and the app has a saved login, MCParrot signs in again by itself during the ChatGPT tool call.
-The user only types a text-message code in the ChatGPT chat when the website asks for one.
-Without a saved login, the tool returns an error that tells the user to save a login or select **Sign in to website** in MCParrot.
-This automatic sign-in is a gap until Nathan's live test passes, as the [status page](STATUS.md) records.
+When the session expires, MCParrot can sign in again by itself during the ChatGPT tool call, in the way the app's **Sign in again automatically** choice says.
+The choice is **Off**, **With Google**, or **With email and password**, and the user picks it on the app page.
+With email and password, the user only types a text-message code in the ChatGPT chat when the website asks for one.
+When the choice is off, or email and password has no saved login, the tool returns an error that tells the user to select **Sign in to website** in MCParrot or choose how the app signs in again.
+Both ways are gaps until Nathan's live tests pass, as the [status page](STATUS.md) records.
+
+### Choosing how to sign in again
+
+The app page has one **Website sign-in** card.
+Its main button is **Sign in to website**, which opens the live cloud browser, and below the sign-in status it has the **Sign in again automatically** choice.
+Selecting a choice saves it on the app at once through the workspace `setAutomaticSignIn` operation, and a failed save puts the earlier choice back.
+**With Google** shows an optional **Google account email** field, which only tells the agent which account to choose and is not a secret; MCParrot accepts only a valid email address there.
+**With email and password** shows the saved-login form, or **Replace** and **Delete** when a login is saved.
+A note under the choice says that email and password works only on a normal sign-in form, not with "Continue with Google".
+An app saved before this choice existed counts as **With email and password** when it has a saved login, and as **Off** when it has none.
+
+### Signing in again with Google
+
+Nathan decided on October 17, 2026, that sites such as DoorDash, where the user selects "Continue with Google", sign in again through the Google session in the app's cloud browser profile.
+MCParrot never stores or types a Google password.
+When the user signs in through **Sign in to website** with Google, the app's profile keeps both the website session and the Google session.
+When a tool then finds the website signed out and the app's choice is **With Google**, MCParrot starts a Browser Use agent run on the app's profile with no secret bindings.
+The agent opens the website and its sign-in page, selects "Continue with Google" or "Sign in with Google", and chooses the account that matches the saved Google email, or the only account shown when there is no email.
+The agent never types on a Google page, and it stops with the outcome `needs_user` when Google asks for an email, a password, a code, or to verify that it is the user, or when the account is not shown.
+Then the tool tells the user to open MCParrot and select **Sign in to website** on the app, then try again.
+When the agent signs in, MCParrot stops the browser so the profile saves the session, records the sign-in time, and runs the original tool again in the same call when at least 60 seconds of the call's budget remain.
+An app with no browser profile gets the same message without an agent run.
+The Google way uses the same one-at-a-time lock, the 150-second agent limit, and the 10-minute pause after a failure as the email and password way, and the pause ends early when the user changes the Google email.
 
 ### Saving a login
 
-The app page has a **Save login** form that takes the username and password for that website.
+When **With email and password** is chosen, the **Website sign-in** card shows a **Save login** form that takes the username and password for that website.
 After saving, the page shows only **Login saved**, with **Replace** to enter new details and **Delete** to remove them.
 Saving takes the website address from the stored app, not from the form, and finds the website's sign-in address by following that address's redirect, so Berkeley Canvas logins are allowed on `bcourses.berkeley.edu` and its CalNet sign-in page `auth.berkeley.edu`.
 Browser Use may type the saved details only on those two hosts, so one app's password never reaches another website.
@@ -315,7 +340,7 @@ Deleting the app also deletes its saved login and any pending sign-in, but delet
 
 ### Automatic sign-in steps
 
-1. A tool call finds the website signed out, and the app has a saved login.
+1. A tool call finds the website signed out, the app's choice is **With email and password**, and the app has a saved login.
 2. MCParrot starts a Browser Use agent run with the app's browser profile, creating the profile first if the app has none.
 3. The agent receives the username and password as Browser Use secret bindings, which the Browser Use server types into the page; the agent's AI model never sees them.
 4. The agent submits the password once; when the website rejects it, MCParrot tells the user to replace the login and never submits that login again until the user replaces it.
@@ -329,6 +354,7 @@ Deleting the app also deletes its saved login and any pending sign-in, but delet
 When the website signs in without verification, the tool continues in the same tool call if at least 60 seconds of the call's 280-second budget remain; otherwise the tool tells ChatGPT to run the original tool again.
 When the website rejects the code, the tool asks ChatGPT to request a new code from the user and keeps the browser waiting.
 When a tool runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
+After the user changes the choice away from **With email and password**, tools and `submit_verification_code` ignore a sign-in that waits for a code, and it expires with its browser.
 Only one sign-in runs at a time for each app; another call during it tells ChatGPT to wait a minute and try again.
 Any other outcome stops the browser and tells the user to select **Sign in to website** in MCParrot, and MCParrot does not try the same login again for 10 minutes.
 MCParrot does not keep the code after the call, and Sentry never receives it.
@@ -452,7 +478,7 @@ Next.js serves the guides as public static files from `public/`, so they must ne
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tools as the dashboard.
 Each user's workspace is one JSON value under `workspace:<user-id>`, as [accounts and ownership](#accounts-and-ownership) describes.
-The value holds each app's name, website address, chosen tools, Browser Use profile ID, sign-in time, login-saved time, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
+The value holds each app's name, website address, chosen tools, Browser Use profile ID, sign-in time, login-saved time, automatic sign-in choice with any Google account email, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
 Each app's last discovery result is a separate value under `discovery:<app-id>`.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
@@ -471,7 +497,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record pages, data requests, and short samples in one opened tab |
 | Capability discovery | Claude Opus 5.5 at low effort in fast mode through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
-| Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login |
+| Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login or the profile's Google session |
 | Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
 | Accounts | Clerk from the Vercel Marketplace, with Google sign-in | Give each user their own workspace and identify the owner |
@@ -524,7 +550,7 @@ MCParrot keeps every trace and every session because it has few users, and it se
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Claude failures that discovery reports to the user |
 | Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the tool name for each `save_task` call |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each tool run's and `read_page` call's outcome, including whether the website was signed out, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in, automatic Google sign-in, and verification code outcome, each tool run's and `read_page` call's outcome, including whether the website was signed out, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
 | AI agent monitoring | The `discover.agent` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
