@@ -167,7 +167,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
           {state.requests.map((request) => <div className="candidate-button" key={`${request.method} ${request.pattern}`}><span>{request.method} {request.pattern}<small>{request.status} · {request.contentType}</small></span></div>)}
         </div>
       </details>
-      <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to an AI that finds what the site can do.</p>
+      <p className="field-help">Cookies, sign-in traffic, and headers other than a few safe ones, such as accept, are not recorded. Selecting Find what this site can do sends these requests and their short samples to an AI that finds what the site can do.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
         <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>
@@ -178,7 +178,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
       <h3>Choose the tools to keep</h3>
       <p className="field-help">Found on {lastSearch}. Find what this site can do again for a new list.</p>
       <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} updatedTask={tasks.find((task) => task.id === choice.updatesTaskId)} problem={problems[index]} problemId={`${appId}-task-name-${index}`} onChange={(changes) => changeChoice(index, changes)} />)}</div>
-      <p className="field-help">Saving adds new tools, replaces each tool that an update changes, and skips ones that match another tool. Reading tools appear in this app’s ChatGPT connection.</p>
+      <p className="field-help">Saving adds new tools, replaces each tool that an update changes, and skips ones that match another tool. Saved tools appear in this app’s ChatGPT connection.</p>
       <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0 || !namesValid} onClick={save}>Save {chosen.length} {chosen.length === 1 ? "tool" : "tools"}</button>{!namesValid && <span className="field-help">Fix the tool names above to save.</span>}</div>
     </div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}

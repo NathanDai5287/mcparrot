@@ -5,7 +5,7 @@ import { Agent, CursorAgentError, JsonlLocalAgentStore, type Run, type RunResult
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
-import { appIdSchema, type Capability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
+import { appIdSchema, maximumBodyLength, type Capability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
 import { isAllowedRequest, requestPlaceholders } from "../../../lib/task-request";
 import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../lib/workspace";
@@ -15,6 +15,7 @@ export const maxDuration = 60;
 
 const discoveryDeadlineMs = 50_000;
 const maximumBodyBytes = 2_000_000;
+const maximumPromptBodyCharacters = 300_000;
 const redacted = "[redacted]";
 const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", "pwd", "session", "sid", "sig", "signature", "auth", "authorization", "csrf", "xsrf", "jwt", "bearer", "verifier", "code", "credential", "credentials", "nonce", "otp", "cookie"]);
 const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|session|verifier|signature/i;
@@ -22,6 +23,9 @@ const jwtLike = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
 const secretLabels = String.raw`password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code`;
 const labelledSecret = new RegExp(String.raw`\b(${secretLabels})(\s*[:=]\s*)(\\?"[^"\\]*\\?"|'[^']*'|(?:[^\s&;,"'<>]|[&;,](?![\w.-]+=|(?:${secretLabels})\s*[:=]|\s|$))+)`, "gi");
+
+const labelledSecretString = new RegExp(String.raw`\b(${secretLabels})(\s*:\s*)"[^"]*"`, "gi");
+const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 
 const clipped = (maximumLength: number) => z.string().transform((value) => value.slice(0, maximumLength));
 const capturedRequestSchema = z.object({
@@ -32,8 +36,9 @@ const capturedRequestSchema = z.object({
   status: z.number().int(),
   contentType: clipped(200),
   sample: clipped(3000),
-  body: clipped(2000).optional(),
+  body: clipped(maximumBodyLength).optional(),
   requestContentType: clipped(200).optional(),
+  requestHeaders: z.record(z.string().max(80), clipped(200)).optional(),
 });
 const discoveryBodySchema = z.object({
   appId: appIdSchema,
@@ -44,7 +49,7 @@ type CapturedRequest = z.infer<typeof capturedRequestSchema>;
 const capabilitySchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(1000),
-  requests: z.array(z.object({ method: z.string(), urlPattern: z.string().min(1).max(2000), bodyPattern: z.string().max(4000).optional(), contentType: z.string().max(200).optional() })).min(1).max(10),
+  requests: z.array(z.object({ method: z.string(), urlPattern: z.string().min(1).max(2000), bodyPattern: z.string().max(maximumBodyLength).optional(), contentType: z.string().max(200).optional() })).min(1).max(10),
   inputs: z.array(z.object({ name: z.string().min(1).max(80), description: z.string().max(500), example: z.string().max(500) })).max(20),
   returns: z.string().max(1000),
   updatesTaskId: z.string().max(80).optional(),
@@ -80,10 +85,12 @@ function withoutLabelledSecrets(text: string) {
   return text.replace(labelledSecret, `$1$2${redacted}`);
 }
 
-function redactValue(value: unknown): unknown {
-  if (typeof value === "string") return withoutTokens(withoutLabelledSecrets(value));
-  if (Array.isArray(value)) return value.map(redactValue);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, item !== null && isSecretKey(key) ? redacted : redactValue(item)]));
+const redactGraphqlDocument = (text: string) => withoutTokens(text.replace(labelledSecretString, `$1$2"${redacted}"`));
+
+function redactValue(value: unknown, key = ""): unknown {
+  if (typeof value === "string") return key === "query" && graphqlDocument.test(value) ? redactGraphqlDocument(value) : withoutTokens(withoutLabelledSecrets(value));
+  if (Array.isArray(value)) return value.map((item) => redactValue(item));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, item !== null && isSecretKey(key) ? redacted : redactValue(item, key)]));
   return value;
 }
 
@@ -109,8 +116,19 @@ function redactUrl(href: string) {
   }
 }
 
-function scrubbed(requests: CapturedRequest[]) {
-  return requests.map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
+const originOf = (href: string) => URL.canParse(href) ? new URL(href).origin : "";
+
+function sameOriginBodies(requests: CapturedRequest[], origin: string) {
+  let budget = maximumPromptBodyCharacters;
+  return requests.map(({ body, url, ...request }) => {
+    const kept = body !== undefined && body.length <= budget && originOf(url) === origin;
+    if (kept) budget -= body.length;
+    return { ...request, url, ...(kept ? { body } : {}) };
+  });
+}
+
+function scrubbed(requests: CapturedRequest[], origin: string) {
+  return sameOriginBodies(requests, origin).map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
 }
 
 function scrubbedTasks(tasks: Task[]) {
@@ -118,15 +136,16 @@ function scrubbedTasks(tasks: Task[]) {
 }
 
 function discoveryPrompt(app: Website, requests: CapturedRequest[]) {
-  const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests) }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests, new URL(app.url).origin) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(app.url).origin} while we recorded the pages they opened and the data requests those pages made.
-Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}".
+Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}". Only requests on the website itself keep their request body.
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
 List the distinct, useful things an assistant could do for this person with these requests, such as listing, searching, or reading information.
 Suggest page-reading tasks for pages whose text is useful, such as "Read course syllabus" with a {courseId} input, especially when no data request returns the same information.
 Ignore analytics, tracking, advertising, configuration, feature flags, and authentication requests, such as third-party pixels.
 Tasks can use GET and POST requests. Many websites read data through POST GraphQL requests with JSON bodies; prefer GraphQL queries for reading. Other POST requests and GraphQL mutations are allowed, but never suggest a request for checkout, payment, purchase, or placing or creating an order; MCParrot rejects those.
 For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method GET or POST and URL pattern on the same website, with {placeholders} for values that change; for POST, also bodyPattern, the request body as a string with {placeholders} inside JSON string values, and contentType, the request body's content type), the inputs a person could change (name, description, and an example taken from the requests; one input for each placeholder in the URL patterns and bodies), and what it returns.
+Copy each bodyPattern exactly from a recorded request body, including the whole GraphQL query text, and only replace values that change with {placeholders}. Never shorten, rewrite, or invent query text, and never suggest a POST request whose body is not in the recorded data.
 The savedTasks inside the recorded data are the tasks the person already saved, each with its id.
 Do not suggest a capability that a saved task already does, even under another name.
 Suggest a change to a saved task only when it clearly improves that task, such as a better request, a useful new input, or more complete results; then give the whole improved task and set updatesTaskId to that saved task's id.
@@ -178,7 +197,19 @@ function normalized({ method, urlPattern, bodyPattern, contentType }: TaskReques
   return { method: method.toUpperCase(), urlPattern, ...(bodyPattern ? { bodyPattern } : {}), ...(bodyPattern && contentType ? { contentType } : {}) };
 }
 
-function capabilitiesFrom(reply: string, app: Website) {
+const pathOf = (address: string, origin: string) => {
+  const placeholderFree = address.replace(/\{[^}]+\}/g, "x");
+  if (!URL.canParse(placeholderFree, origin)) return "";
+  const url = new URL(placeholderFree, origin);
+  return url.origin + url.pathname;
+};
+
+function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
+  const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
+  return match ? { ...request, headers: match.requestHeaders } : request;
+}
+
+function capabilitiesFrom(reply: string, app: Website, recorded: CapturedRequest[]) {
   let parsed: unknown;
   try {
     parsed = firstJsonObject(reply);
@@ -192,7 +223,7 @@ function capabilitiesFrom(reply: string, app: Website) {
     const parsed = capabilitySchema.safeParse(item);
     if (!parsed.success) return [];
     const capability = { ...parsed.data, requests: parsed.data.requests.map(normalized) };
-    return isUsable(capability, origin) ? [capability] : [];
+    return isUsable(capability, origin) ? [{ ...capability, requests: capability.requests.map((request) => withRecordedHeaders(request, recorded, origin)) }] : [];
   });
   const unsaved = unsavedCapabilities(app, capabilities).slice(0, maximumCapabilities);
   if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `MCParrot found no tools on ${origin}. Explore more pages, then try again.`);
@@ -332,7 +363,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "MCParrot found no tools. Explore more pages, then try again." }, { status: 502 });
     }
     const latestApp = await savedApp(userId, appId);
-    const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp) };
+    const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp, requests) };
     Sentry.logger.info("Discovery finished", { capabilityCount: discovery.capabilities.length });
     await storage().set(discoveryKey(app.id), discovery).catch((error) => Sentry.captureException(error));
     return Response.json(discovery);

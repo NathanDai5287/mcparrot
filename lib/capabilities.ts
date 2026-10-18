@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-export type CapturedRequest = { kind?: "page"; method: string; url: string; pattern: string; status: number; contentType: string; sample: string; body?: string; requestContentType?: string };
+export type CapturedRequest = { kind?: "page"; method: string; url: string; pattern: string; status: number; contentType: string; sample: string; body?: string; requestContentType?: string; requestHeaders?: Record<string, string> };
 
-export type TaskRequest = { method: string; urlPattern: string; bodyPattern?: string; contentType?: string };
+export type TaskRequest = { method: string; urlPattern: string; bodyPattern?: string; contentType?: string; headers?: Record<string, string> };
 
 export type Capability = {
   name: string;
@@ -44,13 +44,14 @@ export const maxOrderLimitUsd = 500;
 const shortText = z.string().max(200);
 const longText = z.string().max(4000);
 const address = z.string().max(2000);
+export const maximumBodyLength = 30_000;
 
 export const appIdSchema = z.string().regex(/^[a-zA-Z0-9-]{1,80}$/, "Use 1 to 80 letters, digits, or hyphens.");
 
 export const capabilitySchema = z.object({
   name: shortText,
   description: longText,
-  requests: z.array(z.object({ method: z.string().min(1).max(10), urlPattern: address.min(1), bodyPattern: longText.optional(), contentType: shortText.optional() })).min(1).max(50),
+  requests: z.array(z.object({ method: z.string().min(1).max(10), urlPattern: address.min(1), bodyPattern: z.string().max(maximumBodyLength).optional(), contentType: shortText.optional(), headers: z.record(shortText, shortText).optional() })).min(1).max(50),
   inputs: z.array(z.object({ name: shortText, description: longText, example: longText })).max(50),
   returns: longText,
 }) satisfies z.ZodType<Capability>;

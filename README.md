@@ -193,11 +193,13 @@ Nathan chose to also record each whole page that loads in the tab, such as a ser
 A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts.
 It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `session`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
-For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 2,000 characters, and the value of the request's `Content-Type` header as `requestContentType`.
-It never records any other request header, any response header, or cookies.
+For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 30,000 characters so that a whole GraphQL query fits, and the value of the request's `Content-Type` header as `requestContentType`.
+It also records, as `requestHeaders`, only these request headers when their value does not look like a secret: `accept`, `apollographql-client-name`, `apollographql-client-version`, `x-apollo-operation-name`, `x-channel-id`, `x-experience-id`, and `x-requested-with`.
+It never records any other request header, such as `authorization` or `cookie`, any response header, or cookies.
 It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
 A value looks like a secret when it is a JWT, a `Bearer` or `Basic` value, or a long random-looking string, and text samples and request bodies also lose values after secret names such as `password=` or `api_key:`.
 A JSON request body keeps its whole structure, such as a GraphQL query, and only loses its secret-looking values; it is not shortened like a response sample.
+In a GraphQL `query` text, both the extension and `/api/discover` redact only quoted values after secret names, such as `password: "…"`, JWTs, and random-looking strings, so variable declarations such as `$token: String` stay intact.
 This redaction matches patterns, so a secret in another form, such as a short code or a value under an ordinary key, can still appear in a sample or a request body.
 
 Each sample keeps at most 80 characters per text value and 2 items per list, up to about 3 KB per response.
@@ -205,12 +207,12 @@ A page sample keeps the first 3,000 characters of its visible text, with spaces 
 Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.5.0, asks only for the `storage` and `debugger` permissions and no host permissions.
+The extension, version 0.5.1, asks only for the `storage` and `debugger` permissions and no host permissions.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
 To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
-Version 0.4.0 does not record request bodies, so discovery cannot suggest POST tools from its recordings until the user loads version 0.5.0 and explores again.
+Version 0.4.0 does not record request bodies, and version 0.5.0 cuts each body to 2,000 characters, which cuts off most GraphQL queries, so a POST tool found from those recordings can fail until the user loads version 0.5.1, explores again, and finds tools again.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
@@ -234,9 +236,11 @@ The server deletes the temporary folders after each run and stops waiting after 
 The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tools where a page's text is useful, in the same capability shape as data tools.
 It tells Claude that tools can use GET and POST requests, to prefer GraphQL queries for reading, that other POST requests and mutations are allowed except checkout and payment, and to ignore analytics, tracking, and advertising requests, such as third-party pixels.
 A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
+The instruction tells Claude to copy each body exactly, with the whole GraphQL query text, and never to shorten, rewrite, or invent query text.
+After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`; Claude never sees them.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
-The route accepts at most 2 MB and 150 requests, cuts each request body to 2,000 characters and each request content type to 200, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
+The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's own origin and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
 It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's own origin, have no body on a GET, pass the checkout and payment guard, and whose placeholders in URL patterns and bodies match their inputs one to one.
 It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
@@ -318,6 +322,8 @@ Discovery, `save_task`, the connection's tool list, and every tool run apply the
 The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
 The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address or body contains one of the words, such as a query for a payment history, is refused.
 `read_page` only opens pages with GET, so the guard does not apply to it.
+A POST tool sends its saved `headers`, filtered again to the same short list of header names, and when the page has a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`, it sends that cookie's value as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many GraphQL websites refuse a request without that header.
+The value never leaves the website's page.
 
 ## Reconnecting expired sessions
 
@@ -556,7 +562,7 @@ The password never returns to the dashboard, never appears in MCP results, and n
 `/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public tool definitions, logs, traces, documentation, and source control.
-Recordings must not contain passwords, cookies, or tokens, so the extension skips headers other than the request content type, cookies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values in samples and request bodies, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips cookies, sign-in paths, and headers other than the request content type and a short list of non-secret headers, and both the extension and `/api/discover` redact secret-looking values in samples and request bodies, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
 That redaction matches patterns, so a secret in another form can still reach the recording and Claude, which the [status page](STATUS.md) lists as a gap.
 Recordings stay only in the extension, which deletes them after 30 days.
 

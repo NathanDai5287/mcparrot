@@ -5,10 +5,12 @@ const maximumArrayItems = 2;
 const maximumSampleLength = 3000;
 const maximumTextSampleLength = 400;
 const maximumUrlLength = 2000;
-const maximumBodyLength = 2000;
+const maximumBodyLength = 30000;
+const maximumHeaderLength = 200;
 const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
+const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "x-apollo-operation-name", "x-channel-id", "x-experience-id", "x-requested-with"];
 const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
 const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
@@ -21,6 +23,8 @@ const secretName = "[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf
 const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|<[^<>\\s]*>|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
 const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
 const longValueText = /[\w+=\-~]{32,}/g;
+const secretStringArgumentText = new RegExp(`\\b(${secretName})(\\s*:\\s*)"[^"]*"`, "gi");
+const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
@@ -66,9 +70,14 @@ function redactText(text) {
   return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretElementText, "$1redacted$3").replace(secretAssignmentText, (_, name, separator, value) => `${name}${separator}${/^["']/.test(value) ? `${value[0]}redacted${value[0]}` : "redacted"}`).replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
 }
 
+function redactGraphqlDocument(text) {
+  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretStringArgumentText, '$1$2"redacted"').replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
+}
+
 function redact(value, key = "") {
   if (Array.isArray(value)) return value.map((item) => redact(item, key));
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, redact(item, name)]));
+  if (key === "query" && typeof value === "string" && graphqlDocument.test(value)) return redactGraphqlDocument(value);
   if (key && isSecretKey(key) && value !== null && value !== "" && typeof value !== "boolean") return "redacted";
   if (typeof value === "string") return looksSecret(value) ? "redacted" : redactText(value);
   return value;
@@ -101,6 +110,10 @@ function contentTypeOf(headers = {}) {
   return Object.entries(headers).find(([name]) => name.toLowerCase() === "content-type")?.[1]?.slice(0, 200);
 }
 
+function replayedHeaders(headers = {}) {
+  return Object.fromEntries(Object.entries(headers).filter(([name, value]) => replayedHeaderNames.includes(name.toLowerCase()) && value.length <= maximumHeaderLength && !looksSecret(value)));
+}
+
 function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
@@ -129,7 +142,8 @@ function rememberRequest({ requestId, request }) {
   const captured = { method: request.method, url: withoutSecrets(request.url), pattern };
   if (request.method === "GET") return pendingRequests.set(requestId, captured);
   const requestContentType = contentTypeOf(request.headers);
-  pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), postData: request.postData, hasPostData: request.hasPostData });
+  const requestHeaders = replayedHeaders(request.headers);
+  pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}), postData: request.postData, hasPostData: request.hasPostData });
 }
 
 async function requestBody(tabId, requestId, { postData, hasPostData }) {
