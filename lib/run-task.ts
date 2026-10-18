@@ -5,7 +5,6 @@ import type { Task, Website } from "./capabilities";
 
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
-const maximumErrorBodyCharacters = 1_000;
 const requestTimeout = 30_000;
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
 export const signedOutMessage = "The website is signed out. Open MCParrot, then save a login for this app or select Sign in to website, then try again.";
@@ -54,8 +53,8 @@ const withoutQuery = (address: string) => {
 
 const sanitized = (message: string) => (message.split("\n")[0] ?? "").replace(/\bhttps?:\/\/[^\s"'<>]+/g, withoutQuery);
 
-function shortened(text: string, limit = maximumResponseCharacters) {
-  return text.length > limit ? `${text.slice(0, limit)}\n[Response shortened to ${limit} characters]` : text;
+function shortened(text: string) {
+  return text.length > maximumResponseCharacters ? `${text.slice(0, maximumResponseCharacters)}\n[Response shortened to ${maximumResponseCharacters} characters]` : text;
 }
 
 function requireOnWebsite(page: Page, website: string) {
@@ -94,8 +93,8 @@ function readPageText(page: Page, website: string, url: string) {
   });
 }
 
-function httpError(url: string, status: number, body: string) {
-  return new TaskError("http_error", `GET ${withoutQuery(url)} returned ${status}\n${shortened(body, maximumErrorBodyCharacters)}`);
+function httpError(url: string, status: number) {
+  return new TaskError("http_error", `GET ${withoutQuery(url)} returned ${status}`);
 }
 
 async function readRequest(page: Page, website: string, url: string) {
@@ -103,10 +102,10 @@ async function readRequest(page: Page, website: string, url: string) {
   if (response.failed === "timeout") throw new TaskError("timeout", `GET ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
   if (response.redirected && new URL(response.url).origin !== website) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
-  if (response.status >= 400) throw httpError(url, response.status, response.body);
+  if (response.status >= 400) throw httpError(url, response.status);
   if (!response.failed && !response.contentType.includes("html")) return `GET ${url} returned ${response.status}\n${shortened(response.body)}`;
   const { status, text } = await readPageText(page, website, url);
-  if (status >= 400) throw httpError(url, status, text);
+  if (status >= 400) throw httpError(url, status);
   return `GET ${url} returned ${status}\n${shortened(text)}`;
 }
 
