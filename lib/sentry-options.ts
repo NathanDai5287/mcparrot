@@ -81,6 +81,7 @@ export const sentryOptions = {
     /^This order is not ready to place/,
     /^Browser Use could not read the checkout total again/,
     /already has a tool with this name or page/,
+    /^Reading the image took too long/,
   ],
   dataCollection: {
     userInfo: false,
