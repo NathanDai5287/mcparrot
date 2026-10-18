@@ -51,7 +51,7 @@ async function readTask(app: Website, task: Task, inputs: Record<string, string 
   const urls = task.requests.map((request) => new URL(fillPattern(request.urlPattern, values), app.url).href);
   const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
   try {
-    return await withPage(browser.cdpUrl!, (page) => readRequests(page, app.url, urls));
+    return await withPage(browser.cdpUrl!, (page) => readRequests(page, new URL(app.url).origin, urls));
   } finally {
     await stopBrowser(browser.id);
   }
