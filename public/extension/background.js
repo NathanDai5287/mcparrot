@@ -11,6 +11,7 @@ const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
 const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "x-apollo-operation-name", "x-channel-id", "x-experience-id", "x-requested-with"];
+const tokenHeaderName = /auth|token|jwt|session|api-?key/i;
 const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
 const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
@@ -26,6 +27,7 @@ const longValueText = /[\w+=\-~]{32,}/g;
 const secretStringArgumentText = new RegExp(`\\b(${secretName})(\\s*:\\s*)"[^"]*"`, "gi");
 const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
+const localStorageKeysOf = (values) => `(() => { const keys = Object.keys(localStorage); return ${JSON.stringify(values)}.map((value) => keys.find((key) => localStorage.getItem(key) === value) ?? ""); })()`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
 
@@ -114,6 +116,13 @@ function replayedHeaders(headers = {}) {
   return Object.fromEntries(Object.entries(headers).filter(([name, value]) => replayedHeaderNames.includes(name.toLowerCase()) && value.length <= maximumHeaderLength && !looksSecret(value)));
 }
 
+async function tokenHeadersOf(tabId, tokenValues = []) {
+  if (!tokenValues.length) return [];
+  const evaluation = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: localStorageKeysOf(tokenValues.map(([, value]) => value)), returnByValue: true }).catch(() => undefined);
+  const keys = evaluation?.result?.value ?? [];
+  return tokenValues.flatMap(([name], index) => keys[index] ? [{ header: name.toLowerCase(), fromLocalStorage: keys[index] }] : []);
+}
+
 function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
@@ -139,7 +148,8 @@ function rememberRequest({ requestId, request }) {
   if (!url.protocol.startsWith("http") || analyticsHost.test(url.hostname) || isAuthenticationPath(url.pathname)) return;
   const pattern = url.origin + pathPattern(url);
   if (pattern.length > maximumUrlLength) return;
-  const captured = { method: request.method, url: withoutSecrets(request.url), pattern };
+  const tokenValues = Object.entries(request.headers ?? {}).filter(([name, value]) => tokenHeaderName.test(name) && value);
+  const captured = { method: request.method, url: withoutSecrets(request.url), pattern, ...(tokenValues.length ? { tokenValues } : {}) };
   if (request.method === "GET") return pendingRequests.set(requestId, captured);
   const requestContentType = contentTypeOf(request.headers);
   const requestHeaders = replayedHeaders(request.headers);
@@ -198,10 +208,11 @@ async function recordRequest(tabId, requestId) {
   const request = pendingRequests.get(requestId);
   pendingRequests.delete(requestId);
   if (!request?.contentType) return;
-  const { postData, hasPostData, ...captured } = request;
+  const { postData, hasPostData, tokenValues, ...captured } = request;
   const sentBody = await requestBody(tabId, requestId, { postData, hasPostData });
   const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
-  await save(tabId, { ...captured, ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
+  const tokenHeaders = await tokenHeadersOf(tabId, tokenValues);
+  await save(tabId, { ...captured, ...(tokenHeaders.length ? { tokenHeaders } : {}), ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
 }
 
 async function recordPage(tabId) {

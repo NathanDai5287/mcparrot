@@ -195,7 +195,8 @@ It skips static files such as images, fonts, style sheets, scripts, and media, a
 It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `session`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
 For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 30,000 characters so that a whole GraphQL query fits, and the value of the request's `Content-Type` header as `requestContentType`.
 It also records, as `requestHeaders`, only these request headers when their value does not look like a secret: `accept`, `apollographql-client-name`, `apollographql-client-version`, `x-apollo-operation-name`, `x-channel-id`, `x-experience-id`, and `x-requested-with`.
-It never records any other request header, such as `authorization` or `cookie`, any response header, or cookies.
+For any request, when a request header whose name contains `auth`, `token`, `jwt`, `session`, or `apikey`, such as Ed's `x-token`, has a value that equals a value in the page's local storage, it records, as `tokenHeaders`, only the header name and the name of that local storage key, such as `{ "header": "x-token", "fromLocalStorage": "authToken" }`; it never records the value.
+It never records any other request header, such as `authorization` or `cookie`, any value of a sign-in header, any response header, or cookies.
 It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
 A value looks like a secret when it is a JWT, a `Bearer` or `Basic` value, or a long random-looking string, and text samples and request bodies also lose values after secret names such as `password=` or `api_key:`.
 A JSON request body keeps its whole structure, such as a GraphQL query, and only loses its secret-looking values; it is not shortened like a response sample.
@@ -207,12 +208,13 @@ A page sample keeps the first 3,000 characters of its visible text, with spaces 
 Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.5.1, asks only for the `storage` and `debugger` permissions and no host permissions.
+The extension, version 0.6.0, asks only for the `storage` and `debugger` permissions and no host permissions.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
 To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
-Version 0.4.0 does not record request bodies, and version 0.5.0 cuts each body to 2,000 characters, which cuts off most GraphQL queries, so a POST tool found from those recordings can fail until the user loads version 0.5.1, explores again, and finds tools again.
+Version 0.4.0 does not record request bodies, and version 0.5.0 cuts each body to 2,000 characters, which cuts off most GraphQL queries, so a POST tool found from those recordings can fail until the user loads version 0.6.0, explores again, and finds tools again.
+Versions before 0.6.0 do not record `tokenHeaders`, so tools on a website that signs requests with a header, such as Ed, need a new recording with version 0.6.0 and a new discovery run.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
@@ -237,7 +239,7 @@ The instruction asks for capabilities JSON only, explains that page requests ret
 It tells Claude that tools can use GET and POST requests, to prefer GraphQL queries for reading, that other POST requests and mutations are allowed except checkout and payment, and to ignore analytics, tracking, and advertising requests, such as third-party pixels.
 A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
 The instruction tells Claude to copy each body exactly, with the whole GraphQL query text, and never to shorten, rewrite, or invent query text.
-After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`; Claude never sees them.
+After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`, and the recorded `tokenHeaders` of any recorded request on the same host into each request on that host as `tokenHeaders`; Claude never sees them.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's website or its subdomains and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
@@ -247,7 +249,7 @@ After a successful run, it saves the result and its time under `discovery:<app-i
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
-The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers other than the request content type, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no header values other than the request content type and a few safe headers, no sign-in header values, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
@@ -298,8 +300,8 @@ When a GET response's content type is HTML, the browser opens that address as a 
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
 Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
 An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`, ignoring a leading `www.` on the website's host, so `https://www.doordash.com` also accepts `doordash.com` and `api.doordash.com`.
-A request to a subdomain runs from the website's page as a cross-origin `fetch` with cookies included, so it works only when that subdomain allows it.
-Tools do not send headers that carry sign-in tokens, so a website whose data requests need such a header, such as Ed's `x-token`, returns 401 and the tool reports the website as signed out; this is a [known gap](STATUS.md).
+A request with `tokenHeaders` reads each named local storage key inside the website's page when it runs and sends its value under the header name, such as Ed's `x-token` from `authToken`; the value never leaves the page, so it never reaches the server, the tool result, logs, or Sentry.
+A request to a subdomain runs from the website's page as a cross-origin `fetch`; it sends no cookies when it sends a token header, because websites such as Ed allow any origin but refuse cross-origin requests with cookies, and otherwise it includes cookies, so it works only when that subdomain allows it.
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 
@@ -311,7 +313,7 @@ Assistants can combine taught tools in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
 An unsupported action needs further discovery; a successful example does not establish support for all related actions.
 
-Some requests depend on short-lived tokens in headers rather than cookies, and some websites block reuse of a recorded request.
+Some requests depend on header tokens that are not stored as a plain local storage value, such as a `Bearer` value or a token in memory, and some websites block reuse of a recorded request.
 Those tools fail when they run, and they need a separate browser path or must stay unused.
 Measure speed against an agent navigating the website before you claim an improvement.
 
@@ -565,7 +567,7 @@ The password never returns to the dashboard, never appears in MCP results, and n
 `/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public tool definitions, logs, traces, documentation, and source control.
-Recordings must not contain passwords, cookies, or tokens, so the extension skips cookies, sign-in paths, and headers other than the request content type and a short list of non-secret headers, and both the extension and `/api/discover` redact secret-looking values in samples and request bodies, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips cookies, sign-in paths, sign-in header values, and headers other than the request content type and a short list of non-secret headers, and both the extension and `/api/discover` redact secret-looking values in samples and request bodies, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
 That redaction matches patterns, so a secret in another form can still reach the recording and Claude, which the [status page](STATUS.md) lists as a gap.
 Recordings stay only in the extension, which deletes them after 30 days.
 

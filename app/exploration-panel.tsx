@@ -167,7 +167,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
           {state.requests.map((request) => <div className="candidate-button" key={`${request.method} ${request.pattern}`}><span>{request.method} {request.pattern}<small>{request.status} · {request.contentType}</small></span></div>)}
         </div>
       </details>
-      <p className="field-help">Cookies, sign-in traffic, and headers other than a few safe ones, such as accept, are not recorded. Selecting Find what this site can do sends these requests and their short samples to an AI that finds what the site can do.</p>
+      <p className="field-help">Cookies, sign-in traffic, sign-in codes, and headers other than a few safe ones, such as accept, are not recorded; for a sign-in code, only its header name and where the page stores it are kept. Selecting Find what this site can do sends these requests and their short samples to an AI that finds what the site can do.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
         <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>

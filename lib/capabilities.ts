@@ -1,8 +1,10 @@
 import { z } from "zod";
 
-export type CapturedRequest = { kind?: "page"; method: string; url: string; pattern: string; status: number; contentType: string; sample: string; body?: string; requestContentType?: string; requestHeaders?: Record<string, string> };
+export type TokenHeader = { header: string; fromLocalStorage: string };
 
-export type TaskRequest = { method: string; urlPattern: string; bodyPattern?: string; contentType?: string; headers?: Record<string, string> };
+export type CapturedRequest = { kind?: "page"; method: string; url: string; pattern: string; status: number; contentType: string; sample: string; body?: string; requestContentType?: string; requestHeaders?: Record<string, string>; tokenHeaders?: TokenHeader[] };
+
+export type TaskRequest = { method: string; urlPattern: string; bodyPattern?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
 
 export type Capability = {
   name: string;
@@ -51,7 +53,7 @@ export const appIdSchema = z.string().regex(/^[a-zA-Z0-9-]{1,80}$/, "Use 1 to 80
 export const capabilitySchema = z.object({
   name: shortText,
   description: longText,
-  requests: z.array(z.object({ method: z.string().min(1).max(10), urlPattern: address.min(1), bodyPattern: z.string().max(maximumBodyLength).optional(), contentType: shortText.optional(), headers: z.record(shortText, shortText).optional() })).min(1).max(50),
+  requests: z.array(z.object({ method: z.string().min(1).max(10), urlPattern: address.min(1), bodyPattern: z.string().max(maximumBodyLength).optional(), contentType: shortText.optional(), headers: z.record(shortText, shortText).optional(), tokenHeaders: z.array(z.object({ header: shortText, fromLocalStorage: shortText })).max(10).optional() })).min(1).max(50),
   inputs: z.array(z.object({ name: shortText, description: longText, example: longText })).max(50),
   returns: longText,
 }) satisfies z.ZodType<Capability>;
