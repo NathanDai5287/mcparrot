@@ -175,6 +175,8 @@
     .arch-under .node { background: transparent; border-style: dashed; }
     .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1.5rem, 4vw, 4rem); margin-top: clamp(1.5rem, 3.5vw, 2.5rem); }
     .two-col h3 { font-size: 1.05em; margin-bottom: .6rem; }
+    .two-col.stack { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1rem, 2vw, 1.75rem); }
+    .stack .recipe { padding: 1rem 1.2rem; }
     .plain-list { margin: 0; padding: 0; list-style: none; }
     .plain-list li { position: relative; padding: .5rem 0 .5rem 1.2rem; border-bottom: 1px solid var(--line); font-size: .88em; text-wrap: pretty; }
     .plain-list li::before { content: ""; position: absolute; left: 0; top: 1.05rem; width: .45rem; height: .45rem; border-radius: 50%; background: var(--teal); }
@@ -262,7 +264,7 @@
       .slide { overflow-y: auto; overscroll-behavior: contain; }
       .slide-inner { padding-bottom: 1.5rem; }
       .pin { width: 1.15rem; height: 1.15rem; margin: -.575rem 0 0 -.575rem; font-size: .6rem; box-shadow: 0 0 0 2px var(--teal), 0 .2rem .4rem rgba(0, 0, 0, .35); }
-      .title, .shot-layout, .shot-layout.square, .split, .two-col, .hard, .flow, .insight, .tour { grid-template-columns: 1fr; }
+      .title, .shot-layout, .shot-layout.square, .split, .two-col, .two-col.stack, .hard, .flow, .insight, .tour { grid-template-columns: 1fr; }
       .chores, .shot-pair--row { grid-template-columns: 1fr; gap: .6rem; }
       .chores-head { display: none; }
       .chores .ask-bubble { justify-self: end; margin-bottom: 1rem; }
@@ -344,7 +346,7 @@
         <p class="lede">If a person can do it in the website, their agent should be able to do it by asking.</p>
         <div class="engine">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg>
-          <p><strong>We build MCParrot by the same rule.</strong> Each feature on its app page should also work by asking ChatGPT.</p>
+          <p><strong>We build MCParrot by the same rule.</strong> Each feature on its app page should also work by asking your agent.</p>
         </div>
       </div>
     </section>
@@ -367,7 +369,7 @@
             <span>MCParrot</span>
             <svg viewBox="0 0 40 16" aria-hidden="true"><path d="M2 8h34"/><path d="M30 2l6 6-6 6"/></svg>
           </div>
-          <span class="ask-bubble">Straight to your assistant, signed in as you.</span>
+          <span class="ask-bubble">Straight to your agent, signed in as you.</span>
         </div>
       </div>
     </section>
@@ -379,17 +381,17 @@
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><circle cx="12" cy="14.25" r="2.4"/></svg></span>
             <h3>1. Browse the site</h3>
-            <p>Our Chrome extension watches what the site asks its server for.</p>
+            <p>Our Chrome extension records the API requests the site makes.</p>
           </div>
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
-            <h3>2. Claude finds tools</h3>
+            <h3>2. An LLM finds tools</h3>
             <p>“List my assignments.” “Read the syllabus.” You keep the ones you want.</p>
           </div>
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg></span>
-            <h3>3. ChatGPT uses them</h3>
-            <p>Through one private link. Each tool calls the site’s own data API, with no clicking.</p>
+            <h3>3. Your agent uses them</h3>
+            <p>Through one private MCP link. Each tool calls the site’s own data API, with no clicking.</p>
           </div>
         </div>
         <div class="engine">
@@ -436,7 +438,7 @@
           <h2>Two websites, one answer.</h2>
           <ol class="notes">
             <li><span>Score from <strong>Gradescope</strong></span></li>
-            <li><span>Class stats from a chart on <strong>Ed</strong>, read by Claude</span></li>
+            <li><span>Class stats read from a chart image on <strong>Ed</strong></span></li>
             <li><span>Combined: 0.81 above the mean</span></li>
           </ol>
         </div>
@@ -458,7 +460,7 @@
           <h2>Signed out? It signs back in.</h2>
           <ol class="notes">
             <li><span>A <strong>Browser Use agent</strong> signs in for you</span></li>
-            <li><span>You type the texted code in ChatGPT</span></li>
+            <li><span>You type the texted code in the chat</span></li>
             <li><span>Then it lists the assignments</span></li>
           </ol>
         </div>
@@ -487,24 +489,50 @@
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Not a browser bot: Browser Use signs in as you" data-part="pitch" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="The stack" data-part="pitch" data-section="Pitch · 2 minutes">
       <div class="slide-inner">
-        <h2>Not a browser bot. Browser Use is how it signs in as you.</h2>
-        <div class="two-col">
+        <h2>Not a browser bot. A full stack from clicks to API.</h2>
+        <div class="two-col stack">
           <div class="recipe">
-            <h3>MCParrot does</h3>
+            <h3>1. Record</h3>
             <ul class="plain-list">
-              <li><strong>Calls the website’s own data API.</strong> No clicking through screens, so answers are fast and exact.</li>
-              <li><strong>Builds the tools with Claude</strong> from one recording of you browsing.</li>
-              <li><strong>Sends ChatGPT a small answer,</strong> not a whole page.</li>
+              <li><strong>Chrome extension</strong> captures the site’s API requests through the DevTools Protocol.</li>
+              <li>Passwords, cookies, and tokens are removed before anything is saved.</li>
+            </ul>
+          </div>
+          <div class="recipe">
+            <h3>2. Discover</h3>
+            <ul class="plain-list">
+              <li><strong>An LLM</strong> turns the requests into typed tools with inputs.</li>
+              <li>It also picks the answer fields each tool needs.</li>
+            </ul>
+          </div>
+          <div class="recipe">
+            <h3>3. Serve</h3>
+            <ul class="plain-list">
+              <li><strong>An MCP server</strong> on Next.js and Vercel, one private link per website.</li>
+              <li>Works with any agent that speaks MCP.</li>
+            </ul>
+          </div>
+          <div class="recipe">
+            <h3>4. Replay</h3>
+            <ul class="plain-list">
+              <li>Calls the <strong>site’s own API</strong> directly, with no clicking.</li>
+              <li>Handles sign-in tokens, anti-forgery codes, and multi-step calls.</li>
+            </ul>
+          </div>
+          <div class="recipe">
+            <h3>5. Shrink</h3>
+            <ul class="plain-list">
+              <li>Cleans each answer and writes lists as tables.</li>
+              <li><strong>73–80% fewer tokens</strong> for the agent to read.</li>
             </ul>
           </div>
           <div class="recipe recipe--identity">
-            <h3>Browser Use does</h3>
+            <h3>6. Stay signed in</h3>
             <ul class="plain-list">
-              <li><strong>Stays signed in as you,</strong> with one cloud browser for each website. You sign in once in a live view, Duo included.</li>
-              <li><strong>Signs back in</strong> when the site logs you out. The AI never sees your password.</li>
-              <li><strong>Checks out</strong> with Stripe Pay with Link when you say yes.</li>
+              <li><strong>Browser Use</strong> keeps a signed-in cloud browser per website.</li>
+              <li>Its agents sign back in and check out with Pay with Link.</li>
             </ul>
           </div>
         </div>
@@ -515,7 +543,7 @@
       <div class="slide-inner split">
         <div class="close" style="justify-items:start;text-align:left">
           <img src="/logo.svg" alt="">
-          <h2>Every website, as data for your assistant.</h2>
+          <h2>Every website, as data for your agent.</h2>
           <div class="links" style="justify-content:flex-start">
             <a href="https://mcparrot.vercel.app">mcparrot.vercel.app</a>
             <a href="https://github.com/NathanDai5287/mcparrot">GitHub</a>
@@ -524,9 +552,9 @@
         </div>
         <div>
           <ul class="next-list">
-            <li>Next: MCParrot test-runs every new tool before ChatGPT sees it.</li>
-            <li>Next: ChatGPT can set up a new website by itself.</li>
-            <li>Next: you can run MCParrot itself by asking ChatGPT.</li>
+            <li>Next: test every new tool automatically, so broken ones never reach your agent.</li>
+            <li>Next: add a new website just by asking your agent, with no recording step.</li>
+            <li>Next: manage MCParrot itself from your agent, such as signing in or sharing an app.</li>
           </ul>
           <p class="learned" style="margin-top:1.6rem">Thank you. Questions?</p>
           <div class="jump">
