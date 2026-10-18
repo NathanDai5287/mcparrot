@@ -7,7 +7,7 @@ import { isGone, stopBrowser } from "./browser-use";
 export type Login = { username: string; password: string; hosts: string[] };
 const SealedLogin = z.object({ v: z.literal(1).optional(), kid: z.string().optional(), iv: z.string(), tag: z.string(), data: z.string() });
 type SealedLogin = z.infer<typeof SealedLogin>;
-const PendingBrowser = z.object({ browserId: z.string() });
+const PendingBrowser = z.object({ browserId: z.string(), sessionId: z.string().optional() });
 
 const credentialKeyFormat = "MCPARROT_CREDENTIAL_KEY must be a 32-byte base64 key, for example from `openssl rand -base64 32`.";
 export const unreadableLoginMessage = "MCParrot cannot read the saved login for this app. Open MCParrot and replace the login.";
@@ -59,10 +59,12 @@ export async function readLogin(appId: string) {
   }
 }
 
-export async function stopPendingSignIn(appId: string) {
+const readPendingBrowser = async (appId: string) => PendingBrowser.safeParse(await Redis.fromEnv().get(pendingSignInKey(appId))).data;
+
+export async function stopPendingSignIn(appId: string, keepManual = false) {
   const redis = Redis.fromEnv();
-  const pending = PendingBrowser.safeParse(await redis.get(pendingSignInKey(appId))).data;
-  if (!pending) return;
+  const pending = await readPendingBrowser(appId);
+  if (!pending || (keepManual && !pending.sessionId)) return;
   try {
     await stopBrowser(pending.browserId);
   } catch (error) {
@@ -72,6 +74,8 @@ export async function stopPendingSignIn(appId: string) {
 }
 
 export async function deleteLogin(appId: string) {
-  await stopPendingSignIn(appId).catch(() => Sentry.logger.warn("Pending sign-in browser stop failed", { appId }));
-  await Redis.fromEnv().del(loginKey(appId), pendingSignInKey(appId), rejectedLoginKey(appId), signInCooldownKey(appId));
+  await stopPendingSignIn(appId, true).catch(() => Sentry.logger.warn("Pending sign-in browser stop failed", { appId }));
+  const pending = await readPendingBrowser(appId);
+  const pendingKeys = pending && !pending.sessionId ? [] : [pendingSignInKey(appId)];
+  await Redis.fromEnv().del(loginKey(appId), ...pendingKeys, rejectedLoginKey(appId), signInCooldownKey(appId));
 }
