@@ -4,11 +4,11 @@ type Options = NonNullable<Parameters<typeof init>[0]>;
 type StreamedSpanJSON = Parameters<NonNullable<Options["beforeSendSpan"]>>[0];
 
 const queryString = /\?[^\s#]*/g;
-const bypassSecret = /(x-vercel-protection-bypass=)[^&#\s"']*/gi;
+const secretQueryValue = /((?:x-vercel-protection-bypass|token)=)[^&#\s"']*/gi;
 const urlKey = /url|target|query|^next\./i;
 
 function scrub(value: unknown) {
-  return typeof value === "string" ? value.replace(bypassSecret, "$1[Filtered]") : value;
+  return typeof value === "string" ? value.replace(secretQueryValue, "$1[Filtered]") : value;
 }
 
 function stripQuery(value: unknown) {

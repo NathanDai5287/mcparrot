@@ -147,7 +147,21 @@ function LoginSection({ app, onChange }: { app: Website; onChange: (changes: App
   </section>;
 }
 
-function ConnectionSection({ app, connectionSecret }: { app: Website; connectionSecret?: string }) {
+function ConnectionSteps({ app }: { app: Website }) {
+  return <ol className="field-help">
+    <li>Copy the link.</li>
+    <li>In ChatGPT, open Settings, then Plugins, and select Browse directory.</li>
+    <li>Select Add, then Add custom MCP server.</li>
+    <li>Name it {app.name}, paste the link as the Server URL, and set Authentication to No authentication.</li>
+    <li>Tick I understand and want to continue, then select Create as a plugin.</li>
+    <li>In a new chat, turn on the {app.name} plugin and ask ChatGPT to use it.</li>
+  </ol>;
+}
+
+function ConnectionSection({ app, onApps }: { app: Website; onApps: (apps: Website[]) => void }) {
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   useEffect(() => {
@@ -155,8 +169,20 @@ function ConnectionSection({ app, connectionSecret }: { app: Website; connection
     const timer = setTimeout(() => setCopied(false), 3000);
     return () => clearTimeout(timer);
   }, [copied]);
-  if (!connectionSecret) return <section className="assistant-section"><div><h2>Use tasks in ChatGPT</h2><p>The connection link is available on the production site.</p></div></section>;
-  const link = `${window.location.origin}/mcp/apps/${app.id}?x-vercel-protection-bypass=${connectionSecret}`;
+
+  async function createLink() {
+    setBusy(true);
+    setError("");
+    const response = await fetch("/api/connection", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: app.id }) }).catch(() => null);
+    const result = await response?.json().catch(() => ({})) ?? {};
+    setBusy(false);
+    if (!response?.ok) {
+      setError(result.error ?? "MCParrot could not create the link. Try again.");
+      return;
+    }
+    onApps(result.apps);
+    setLink(`${window.location.origin}/mcp/apps/${app.id}?token=${result.token}`);
+  }
 
   async function copyLink() {
     try {
@@ -169,28 +195,32 @@ function ConnectionSection({ app, connectionSecret }: { app: Website; connection
     }
   }
 
+  const linkButton = <button className="button" disabled={busy} onClick={createLink}>{busy ? "Creating link…" : app.connectionTokenHash ? "Regenerate link" : "Create link"}</button>;
+  if (!link) return <section className="assistant-section">
+    <div>
+      <h2>Use tasks in ChatGPT</h2>
+      <p>{app.connectionTokenHash ? "This app has a private ChatGPT link. MCParrot shows a link only once, when you create it. Regenerate the link to get a new one, and the old link stops working." : "Create a private link that gives ChatGPT this app’s tasks."}</p>
+      {error && <p className="pilot-error" role="alert">{error}</p>}
+    </div>
+    {linkButton}
+  </section>;
+
   return <section className="assistant-section">
     <div>
       <h2>Use tasks in ChatGPT</h2>
-      <p>This private link contains a secret code. Anyone with the link can use MCParrot, so keep it private. ChatGPT gets this app’s reading tasks only.</p>
-      <ol className="field-help">
-        <li>Copy the link.</li>
-        <li>In ChatGPT, open Settings, then Plugins, and select Browse directory.</li>
-        <li>Select Add, then Add custom MCP server.</li>
-        <li>Name it {app.name}, paste the link as the Server URL, and set Authentication to No authentication.</li>
-        <li>Tick I understand and want to continue, then select Create as a plugin.</li>
-        <li>In a new chat, turn on the {app.name} plugin and ask ChatGPT to use it.</li>
-      </ol>
+      <p>Copy this link now, because MCParrot shows it only once. Anyone with the link can use this app’s tasks in ChatGPT, so keep it private.</p>
+      <ConnectionSteps app={app} />
       {copyFailed && <><p className="pilot-error" role="alert">MCParrot could not copy the link. Copy it from this box instead.</p><input aria-label="Connection link" readOnly value={link} autoFocus onFocus={(event) => event.currentTarget.select()} /></>}
+      {error && <p className="pilot-error" role="alert">{error}</p>}
     </div>
-    <button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>
+    <div className="login-actions"><button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>{linkButton}</div>
   </section>;
 }
 
-export function AssistantPanel({ app, connectionSecret, onChange }: { app: Website; connectionSecret?: string; onChange: (changes: AppChanges) => void }) {
+export function AssistantPanel({ app, onChange, onApps }: { app: Website; onChange: (changes: AppChanges) => void; onApps: (apps: Website[]) => void }) {
   return <>
     <SignInSection key={app.id} app={app} onChange={onChange} />
     <LoginSection app={app} onChange={onChange} />
-    <ConnectionSection app={app} connectionSecret={connectionSecret} />
+    <ConnectionSection app={app} onApps={onApps} />
   </>;
 }
