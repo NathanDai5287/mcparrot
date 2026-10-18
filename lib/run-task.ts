@@ -14,7 +14,7 @@ const pageLoadTimeout = requestTimeout - networkQuietTimeout - shortPageWait;
 const shortPageCharacters = 200;
 const runBudget = 250_000;
 const stepReserve = 2 * requestTimeout;
-const imageTypes = ["image/png", "image/jpeg", "image/jpg", "image/pjpeg", "image/webp", "image/gif"];
+const imageTypes = ["image/png", "image/jpeg", "image/jpg", "image/pjpeg", "image/webp", "image/gif", "image/avif"];
 const maximumImageSide = 1600;
 const maximumImageCharacters = 1_500_000;
 const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your humanity|kpsdk|kasada|akamai/i;
@@ -283,7 +283,7 @@ function readImage(page: Page, url: string, website?: string) {
     if (website && (status === 401 || status === 403)) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
     if (status >= 400) throw httpError("GET", url, status);
     const contentType = navigation?.headers()["content-type"]?.split(";")[0].trim().toLowerCase() ?? "";
-    if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, or GIF image, so MCParrot did not read it.`);
+    if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, GIF, or AVIF image, so MCParrot did not read it.`);
     const dataUrl = await page.evaluate(async (maximumSide) => {
       const image = document.querySelector("img")!;
       await image.decode();
