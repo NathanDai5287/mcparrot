@@ -137,6 +137,7 @@ export default function Workspace() {
 
   async function deleteApp(app: Website) {
     await requestExtension("clear", app.id).catch(() => undefined);
+    await fetch(`/api/login?appId=${app.id}`, { method: "DELETE" }).catch(() => undefined);
     setApps((savedApps) => savedApps.filter((savedApp) => savedApp.id !== app.id));
     navigate({ view: "apps" }, true);
   }

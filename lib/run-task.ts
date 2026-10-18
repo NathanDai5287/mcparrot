@@ -6,7 +6,9 @@ import type { Task, Website } from "./capabilities";
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 20_000;
 const signInAddress = /log-?in|sign-?in|sso|saml/i;
-const signedOutMessage = "The website is signed out. Open MCParrot, select Sign in to website on this app, then try again.";
+export const signedOutMessage = "The website is signed out. Open MCParrot, then save a login for this app or select Sign in to website, then try again.";
+
+export type TaskInputs = Record<string, string | undefined>;
 
 export const isReadingTask = (task: Task) => task.requests.every((request) => request.method.toUpperCase() === "GET");
 
@@ -45,7 +47,7 @@ async function readRequests(page: Page, website: string, urls: string[]) {
   return results.join("\n\n");
 }
 
-async function readTask(app: Website, task: Task, inputs: Record<string, string | undefined>) {
+async function readTask(app: Website, task: Task, inputs: TaskInputs) {
   if (!app.browserProfileId) throw new Error(signedOutMessage);
   const values = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
   const urls = task.requests.map((request) => new URL(fillPattern(request.urlPattern, values), app.url).href);
@@ -57,7 +59,7 @@ async function readTask(app: Website, task: Task, inputs: Record<string, string 
   }
 }
 
-export async function runTask(app: Website, task: Task, inputs: Record<string, string | undefined>) {
+export async function runTask(app: Website, task: Task, inputs: TaskInputs) {
   const taskAttributes = { appId: app.id, task: task.name, requestCount: task.requests.length };
   try {
     const result = await readTask(app, task, inputs);

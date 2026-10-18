@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import type { Website } from "../lib/capabilities";
 
-type AppChanges = Pick<Website, "browserProfileId" | "signedInAt">;
+type AppChanges = Partial<Pick<Website, "browserProfileId" | "signedInAt" | "loginSavedAt">>;
 type SignInBrowser = { browserId: string; liveUrl: string; popup: Window | null };
 
 function SignInSection({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
@@ -54,6 +54,62 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
   </section>;
 }
 
+function LoginSection({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
+  const [replacing, setReplacing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function saveLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const fields = new FormData(event.currentTarget);
+    setBusy(true);
+    setError("");
+    const response = await fetch("/api/login", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: app.id, websiteUrl: app.url, username: fields.get("username"), password: fields.get("password") }) }).catch(() => null);
+    const result = await response?.json().catch(() => ({})) ?? {};
+    setBusy(false);
+    if (!response?.ok) {
+      setError(result.error ?? "MCParrot could not save the login. Try again.");
+      return;
+    }
+    onChange({ loginSavedAt: new Date().toISOString() });
+    setReplacing(false);
+  }
+
+  async function deleteLogin() {
+    setBusy(true);
+    setError("");
+    const response = await fetch(`/api/login?appId=${app.id}`, { method: "DELETE" }).catch(() => null);
+    setBusy(false);
+    if (!response?.ok) {
+      setError("MCParrot could not delete the login. Try again.");
+      return;
+    }
+    onChange({ loginSavedAt: undefined });
+  }
+
+  if (app.loginSavedAt && !replacing) return <section className="assistant-section">
+    <div>
+      <h2>Saved login</h2>
+      <p>Login saved. When the website signs out, MCParrot signs in again with it and asks you in ChatGPT for any text-message code.</p>
+      {error && <p className="pilot-error" role="alert">{error}</p>}
+    </div>
+    <div className="login-actions"><button className="button" disabled={busy} onClick={() => setReplacing(true)}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
+  </section>;
+
+  return <section className="assistant-section">
+    <form className="editor" onSubmit={saveLogin}>
+      <h2>Save login</h2>
+      <p>Save your username and password for {app.name} so MCParrot can sign in again when the website signs out. MCParrot encrypts them and never shows the password again.</p>
+      <label htmlFor={`login-username-${app.id}`}>Username</label>
+      <input id={`login-username-${app.id}`} name="username" autoComplete="off" required />
+      <label htmlFor={`login-password-${app.id}`}>Password</label>
+      <input id={`login-password-${app.id}`} name="password" type="password" autoComplete="new-password" required />
+      {error && <p className="pilot-error" role="alert">{error}</p>}
+      <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Saving login…" : "Save login"}</button>{replacing && <button className="button" type="button" onClick={() => setReplacing(false)}>Cancel</button>}</div>
+    </form>
+  </section>;
+}
+
 function ConnectionSection({ app, connectionSecret }: { app: Website; connectionSecret?: string }) {
   const [copied, setCopied] = useState(false);
   if (!connectionSecret) return <section className="assistant-section"><div><h2>Use tasks in ChatGPT</h2><p>The connection link is available on the production site.</p></div></section>;
@@ -84,6 +140,7 @@ function ConnectionSection({ app, connectionSecret }: { app: Website; connection
 export function AssistantPanel({ app, connectionSecret, onChange }: { app: Website; connectionSecret?: string; onChange: (changes: AppChanges) => void }) {
   return <>
     <SignInSection app={app} onChange={onChange} />
+    <LoginSection app={app} onChange={onChange} />
     <ConnectionSection app={app} connectionSecret={connectionSecret} />
   </>;
 }

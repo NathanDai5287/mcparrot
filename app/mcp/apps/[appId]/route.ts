@@ -3,11 +3,12 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
-import { isReadingTask, runTask } from "../../../../lib/run-task";
+import { isReadingTask } from "../../../../lib/run-task";
+import { runTaskSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { readWorkspace } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function toolName(taskName: string) {
   return taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
@@ -17,16 +18,23 @@ function inputSchema(task: Task) {
   return Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)]));
 }
 
+const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
+
 function appServer(app: Website) {
-  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: true, recordOutputs: false });
+  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
   for (const task of app.tasks.filter(isReadingTask)) {
     server.registerTool(toolName(task.name), {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
       annotations: { readOnlyHint: true },
-    }, async (inputs) => ({ content: [{ type: "text", text: await runTask(app, task, inputs) }] }));
+    }, async (inputs) => textResult(await runTaskSigningIn(app, task, inputs)));
   }
+  server.registerTool("submit_verification_code", {
+    title: "Submit verification code",
+    description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a task result says that a code was sent.`,
+    inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
+  }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
   return server;
 }
 

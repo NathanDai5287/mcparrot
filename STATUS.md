@@ -8,10 +8,11 @@ Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authentication.
 Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in Upstash Redis.
-Each app page offers **Sign in to website** through a Browser Use cloud browser and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks.
-The MCP route passed a direct Node check, but Browser Use sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
+Each app page offers **Sign in to website** through a Browser Use cloud browser, a **Save login** form that stores an encrypted username and password, and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks.
+When a task finds the website signed out, a Browser Use agent signs in again with the saved login, and the user types any text-message code in the ChatGPT chat.
+The MCP route and saved logins passed direct Node checks, but Browser Use sign-in, automatic sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
 Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring are wired in, but they need events from Nathan's use of the deployed app.
-Task testing, the management connection, and automatic sign-in recovery remain aspirational.
+Task testing and the management connection remain aspirational.
 
 ## Status word meanings
 
@@ -38,7 +39,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Explore any website | gap | MCParrot Explorer 0.2.0 records data requests with short response samples in the opened tab; syntax checks pass; Nathan's live recording demonstration must pass |
 | Capability discovery with Cursor Composer | shipped | `/api/discover` returned three capabilities with inputs from three sample requests in a direct Node check through the Cursor SDK on October 17, 2026; discovery on Vercel and from a live recording needs Nathan's demonstration |
 | Choose and save tasks | shipped | The checklist saves ticked, edited capabilities as the app's tasks; automatic type and production build checks pass; Nathan tests the live flow |
-| MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026 |
+| MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026; a later check that day answered an initialize request for protocol version 2026-07-28 with version 2025-11-25 and listed `submit_verification_code` |
 | Private ChatGPT connection link | gap | The Vercel automation bypass secret exists and the app page shows the link with **Copy link**; a live ChatGPT connector needs Nathan's test |
 | Sign-in through Browser Use | gap | `/api/sign-in` creates the app's Browser Use profile, starts a cloud browser with its live view, and stops it on **Done signing in**; it needs Nathan's live sign-in |
 | Running tasks from ChatGPT | gap | Each tool call runs the task's GET requests inside a Browser Use browser with the app's profile and returns the response or a signed-out error; it needs Nathan's live ChatGPT request |
@@ -49,9 +50,9 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Write tasks | aspirational | Run tasks that change website data; the first version runs GET requests only |
 | Management MCP connection | aspirational | Add MCP operations that match each dashboard capability; Nathan scoped the first version to app connections only |
 | Owner authentication | aspirational | Product accounts, MCP sign-in, and multi-user ownership remain unavailable; the private link is the only MCP access control |
-| Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it; today the tool returns a signed-out error instead |
-| Saved credentials | aspirational | Optional per-website username/password entry, replacement, and deletion require durable encrypted storage, a separate managed key, and product owner authorization |
-| Long task status | aspirational | Store operation status for tasks that take longer than one 60-second request |
+| Session reconnection and verification | gap | A signed-out task starts a Browser Use agent sign-in with the saved login, keeps the browser for a text-message code, and `submit_verification_code` finishes sign-in; a direct Node check with Browser Use replaced by a stub returned the code request and stored the pending sign-in on October 17, 2026; Nathan's live Canvas test with Duo must pass |
+| Saved credentials | gap | **Save login**, **Replace**, and **Delete** store each app's login in Redis encrypted with AES-256-GCM under `MCPARROT_CREDENTIAL_KEY`; a direct Node check on October 17, 2026 passed the encryption round trip, rejected changed ciphertext, and saved and deleted a login through `/api/login`; Nathan's live save must pass, and per-owner authorization remains aspirational |
+| Long task status | aspirational | Store operation status for tasks that take longer than one 300-second request |
 | Sentry connection and source maps | shipped | `@sentry/nextjs` starts in the browser and on the server; on October 17, 2026, the production build uploaded source maps, and a direct Node event sent with the project's DSN reached `nathan-s4/mcparrot`, where the Sentry API returned it |
 | Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
 | Sentry Tracing | gap | Spans cover Composer discovery, Browser Use start and stop, the CDP connection, and each task request; traces from the deployed app need Nathan's use |
@@ -77,6 +78,13 @@ On October 17, 2026, a direct Node check saved a test app with one GET task and 
 The route answered initialize with the server name, listed only the GET task as a read-only tool with its input, returned the signed-out tool error because the app had no sign-in, and returned 404 for an unknown app.
 That check does not prove the production store, Browser Use sign-in, task execution, or a live ChatGPT connector.
 
+Later on October 17, 2026, a direct Node check called the route handlers with an in-memory Redis replacement and the real `MCPARROT_CREDENTIAL_KEY`.
+An encrypted login decrypted to the same password, its ciphertext did not contain the password, and changed ciphertext was rejected.
+`/api/login` saved a login with the hosts `bcourses.berkeley.edu` and `auth.berkeley.edu` without storing the password in plain text, then deleted it.
+The MCP route answered an initialize request for protocol version 2026-07-28 with version 2025-11-25, listed `submit_verification_code`, returned the save-login message for a signed-out app without a login, and returned a no-pending message for a code with no waiting sign-in.
+With the Browser Use API replaced by a stub, a signed-out app with a saved login created a profile, started one agent run with the password only in secret bindings and a 900-second keep-alive, stored the pending sign-in, and returned the request for a text-message code.
+That check cannot prove a real Browser Use run, because the Browser Use key is readable only on Vercel.
+
 On October 17, 2026, the production build uploaded source maps to the Sentry project `nathan-s4/mcparrot`.
 A direct Node script then sent one test error and one test log with the project's DSN, and the Sentry API returned the test error by its event ID.
 The available auth token cannot read organization data, so the API could not confirm the log.
@@ -89,6 +97,10 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - The dashboard has no management MCP operations, including `delete_app`, sign-in, and the discovery operations, which breaks the [UI and MCP parity rule](README.md#ui-and-mcp-parity).
 - The production Upstash store needs Nathan to finish its setup in Vercel before apps and tasks can load.
 - Browser Use sign-in, task execution, and a live ChatGPT connector need Nathan's production demonstration.
+- Automatic sign-in with a saved login and the text-message code step need Nathan's live Canvas test; the agent prompt, Duo option choice, and secret-binding hosts are untested against the real website.
+- Browser Use keeps a waiting sign-in browser for 15 minutes only on paid projects; free projects stop it after 2 minutes, so a slow code entry fails and the task must start sign-in again.
+- A sign-in agent run that takes longer than 220 seconds ends the tool call with an error, because Vercel stops the call at 300 seconds.
+- ChatGPT first sends MCP protocol version 2026-07-28, which no MCP SDK supports; the route relies on ChatGPT falling back to version 2025-11-25, which Nathan's live connector test must confirm.
 - Saved tasks become tools without a test, run GET requests only, and fail when a website needs header tokens instead of cookies.
 - Anyone with an app's connection link can use the whole site until the bypass secret is regenerated.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.

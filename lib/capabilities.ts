@@ -18,4 +18,5 @@ export type Website = {
   tasks: Task[];
   browserProfileId?: string;
   signedInAt?: string;
+  loginSavedAt?: string;
 };

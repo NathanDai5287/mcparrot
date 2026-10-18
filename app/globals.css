@@ -79,6 +79,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
 .empty-state p { margin: 8px 0 20px; color: var(--muted); font-size: 13px; }
 .assistant-section { margin-top: 38px; background: var(--soft); border-radius: 9px; padding: 23px; display: flex; gap: 20px; justify-content: space-between; align-items: center; }
 .assistant-section p { margin-top: 5px; color: #5a6f64; font-size: 12px; max-width: 60ch; }
+.login-actions { display: flex; gap: 9px; }
 .browser-preview { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: #fff; }
 .browser-bar { display: flex; align-items: center; gap: 11px; padding: 13px 18px; border-bottom: 1px solid var(--line); background: #f3f6f4; color: var(--muted); font-size: 12px; }
 .browser-bar > span:nth-child(2) { flex: 1; overflow-wrap: anywhere; min-width: 0; }

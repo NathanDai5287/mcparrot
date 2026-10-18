@@ -85,14 +85,14 @@
             <thead><tr><th scope="col">Part</th><th scope="col">Where it runs</th></tr></thead>
             <tbody>
               <tr><th scope="row">Website, ChatGPT connections, and short server work</th><td>Vercel</td></tr>
-              <tr><th scope="row">Saved apps and tasks</th><td>Upstash Redis, added through the Vercel Marketplace</td></tr>
+              <tr><th scope="row">Saved apps, tasks, and encrypted logins</th><td>Upstash Redis, added through the Vercel Marketplace</td></tr>
               <tr><th scope="row">Exploration</th><td>Your normal browser with MCParrot Explorer</td></tr>
               <tr><th scope="row">Finding what a site can do</th><td>Cursor Composer 2.5 Fast through the Cursor SDK, called from our website</td></tr>
               <tr><th scope="row">Your website sign-in and running tasks</th><td>Browser Use Cloud browsers</td></tr>
             </tbody>
           </table>
         </div>
-        <p>You chose Upstash Redis so that ChatGPT’s connection can read the same apps and tasks you see. MCParrot has one owner for now, you, because Vercel asks for your sign-in before anyone can open the website, so all your apps are saved together. They appear on any device where you open MCParrot. The first time you open the new version, MCParrot copies the apps that this browser saved before. Each task that ChatGPT runs must finish within one minute. Passwords and browser profiles stay outside the public deployment. These guides are part of the website too.</p>
+        <p>You chose Upstash Redis so that ChatGPT’s connection can read the same apps and tasks you see. MCParrot has one owner for now, you, because Vercel asks for your sign-in before anyone can open the website, so all your apps are saved together. They appear on any device where you open MCParrot. The first time you open the new version, MCParrot copies the apps that this browser saved before. Each ChatGPT request to MCParrot must finish within five minutes. Saved logins are locked with a separate secret key before they reach Upstash, and browser profiles stay with Browser Use. These guides are part of the website too.</p>
       </section>
 
       <section id="idea">
@@ -149,6 +149,7 @@
           <li><h3>Sign in</h3><p>Sign in as usual in the popup and complete Duo or any other check. You have 15 minutes.</p></li>
           <li><h3>Finish</h3><p>Return to MCParrot and select <strong>Done signing in</strong>. The cloud browser closes and saves your sign-in. The app page and app list then show that the app is signed in.</p></li>
         </ol>
+        <p>You can also save your login on the app page, so MCParrot signs in again by itself when the website signs you out. <a href="#reconnect">Recovering an expired sign-in</a> explains how.</p>
       </section>
 
       <section id="connections">
@@ -173,7 +174,7 @@
           <li><h3>MCParrot runs the task</h3><p>A hidden Browser Use browser opens the website with your saved sign-in and repeats the task’s requests inside the website page. You never see this browser.</p></li>
           <li><h3>Get the result</h3><p>ChatGPT receives the website’s answer, shortened if it is very long, and nobody clicks through the website pages again.</p></li>
         </ol>
-        <p>If the website has signed you out, ChatGPT shows a message that tells you to select <strong>Sign in to website</strong> in MCParrot. Sign in again, then ask again. Tasks only read information in this first version, so tasks that would change website data do not appear in ChatGPT. Some websites need special codes that only their own page adds, so some saved tasks can fail. Your assistant can combine tasks to answer new requests, but one browsing session cannot prove support for every website feature.</p>
+        <p>If the website has signed you out and you saved a login, MCParrot signs in again for you, as <a href="#reconnect">recovering an expired sign-in</a> explains. Without a saved login, ChatGPT shows a message that tells you to save a login or select <strong>Sign in to website</strong> in MCParrot, and then you ask again. Tasks only read information in this first version, so tasks that would change website data do not appear in ChatGPT. Some websites need special codes that only their own page adds, so some saved tasks can fail. Your assistant can combine tasks to answer new requests, but one browsing session cannot prove support for every website feature.</p>
       </section>
 
       <section id="agent-access">
@@ -183,22 +184,25 @@
         <p>The rule applies to app management, task teaching, testing, sign-in, connections, progress, and recovery. We check both paths before we mark a feature shipped. Today, ChatGPT can run an app’s saved tasks, but it cannot manage MCParrot, which is a <span class="badge badge--gap">gap</span> listed on the <a href="status.html#gaps">status page</a>.</p>
         <aside class="note">
           <strong class="note-label">You still control personal verification</strong>
-          <p>Your agent could request exploration, but you still need the extension and your selected browser tab. You browse the website yourself. You still approve Duo on your phone and complete any other personal verification. After that, your agent checks progress and continues the supported work. Keep passwords and verification codes out of assistant messages.</p>
+          <p>Your agent could request exploration, but you still need the extension and your selected browser tab. You browse the website yourself. You still receive Duo’s text-message code on your phone and complete any other personal verification. You chose to type verification codes in the ChatGPT chat. Passwords never go into ChatGPT; you enter them only in MCParrot’s <strong>Save login</strong> form.</p>
         </aside>
       </section>
 
       <section id="reconnect">
         <h2>Recovering an expired sign-in</h2>
-        <p>A saved login can expire. Today, ChatGPT then shows a message that tells you to select <strong>Sign in to website</strong> in MCParrot, and you sign in again and ask again. The automatic recovery below is <span class="badge badge--aspirational">aspirational</span>.</p><p>You can choose to save a username and password separately for each website app. Enter them only in a private MCParrot form. You can replace or delete them later. The app uses them only for that website and its approved sign-in page. It does not collect passwords while you explore or copy them from your browser.</p><p>Browser Use would use saved details to sign in again when your tasks run. You still enter each text code yourself. Your assistant can request a private entry page or check whether details are saved, but it cannot read your password.</p>
+        <p>Websites sign you out after a while. If you saved a login for the app, MCParrot signs in again by itself while ChatGPT runs your task, and you only type the text-message code in ChatGPT. This is a <span class="badge badge--gap">gap</span> until your live Canvas test passes. Without a saved login, ChatGPT tells you to save one or select <strong>Sign in to website</strong> in MCParrot.</p>
+        <p>To save a login, open the app page, enter your username and password in <strong>Save login</strong>, and select <strong>Save login</strong>. The page then only says <strong>Login saved</strong>, with <strong>Replace</strong> and <strong>Delete</strong>. MCParrot locks the details with a secret key before it stores them and never shows the password again, not to the page and not to ChatGPT. Saving also notes the website’s sign-in page, such as CalNet for Berkeley Canvas, and the password can only be typed on the website and that page. Deleting the app deletes its login too. Deleting a login does not sign you out of the website.</p>
         <ol class="flow">
-          <li><h3>The browser attempts sign-in</h3><p>If you chose to save your sign-in details securely, Browser Use enters them and continues as far as possible. If not, you enter your sign-in details through a secure page inside our app.</p></li>
-          <li><h3>Your assistant shows a verification request</h3><p>The tool gives a <strong>Verification required</strong> status and a link that your assistant can show you.</p></li>
-          <li><h3>You complete verification</h3><p>Enter a verification code on the secure page, or approve Duo on your phone. Keep passwords and verification codes out of assistant messages.</p></li>
-          <li><h3>The task continues</h3><p>The browser finishes sign-in, and the app tries to continue the waiting task. Some assistants may need to check the task status before they show the result.</p></li>
-        </ol><p>User-managed saved logins remain aspirational. They need private account access and encrypted storage before you can use them. Verification codes are not saved. Deleting saved details will remove them from MCParrot; it will not sign out existing website sessions.</p>
+          <li><h3>A task finds you signed out</h3><p>You ask ChatGPT for something, such as your course syllabus, and the website says you are signed out.</p></li>
+          <li><h3>Browser Use signs in</h3><p>A Browser Use agent opens the website in a hidden browser with your app’s saved sign-in. Browser Use types your username and password into the page itself, so the agent’s AI never sees them. It tries the password once and never again if the website rejects it; then ChatGPT tells you to replace the login in MCParrot.</p></li>
+          <li><h3>The website asks for a code</h3><p>When Duo or a similar check appears, the agent chooses the text-message option, opening <strong>Other options</strong> if needed, and stops at the code box. The hidden browser waits for up to 15 minutes. ChatGPT tells you that a code was sent to your phone and asks you for it.</p></li>
+          <li><h3>You type the code in ChatGPT</h3><p>Type the code in the chat. ChatGPT passes it to MCParrot, and the agent enters it in the same browser and declines the offer to remember the device. If the website rejects the code, ChatGPT asks you for a new one.</p></li>
+          <li><h3>Ask again</h3><p>MCParrot closes the browser, which saves your new sign-in, and ChatGPT tells you sign-in finished. ChatGPT then runs your task again. If the website did not ask for a code, the task continues straight away.</p></li>
+        </ol>
+        <p>MCParrot does not keep the code after it uses it, and Sentry never receives codes or passwords. Your agent will be able to check whether a login is saved or delete it, but it will never read your password; these agent controls are aspirational.</p>
         <aside class="note">
           <strong class="note-label">Needs a real school test</strong>
-          <p>The sign-in rules of a school may prevent parts of this flow. Unsupported recovery must show a clear failure instead of opening a visible website browser. We have not tested automatic sign-in or Duo recovery on the website of your school.</p>
+          <p>The sign-in rules of a school, device checks, or Duo settings may stop automatic sign-in. In that case ChatGPT shows a clear message that tells you to select <strong>Sign in to website</strong> in MCParrot. No visible browser opens during ChatGPT use. We have not yet tested automatic sign-in on Berkeley Canvas.</p>
         </aside>
       </section>
 
@@ -220,7 +224,7 @@
         <p>First, you browse a reading page, save one suggested task, sign in once, and ask ChatGPT to run it with different inputs. The <a href="status.html#order">order of remaining work</a> lists every later stage and how we know each one is finished.</p>
         <aside class="note">
           <strong class="note-label">Make failures useful</strong>
-          <p>Sentry is a service that reports errors and slow steps in an app. MCParrot sends it error reports, the timing of each step (Tracing), short log lines (Logs), screen recordings of the workspace with all text hidden (Session Replay), and the timing of each Cursor Composer and ChatGPT tool call (AI agent monitoring). Logs go through Sentry itself, because the Vercel log forwarding feature needs a paid plan. Sentry never receives passwords, cookies, website answers, or the private link secret. The demonstration should show a real problem that these tools helped us fix.</p>
+          <p>Sentry is a service that reports errors and slow steps in an app. MCParrot sends it error reports, the timing of each step (Tracing), short log lines (Logs), screen recordings of the workspace with all text hidden (Session Replay), and the timing of each Cursor Composer and ChatGPT tool call (AI agent monitoring). Logs go through Sentry itself, because the Vercel log forwarding feature needs a paid plan. Sentry never receives passwords, verification codes, cookies, website answers, the values ChatGPT sends to tools, or the private link secret. ChatGPT first asks for the newest connection version, 2026-07-28, which no MCP toolkit supports yet; MCParrot answers with the versions it supports, ChatGPT then uses the older version, and Sentry ignores that expected first error. The demonstration should show a real problem that these tools helped us fix.</p>
         </aside>
       </section>
       <footer>

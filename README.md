@@ -66,6 +66,7 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Find what the website can do | `discover_capabilities` |
 | Save chosen capabilities as tasks | `save_tasks` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
+| Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
 | Copy the app's connection link | `get_connection_link` |
 | Delete an app and its tasks | `delete_app` |
 
@@ -95,6 +96,7 @@ Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
 Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
+Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 
 Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
@@ -107,8 +109,9 @@ Do not promise automatic connector installation or identical support across assi
 Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tasks, report status, and request sign-in recovery.
 An agent can start exploration, but the user browses the website in the explore tab.
 An agent cannot replace required personal verification.
-For example, Duo is a sign-in check that asks the user to approve a request on their phone, and only the user can approve it.
-Keep passwords and verification codes in MCParrot's private verification flow, never in assistant messages.
+For example, Duo is a sign-in check that sends a code to the user's phone or asks the user to approve a request there, and only the user can do it.
+Nathan decided that the user types website verification codes, such as a text-message code, in the ChatGPT chat.
+Passwords never go into assistant messages; the user enters them only in MCParrot's **Save login** form.
 
 ## Teaching website tasks
 
@@ -177,10 +180,10 @@ The user signs in normally and completes personal verification; exploration does
 Signing in for assistant use is the one step with a visible cloud browser: the user selects **Sign in to website** on the app page and signs in through Browser Use's live view in a popup.
 During MCP use, the product never opens a visible website browser window.
 Each tool call runs in a hidden Browser Use cloud browser that the user never sees.
-For aspirational recovery flows, sign-in and verification use secure forms inside our app.
-Browser Use enters those values into the hidden website browser without sending them to an AI model.
+When a tool call finds the website signed out, a hidden Browser Use agent signs in again with the app's saved login.
+Browser Use types the password into the website page without sending it to the agent's AI model.
 Required personal verification stays in place in both UI and MCP flows.
-Unsupported recovery must return a clear failure instead of opening a visible browser during MCP use.
+Unsupported recovery returns a clear failure instead of opening a visible browser during MCP use.
 
 ## Signing in to websites
 
@@ -196,6 +199,7 @@ The user's normal browser and the Browser Use browser have separate sign-ins, so
 MCParrot stores the profile ID and the sign-in time with the app, and the app page and app list show whether the app is signed in.
 If the popup is blocked, select **Open the sign-in window** on the app page.
 The server route `/api/sign-in` starts and stops these browsers with `BROWSER_USE_API_KEY`, which never reaches the browser.
+The user can also save a login on the app page, so MCParrot signs in again by itself when the website signs out, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 
 ## Using saved tasks
 
@@ -207,10 +211,11 @@ When ChatGPT calls a tool, the server starts a Browser Use cloud browser with th
 It opens the app's website address, fills each `{placeholder}` in the task's URL patterns from the tool inputs, and runs each request with `fetch` inside the page using the website's own cookies.
 Inputs that ChatGPT leaves out use the example value that discovery found.
 The tool returns each request's address, status, and response body, shortened to 20,000 characters, and the server then stops the browser.
-The whole call must finish within Vercel's 60-second function limit.
+The whole call must finish within the route's 300-second Vercel function limit.
 
-The task fails with a clear message when the website is signed out: when the website address lands on a sign-in page, a request returns 401 or 403, or a request redirects to a sign-in page.
-That message tells the user to open MCParrot and select **Sign in to website** on the app.
+The task treats the website as signed out when the website address lands on a sign-in page, a request returns 401 or 403, or a request redirects to a sign-in page.
+When the app has a saved login, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
+Without a saved login, the task fails with a message that tells the user to open MCParrot and save a login or select **Sign in to website** on the app.
 Tasks run only GET requests in this first version, because the first milestone reads website data and never changes it.
 
 Assistants can combine taught tasks in new ways without another recording.
@@ -224,41 +229,42 @@ Measure speed against an agent navigating the website before you claim an improv
 ## Reconnecting expired sessions
 
 During normal use, tasks run without another sign-in while the website session is valid.
-When the session expires, the tool returns an error that tells the user to select **Sign in to website** in MCParrot, and the user signs in again and repeats the request.
-The automatic recovery below is aspirational.
+When the session expires and the app has a saved login, MCParrot signs in again by itself during the ChatGPT tool call.
+The user only types a text-message code in the ChatGPT chat when the website asks for one.
+Without a saved login, the tool returns an error that tells the user to save a login or select **Sign in to website** in MCParrot.
+This automatic sign-in is a gap until Nathan's live test passes, as the [status page](STATUS.md) records.
 
-Users can optionally save a username and password for each website app through a private form inside MCParrot.
-They can replace or delete those saved details and can use manual sign-in instead.
-Saved details belong to one owner, one website app, and its approved login origin.
-Never reuse one app's password on another website or assume the website origin matches its separate sign-in provider.
-For example, Berkeley Canvas uses its approved CalNet login origin.
-The product must not capture typed passwords while exploring or import passwords from the user's normal browser.
-User-managed saved logins remain aspirational, as the [status page](STATUS.md) records.
-When a session expires, the product follows these steps:
+### Saving a login
 
-1. Detect the expired session and keep the pending operation.
-2. Start Browser Use with the website's browser profile.
-3. Continue sign-in with securely supplied credentials, if the user enabled this option.
-4. Return a verification-required result when the website needs user action.
-5. Show an authenticated link through the assistant for entering credentials or a verification code inside our app.
-6. Wait for the user to submit the code or approve Duo on their phone.
-7. Finish sign-in, refresh session data, and resume the pending operation.
+The app page has a **Save login** form that takes the username and password for that website.
+After saving, the page shows only **Login saved**, with **Replace** to enter new details and **Delete** to remove them.
+Saving also finds the website's sign-in address by following the website's redirect, so Berkeley Canvas logins are allowed on `bcourses.berkeley.edu` and its CalNet sign-in page `auth.berkeley.edu`.
+Browser Use may type the saved details only on those two hosts, so one app's password never reaches another website.
+The product never captures typed passwords while exploring and never imports passwords from the user's normal browser.
+Deleting the app also deletes its saved login, but deleting a login does not sign out existing website sessions.
 
-The authenticated link opens our app's verification flow.
-Do not ask users to paste passwords or verification codes into assistant messages.
-Store pending status so users can see whether a task needs verification, is running, or has finished.
-Assistant clients differ, so do not assume every client resumes a tool call automatically after verification.
-The client may need to check status or request the result again.
-When an interrupted operation resumes, do not repeat a write that already finished.
+### Automatic sign-in steps
 
-The user manages saved-login status, replacement, and deletion through the same authorized operations in the UI and management MCP.
-MCP operations return saved status only; they never return a stored password or accept a password through an assistant message.
-An agent can request a private entry link and resume sign-in after the user completes it.
-Do not retain SMS codes after submission, and do not retry rejected passwords automatically.
+1. A tool call finds the website signed out, and the app has a saved login.
+2. MCParrot starts a Browser Use agent run with the app's browser profile, creating the profile first if the app has none.
+3. The agent receives the username and password as Browser Use secret bindings, which the Browser Use server types into the page; the agent's AI model never sees them.
+4. The agent submits the password once and never retries a rejected password; MCParrot then tells the user to replace the login in MCParrot.
+5. When the website asks for verification, the agent chooses the text-message option, opening "Other options" in Duo when needed, and stops when the page asks for the code.
+6. MCParrot keeps that browser running for 15 minutes and stores its session ID, browser ID, and CDP address in Redis as the app's pending sign-in, which expires with it.
+7. The tool result tells ChatGPT that a code was sent to the user's phone and to ask the user for it, then call `submit_verification_code`.
+8. That tool reads the page's host names over CDP and starts a follow-up agent run in the same browser, which receives the code as a secret binding for those hosts, submits it, and skips optional device trust.
+9. When sign-in finishes, MCParrot stops the browser so the profile saves the session, clears the pending sign-in, and records the sign-in time.
+10. The tool tells ChatGPT that sign-in finished and to run the original task again; it does not rerun the task itself.
 
-School rules, device checks, and Duo settings can prevent automated sign-in.
-In that case, use supported in-app verification without opening a visible website browser, or show a clear failure.
-Reconnection cannot guarantee access to every website.
+When the website signs in without verification, the task continues straight away in the same tool call.
+When the website rejects the code, the tool asks ChatGPT to request a new code from the user and keeps the browser waiting.
+When a task runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
+Any other outcome stops the browser and tells the user to select **Sign in to website** in MCParrot.
+MCParrot does not keep the code after the call, and Sentry never receives it.
+
+The saved-login operations follow the parity rule: MCP operations may return saved status only and never return a stored password or accept one through an assistant message.
+Those management MCP operations remain aspirational, as the [UI and MCP parity section](#ui-and-mcp-parity) records.
+School rules, device checks, and Duo settings can prevent automated sign-in, and reconnection cannot guarantee access to every website.
 
 ## Production deployment setup
 
@@ -268,14 +274,15 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
+The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
 Vercel Authentication protects every deployment, including the production domain; only requests that carry the automation bypass secret skip it.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
 MCParrot has one owner for now, because Vercel Authentication lets only Nathan reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
-The value holds each app's name, website address, chosen tasks, Browser Use profile ID, and sign-in time; it holds no credentials, and recorded requests stay in the extension.
+The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
+Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
 The dashboard reads the workspace through `/api/workspace` when it opens and saves the whole workspace after each change.
 The first time it finds no stored workspace, it copies apps that an earlier version saved in this browser's local storage.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
@@ -288,15 +295,17 @@ The following table describes the complete product; the [status page](STATUS.md)
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
 | Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
-| Browser sessions | Browser Use Cloud browsers with one persistent profile per app | Keep the user's website sign-in, and run each task in a hidden browser |
+| Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each task in a hidden browser, and sign in again with the saved login |
 | Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests with the website's own cookies |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
-| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, and Browser Use profile IDs |
+| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, Browser Use profile IDs, encrypted saved logins, and pending sign-ins |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
 A sign-in browser runs for up to 15 minutes, but the Vercel request that starts it returns at once, and **Done signing in** stops it with a separate request.
-Each task call runs inside one Vercel request with `maxDuration = 60`, so a task must finish within 60 seconds.
+Each MCP tool call runs inside one Vercel request with `maxDuration = 300`, the most that Fluid compute allows on the Hobby plan.
+MCParrot waits at most 220 seconds for each Browser Use sign-in agent run, so a sign-in plus the task fits in one call; a slower run ends the call with an error.
+The verification code arrives in a separate tool call, so waiting for the user never holds a request open.
 For work that takes longer than one request, durable operation status that clients check is aspirational.
 
 ## Authentication and private data
@@ -312,11 +321,12 @@ MCP sign-in for each owner remains aspirational.
 
 The Browser Use profile holds the website's cookies inside Browser Use, and MCParrot stores only its ID.
 A sign-in browser's live view address works like a password while the browser runs, so MCParrot shows it only on the protected app page.
-Use encrypted storage and controlled access for saved credentials, cookies, and tokens.
-Before adding user-managed saved logins, provide durable encrypted storage, a separate managed encryption key, and server-enforced owner authorization for every access.
-Vercel deployment access alone does not establish product ownership for each credential record.
-Only the authentication worker may decrypt the selected app's password for its approved login origin; neither the UI nor MCP can read it back.
-Deleting saved login details removes the credential record; ending existing website sessions is a separate action.
+MCParrot encrypts each saved login with AES-256-GCM before it reaches Redis, using the 32-byte key in `MCPARROT_CREDENTIAL_KEY`.
+That key is a Sensitive Vercel variable in production and preview, separate from the Redis credentials, so a Redis leak alone does not reveal passwords.
+Only the automatic sign-in step on the server decrypts a login, and it passes the username and password to Browser Use only as secret bindings for the app's website and sign-in hosts.
+The password never returns to the dashboard, never appears in MCP results, and never reaches an AI model, a log, or Sentry.
+Vercel Authentication is the only owner check for saved logins, because MCParrot has one owner; per-owner authorization for each credential record is aspirational.
+Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
 Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in traffic.
 Define how long recordings are kept and how they are deleted before you store captures in production.
@@ -332,15 +342,19 @@ MCParrot keeps every trace and every session because it has one user, and it sen
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, and one `task.request` for each request a task runs |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, and each task run's outcome, including whether the website was signed out |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, and one `task.request` for each request a task runs |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, and each task run's outcome, including whether the website was signed out |
 | Session Replay | Recordings of dashboard sessions, with all text and inputs masked |
 | AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
 Spans carry only non-secret attributes, such as the app ID, task name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
-MCP spans record tool inputs but never tool results, because the results are website responses.
+MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
+
+ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
+The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
+Sentry ignores that expected error, so it does not hide real failures in Issues.
 
 ## Workspace navigation behavior
 
@@ -356,6 +370,7 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 Use Node.js 24 or later.
 The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
 That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
+Add `MCPARROT_CREDENTIAL_KEY` with a random 32-byte base64 key, for example from `openssl rand -base64 32`, to save logins; the production key is Sensitive and cannot be pulled, so logins saved locally cannot be read in production.
 Add `NEXT_PUBLIC_SENTRY_DSN` to send diagnostics and `SENTRY_AUTH_TOKEN` to upload source maps during `npm run build`; without them, Sentry stays off.
 The connection link appears only on Vercel, where `VERCEL_AUTOMATION_BYPASS_SECRET` exists.
 
