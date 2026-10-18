@@ -14,7 +14,9 @@ const replayedHeaderNames = ["accept", "apollographql-client-name", "apollograph
 
 export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name]) => replayedHeaderNames.includes(name.toLowerCase())));
 
-const isGraphqlDocument = (text: string) => graphqlDocument.test(text) && !/^\s*\{[^{}]*\}\s*$/.test(text);
+const isGraphqlDocument = (text: string) => graphqlDocument.test(text);
+
+const isPlaceholderOnly = (text: string) => new RegExp(`^${bodyPlaceholderPattern.source}$`).test(text);
 
 export type BodyPlace = { inString: boolean; inGraphql: boolean };
 
@@ -25,7 +27,7 @@ function replacedInString(literal: string, replace: PlaceholderReplacer) {
   try {
     text = JSON.parse(literal);
   } catch {}
-  if (!isGraphqlDocument(text)) return literal.replace(bodyPlaceholderPattern, (match, name: string) => replace(name, match, { inString: true, inGraphql: false }));
+  if (!isGraphqlDocument(text) || isPlaceholderOnly(text)) return literal.replace(bodyPlaceholderPattern, (match, name: string) => replace(name, match, { inString: true, inGraphql: false }));
   return literal.replace(graphqlPlaceholderPattern, (match, name: string) => `\\"${replace(name, match.slice(2, -2), { inString: true, inGraphql: true })}\\"`);
 }
 
