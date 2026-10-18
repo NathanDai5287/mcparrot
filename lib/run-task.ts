@@ -3,21 +3,26 @@ import type { Page } from "playwright-core";
 import { timed, withWarmPage, type RunSteps } from "./browser-use";
 import { compactAnswer } from "./compact-answer";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
-import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
+import { isAllowedRequest, isOnWebsite, paymentRefusal, replaceBodyPlaceholders, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern, type BodyPlace, type PlaceholderReplacer } from "./task-request";
 
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
 const networkQuietTimeout = 5_000;
 const shortPageWait = 2_000;
+const navigationGrace = 1_000;
 const pageLoadTimeout = requestTimeout - networkQuietTimeout - shortPageWait;
 const shortPageCharacters = 200;
-const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const runBudget = 250_000;
+const stepReserve = 2 * requestTimeout;
+const imageTypes = ["image/png", "image/jpeg", "image/jpg", "image/pjpeg", "image/webp", "image/gif", "image/avif"];
 const maximumImageSide = 1600;
 const maximumImageCharacters = 1_500_000;
 const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your humanity|kpsdk|kasada|akamai/i;
 const csrfRefusal = /forgery|invalid authenticity token|csrf[^<\n]{0,40}(fail|invalid|missing|mismatch|expired)|(invalid|missing|bad)[^<\n]{0,20}csrf/i;
 const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
+const dotSegment = /^(\.|%2e){1,2}$/i;
+const jsonLiteral = /^(-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?|true|false|null)$/;
 export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
 
 export const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
@@ -25,11 +30,13 @@ export const csrfRefusedMessage = "The website refused the request because its p
 
 export type TaskInputs = Record<string, string | undefined>;
 
-type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "not_image" | "image_too_large" | "failed";
+type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "not_image" | "image_too_large" | "bad_input" | "failed";
 
 type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
 
-type RequestFiller = (responses: string[]) => FilledRequest;
+type StepResponse = { body: string; truncated: boolean };
+
+type RequestFiller = (responses: StepResponse[]) => FilledRequest;
 
 class TaskError extends Error {
   constructor(readonly reason: Reason, message: string) {
@@ -51,48 +58,73 @@ const jsonEscaped = (value: string) => JSON.stringify(value).slice(1, -1);
 
 const valueAt = (value: unknown, key: string) => value !== null && typeof value === "object" && Object.hasOwn(value, key) ? (value as Record<string, unknown>)[key] : undefined;
 
-function parsedResponse(responses: string[], step: number) {
-  if (step < 1 || step > responses.length) throw new TaskError("missing_step_value", `Step ${step} has not run yet, so this tool cannot use its response.`);
+function parsedResponse(responses: StepResponse[], step: number, placeholder: string) {
+  if (step < 1 || step > responses.length) throw new TaskError("missing_step_value", `Step ${step} has not run yet, so this tool could not fill ${placeholder}.`);
+  const { body, truncated } = responses[step - 1];
+  if (truncated) throw new TaskError("missing_step_value", `The response of step ${step} is longer than ${maximumResponseCharacters.toLocaleString("en-US")} characters, so this tool could not fill ${placeholder}.`);
   try {
-    return JSON.parse(responses[step - 1]) as unknown;
+    return JSON.parse(body) as unknown;
   } catch {
-    throw new TaskError("missing_step_value", `Step ${step} did not return JSON, so this tool cannot read a value from its response.`);
+    throw new TaskError("missing_step_value", `Step ${step} did not return JSON, so this tool could not fill ${placeholder}.`);
   }
 }
 
-function stepValue(responses: string[], step: number, path: string) {
-  const value = path.split(".").reduce(valueAt, parsedResponse(responses, step));
-  if (value === undefined || value === null) throw new TaskError("missing_step_value", `The response of step ${step} has no value at ${path}, so this tool could not fill {step${step}.${path}}.`);
-  return typeof value === "string" ? value : JSON.stringify(value);
+function stepValue(responses: StepResponse[], step: number, path: string) {
+  const placeholder = `{step${step}.${path}}`;
+  const value = path.split(".").reduce(valueAt, parsedResponse(responses, step, placeholder));
+  if (value === undefined || value === null) throw new TaskError("missing_step_value", `The response of step ${step} has no value at ${path}, so this tool could not fill ${placeholder}.`);
+  return value;
 }
 
-function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, responses: string[], encode: (value: string) => string) {
+const asText = (value: unknown) => typeof value === "string" ? value : JSON.stringify(value);
+
+const urlEncoded = (value: unknown) => encodeURIComponent(asText(value));
+
+function jsonEncoded(value: unknown, { inString, inGraphql }: BodyPlace) {
+  if (inGraphql) return jsonEscaped(jsonEscaped(asText(value)));
+  if (inString) return jsonEscaped(asText(value));
+  return typeof value === "string" && jsonLiteral.test(value) ? value : JSON.stringify(value);
+}
+
+const outsideString: BodyPlace = { inString: false, inGraphql: false };
+
+function fillPattern(fill: (replace: PlaceholderReplacer) => string, values: TaskInputs, responses: StepResponse[], encode: (value: unknown, place: BodyPlace) => string) {
   const missing = new Set<string>();
-  const filled = pattern.replace(placeholder, (match, name: string) => {
+  const filled = fill((name, match, place) => {
     const step = name.match(stepPlaceholderPattern);
-    if (step) return encode(stepValue(responses, Number(step[1]), step[2]));
+    if (step) return encode(stepValue(responses, Number(step[1]), step[2]), place);
     const value = Object.hasOwn(values, name) ? values[name] : undefined;
     if (value === undefined) {
       missing.add(name);
       return match;
     }
-    return encode(value);
+    return encode(value, place);
   });
   if (missing.size) throw new TaskError("missing_input", `This tool needs a value for ${[...missing].join(", ")}.`);
   return filled;
 }
 
-function filledRequest(app: Website, request: TaskRequest, values: TaskInputs, responses: string[]): FilledRequest {
-  const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, responses, encodeURIComponent)).href;
-  const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
-  const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, responses, bodyEncoding);
+const dotSegments = (address: string) => address.replace(/^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i, "").split(/[?#]/)[0].split("/").filter((part) => dotSegment.test(part)).length;
+
+function filledRequest(app: Website, request: TaskRequest, values: TaskInputs, responses: StepResponse[]): FilledRequest {
+  const filledUrl = fillPattern((replace) => request.urlPattern.replace(urlPlaceholderPattern, (match, name: string) => replace(name, match, outsideString)), values, responses, urlEncoded);
+  if (dotSegments(filledUrl) > dotSegments(request.urlPattern)) throw new TaskError("bad_input", "A tool input or step value cannot be . or .. in an address, so MCParrot did not send this request.");
+  const url = addressOnWebsite(app, filledUrl).href;
+  const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? urlEncoded : jsonEncoded;
+  const { bodyPattern } = request;
+  const body = bodyPattern === undefined ? undefined : fillPattern((replace) => replaceBodyPlaceholders(bodyPattern, replace), values, responses, bodyEncoding);
   if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers), tokenHeaders: request.tokenHeaders };
 }
 
-function looksSignedOut(address: string) {
+function signInParts(address: string) {
   const { hostname, pathname } = new URL(address);
-  return [...hostname.split("."), ...pathname.split("/")].some((part) => signInPart.test(part));
+  return [...hostname.split("."), ...pathname.split("/")].filter((part) => signInPart.test(part)).map((part) => part.toLowerCase());
+}
+
+function redirectedToSignIn(address: string, requested: string) {
+  const requestedParts = new Set(signInParts(requested));
+  return signInParts(address).some((part) => !requestedParts.has(part));
 }
 
 const withoutQuery = (address: string) => {
@@ -106,8 +138,8 @@ const withoutQuery = (address: string) => {
 
 const sanitized = (message: string) => (message.split("\n")[0] ?? "").replace(/\bhttps?:\/\/[^\s"'<>]+/g, withoutQuery);
 
-function requireOnWebsite(page: Page, website: string) {
-  if (looksSignedOut(page.url())) throw signedOut();
+function requireOnWebsite(page: Page, website: string, requested: string) {
+  if (redirectedToSignIn(page.url(), requested)) throw signedOut();
   if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
 }
 
@@ -130,15 +162,17 @@ function fetchInPage(page: Page, request: FilledRequest) {
         }));
         const credentials = Object.keys(tokens).length && new URL(address).origin !== location.origin ? "omit" : "include";
         const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...csrfHeaders };
-        const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" ? "follow" : "manual", credentials, signal: AbortSignal.timeout(timeout) });
-        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "" };
+        const carriesSecrets = Object.keys(tokens).length > 0 || Object.keys(csrfHeaders).length > 0;
+        const signal = AbortSignal.timeout(timeout);
+        const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" && !carriesSecrets ? "follow" : "manual", credentials, signal });
+        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "", truncated: false };
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
         if (html) await reply.body?.cancel();
-        const body = html ? "" : (await reply.text()).slice(0, limit + 1);
-        return { failed: "", status: reply.status, url: reply.url, redirected: reply.redirected, mitigated: reply.headers.has("cf-mitigated"), contentType, body };
+        const text = html ? "" : await reply.text();
+        return { failed: "", status: reply.status, url: reply.url, redirected: reply.redirected, mitigated: reply.headers.has("cf-mitigated"), contentType, body: text.slice(0, limit), truncated: text.length > limit };
       } catch (error) {
-        return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "" };
+        return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "", truncated: false };
       }
     }, { request, csrfPageSelectors, limit: maximumResponseCharacters, timeout: requestTimeout });
     span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
@@ -159,7 +193,7 @@ async function settledText(page: Page) {
 function readPageText(page: Page, website: string, url: string) {
   return Sentry.startSpan({ name: "page.read" }, async (span) => {
     const navigation = await page.goto(url, { waitUntil: "load", timeout: pageLoadTimeout });
-    requireOnWebsite(page, website);
+    requireOnWebsite(page, website, url);
     const status = navigation?.status() ?? 200;
     if (status === 401 || status === 403) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
     const text = await settledText(page);
@@ -174,37 +208,67 @@ function httpError(method: string, url: string, status: number) {
 
 async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
   await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
-  if (looksSignedOut(page.url())) return signedOut();
+  if (redirectedToSignIn(page.url(), website)) return signedOut();
   return new TaskError("fetch_failed", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
+}
+
+async function settledFetch(page: Page, website: string, request: FilledRequest) {
+  const before = page.url();
+  const response = await fetchInPage(page, request).catch((error: Error) => {
+    if (page.url() === before && !/context was destroyed|navigat/i.test(error.message)) throw error;
+    return undefined;
+  });
+  if (response && response.failed !== "fetch_failed") return response;
+  await page.waitForURL((address) => address.href !== before, { waitUntil: "domcontentloaded", timeout: navigationGrace }).catch(() => undefined);
+  if (response && page.url() === before) return response;
+  requireOnWebsite(page, website, before);
+  if (request.method !== "GET") throw new TaskError("fetch_failed", `${request.method} ${withoutQuery(request.url)} was interrupted when the page navigated, so MCParrot cannot tell whether the website applied it. Check the website before trying again.`);
+  return fetchInPage(page, request);
 }
 
 async function readRequest(page: Page, website: string, request: FilledRequest, steps: RunSteps, step: string, keepFields: string[]) {
   const { method, url } = request;
-  const response = await fetchInPage(page, request);
+  const response = await settledFetch(page, website, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
   if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
-  if (response.redirected && looksSignedOut(response.url)) throw signedOut();
-  if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
+  if (response.redirected && redirectedToSignIn(response.url, url)) throw signedOut();
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
+  if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, truncated: response.truncated, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
   const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url));
   if (status >= 400) throw httpError(method, url, status);
-  return { body: text, summary: `${method} ${url} returned ${status}\n${compactAnswer(text)}` };
+  const body = text.slice(0, maximumResponseCharacters);
+  return { body, truncated: text.length > maximumResponseCharacters, summary: `${method} ${url} returned ${status}\n${compactAnswer(body)}` };
 }
 
-async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps, keepFields: string[]) {
+function landedOrigin(page: Page, website: string) {
+  const landed = new URL(page.url());
+  const site = new URL(website);
+  const sameHost = landed.hostname.replace(/^www\./, "") === site.hostname.replace(/^www\./, "") && landed.port === site.port;
+  return sameHost && isOnWebsite(landed, website) ? landed.origin : website;
+}
+
+function rebased(url: string, website: string, origin: string) {
+  const address = new URL(url);
+  return address.origin === website ? new URL(address.pathname + address.search + address.hash, origin).href : url;
+}
+
+async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps, keepFields: string[], deadline: number) {
   await timed(steps, "websiteOpenMs", () => Sentry.startSpan({ name: "page.open_website" }, () => page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout })));
-  requireOnWebsite(page, website);
-  const responses: string[] = [];
+  requireOnWebsite(page, website, website);
+  const origin = landedOrigin(page, website);
+  const responses: StepResponse[] = [];
   const results = [];
   for (const [index, fill] of requests.entries()) {
-    const request = fill(responses);
-    if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+    if (deadline - Date.now() < stepReserve) throw new TaskError("timeout", `This tool ran out of time after ${index} of ${requests.length} requests.`);
+    const filled = fill(responses);
+    const request = { ...filled, url: rebased(filled.url, website, origin) };
+    if (new URL(page.url()).origin !== origin) await page.goto(origin, { waitUntil: "domcontentloaded", timeout: requestTimeout });
     const step = `request${index + 1}`;
-    const { body, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step, index === requests.length - 1 ? keepFields : []));
-    responses.push(body);
+    const { body, truncated, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step, index === requests.length - 1 ? keepFields : []));
+    responses.push({ body, truncated });
     results.push(summary);
   }
   return results.join("\n\n");
@@ -212,13 +276,16 @@ async function readRequests(page: Page, website: string, requests: RequestFiller
 
 function readImage(page: Page, url: string, website?: string) {
   return Sentry.startSpan({ name: "image.read" }, async (span) => {
-    const navigation = await page.goto(url, { waitUntil: "load", timeout: requestTimeout });
-    if (website) requireOnWebsite(page, website);
+    const navigation = await page.goto(url, { waitUntil: "load", timeout: requestTimeout }).catch((error: Error) => {
+      if (/ERR_ABORTED|Download is starting/i.test(error.message)) throw new TaskError("not_image", `${withoutQuery(url)} downloads a file instead of showing an image, so MCParrot did not read it.`);
+      throw error;
+    });
+    if (website) requireOnWebsite(page, website, url);
     const status = navigation?.status() ?? 200;
     if (website && (status === 401 || status === 403)) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
     if (status >= 400) throw httpError("GET", url, status);
     const contentType = navigation?.headers()["content-type"]?.split(";")[0].trim().toLowerCase() ?? "";
-    if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, or GIF image, so MCParrot did not read it.`);
+    if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, GIF, or AVIF image, so MCParrot did not read it.`);
     const dataUrl = await page.evaluate(async (maximumSide) => {
       const image = document.querySelector("img")!;
       await image.decode();
@@ -243,7 +310,10 @@ async function inSignedInBrowser(app: Website, steps: RunSteps, read: (page: Pag
   return withWarmPage(app.id, app.browserProfileId, steps, read);
 }
 
-const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = []) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields));
+const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = []) => {
+  const deadline = Date.now() + runBudget;
+  return inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields, deadline));
+};
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -279,8 +349,8 @@ export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer
 
 export function addressOnWebsite(app: Website, url: string) {
   const website = new URL(app.url).origin;
-  const address = new URL(url, website);
-  if (!isOnWebsite(address, website)) throw new TaskError("off_site", `MCParrot only uses pages on ${website}. Give an address on that website or a path such as /courses.`);
+  const address = URL.parse(url, website);
+  if (!address || !isOnWebsite(address, website)) throw new TaskError("off_site", `MCParrot only uses pages on ${website}. Give an address on that website or a path such as /courses.`);
   return address;
 }
 
@@ -300,7 +370,8 @@ async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>)
 
 export function readImageDataUrl(app: Website, url: string) {
   const website = new URL(app.url).origin;
-  const address = new URL(url, website);
+  const address = URL.parse(url, website);
+  if (!address) throw new TaskError("bad_input", `${withoutQuery(url)} is not a valid address, so MCParrot did not read it.`);
   if (isOnWebsite(address, website)) return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => readImage(page, address.href, website)));
   if (address.protocol !== "https:") throw new TaskError("off_site", `MCParrot only opens images on ${website} or at https addresses on other websites.`);
   return logOutcome("Image read", { appId: app.id, offSite: true }, (steps) => inSignedInBrowser(app, steps, (page) => inEmptyContext(page, (emptyPage) => readImage(emptyPage, address.href))));
