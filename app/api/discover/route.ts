@@ -3,9 +3,9 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
 import { claudeModelName, runClaudeAgent } from "../../../lib/claude-agent";
-import { appIdSchema, maximumBodyLength, type Capability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
+import { appIdSchema, capabilitySchema as storedCapabilitySchema, maximumBodyLength, type Capability, type DiscoveredCapability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
-import { isAllowedRequest, isOnWebsite, replayedHeaders, requestPlaceholders, usesOnlyEarlierSteps } from "../../../lib/task-request";
+import { bodyPlaceholderPattern, isOnWebsite, replayedHeaders } from "../../../lib/task-request";
 import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -27,9 +27,10 @@ const labelledSecretString = new RegExp(String.raw`\b(${secretLabels})(\s*:\s*)"
 const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 
 const clipped = (maximumLength: number) => z.string().transform((value) => value.slice(0, maximumLength));
+const tokenHeaderSchema = z.object({ header: z.string().max(80), fromLocalStorage: z.string().max(200), prefix: z.string().max(20).optional(), path: z.string().max(200).optional() });
 const capturedRequestSchema = z.object({
   kind: z.literal("page").optional(),
-  method: z.string().max(16),
+  method: clipped(16),
   url: clipped(2000),
   pattern: clipped(2000),
   status: z.number().int(),
@@ -37,8 +38,11 @@ const capturedRequestSchema = z.object({
   sample: clipped(maximumSampleCharacters),
   body: clipped(maximumBodyLength).optional(),
   requestContentType: clipped(200).optional(),
-  requestHeaders: z.record(z.string().max(80), clipped(200)).optional(),
-  tokenHeaders: z.array(z.object({ header: z.string().max(80), fromLocalStorage: z.string().max(200), prefix: z.string().max(20).optional(), path: z.string().max(200).optional() })).max(10).optional(),
+  requestHeaders: z.record(z.string(), clipped(200)).transform((headers) => Object.fromEntries(Object.entries(headers).filter(([name]) => name.length <= 80))).optional(),
+  tokenHeaders: z.array(z.unknown()).transform((headers) => headers.flatMap((header) => {
+    const parsed = tokenHeaderSchema.safeParse(header);
+    return parsed.success ? [parsed.data] : [];
+  }).slice(0, 10)).optional(),
 });
 const discoveryBodySchema = z.object({
   appId: appIdSchema,
@@ -56,6 +60,17 @@ const capabilitySchema = z.object({
   updatesTaskId: z.string().max(80).optional(),
 });
 const replySchema = z.object({ capabilities: z.array(z.unknown()) });
+const discoveredCapabilitySchema = storedCapabilitySchema.extend({ updatesTaskId: z.string().optional() }) satisfies z.ZodType<DiscoveredCapability>;
+const storedDiscoverySchema = z.object({
+  discoveredAt: z.string(),
+  capabilities: z.array(z.unknown()).transform((capabilities) => capabilities.flatMap((capability) => {
+    const parsed = discoveredCapabilitySchema.safeParse(capability);
+    return parsed.success ? [parsed.data] : [];
+  })),
+}) satisfies z.ZodType<Discovery>;
+const saveDiscovery = `if redis.call("EXISTS", KEYS[1]) == 0 then return 0 end
+redis.call("SET", KEYS[2], ARGV[1])
+return 1`;
 const maximumCandidates = 200;
 const maximumCapabilities = 50;
 
@@ -129,7 +144,7 @@ function scrubbedTasks(tasks: Task[]) {
 function discoveryPrompt(app: Website, requests: CapturedRequest[]) {
   const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests, new URL(app.url).origin) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(app.url).origin} while we recorded the pages they opened and the data requests those pages made.
-Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}". Only requests on the website's domain, such as api.example.com or example.com for www.example.com, keep their request body.
+Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}", or with redacted in URLs and request bodies; never copy either marker into a urlPattern or bodyPattern, and use a {placeholder} input for that value instead. Only requests on the website's domain, such as api.example.com or example.com for www.example.com, keep their request body.
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
 List the distinct, useful things an assistant could do for this person with these requests, such as listing, searching, or reading information.
 Suggest page-reading tasks for pages whose text is useful, such as "Read course syllabus" with a {courseId} input, especially when no data request returns the same information.
@@ -168,24 +183,6 @@ function firstJsonObject(reply: string) {
   throw new Error("no JSON object");
 }
 
-function sameSet(left: string[], right: string[]) {
-  const a = new Set(left);
-  const b = new Set(right);
-  return a.size === b.size && [...a].every((item) => b.has(item));
-}
-
-function isUsable(capability: Capability, origin: string) {
-  if (!usesOnlyEarlierSteps(capability.requests) || !sameSet(capability.requests.flatMap(requestPlaceholders), capability.inputs.map((input) => input.name))) return false;
-  return capability.requests.every((request) => {
-    if (!isAllowedRequest(request)) return false;
-    try {
-      return isOnWebsite(new URL(request.urlPattern.replace(/\{[^}]+\}/g, "x"), origin), origin);
-    } catch {
-      return false;
-    }
-  });
-}
-
 function normalized({ method, urlPattern, bodyPattern, contentType }: TaskRequest): TaskRequest {
   return { method: method.toUpperCase(), urlPattern, ...(bodyPattern ? { bodyPattern } : {}), ...(bodyPattern && contentType ? { contentType } : {}) };
 }
@@ -198,6 +195,51 @@ const pathOf = (address: string, origin: string) => {
 };
 
 const originOf = (address: string, origin: string) => pathOf(address, origin) && new URL(pathOf(address, origin)).origin;
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const placeholderMark = "\u0000";
+
+function addressMatches(urlPattern: string, recordedUrl: string, origin: string) {
+  const marked = urlPattern.replace(/\{[^}]+\}/g, "mcparrotplaceholder");
+  if (!URL.canParse(marked, origin) || !URL.canParse(recordedUrl)) return false;
+  const pattern = new URL(marked, origin);
+  const recorded = new URL(recordedUrl);
+  return new RegExp(`^${(pattern.origin + pattern.pathname).split("mcparrotplaceholder").map(escaped).join("[^/]+")}$`).test(recorded.origin + recorded.pathname);
+}
+
+const sameText = (first: string, second: string) => first.replace(/\s+/g, " ").trim() === second.replace(/\s+/g, " ").trim();
+
+function valueMatches(pattern: unknown, recorded: unknown): boolean {
+  if (typeof pattern === "string") {
+    const marked = pattern.replace(bodyPlaceholderPattern, placeholderMark);
+    if (marked === pattern) return typeof recorded === "string" && sameText(pattern, recorded);
+    return new RegExp(`^${marked.split(placeholderMark).map(escaped).join("[\\s\\S]*")}$`).test(typeof recorded === "string" ? recorded : JSON.stringify(recorded));
+  }
+  if (Array.isArray(pattern)) return Array.isArray(recorded) && pattern.length === recorded.length && pattern.every((item, index) => valueMatches(item, recorded[index]));
+  if (pattern && typeof pattern === "object") return !!recorded && typeof recorded === "object" && !Array.isArray(recorded) && Object.keys(pattern).length === Object.keys(recorded).length && Object.entries(pattern).every(([key, item]) => Object.hasOwn(recorded, key) && valueMatches(item, (recorded as Record<string, unknown>)[key]));
+  return pattern === recorded;
+}
+
+function parsedJson(text: string) {
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    return undefined;
+  }
+}
+
+function bodyMatches(bodyPattern: string, body: string) {
+  const pattern = parsedJson(bodyPattern);
+  const recorded = parsedJson(body);
+  return pattern && recorded ? valueMatches(pattern.value, recorded.value) : valueMatches(bodyPattern, body);
+}
+
+const wasRecorded = (request: TaskRequest, recorded: CapturedRequest[], origin: string) => recorded.some((candidate) =>
+  candidate.method.toUpperCase() === request.method
+  && ((URL.canParse(candidate.pattern) && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin)) || addressMatches(request.urlPattern, candidate.url, origin))
+  && (request.bodyPattern === undefined ? !candidate.body : candidate.body !== undefined && bodyMatches(request.bodyPattern, candidate.body)));
+
+const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: string) => capability.requests.every((request) => wasRecorded(request, recorded, origin));
 
 function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
   const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
@@ -219,7 +261,7 @@ function capabilitiesFrom(reply: string, app: Website, recorded: CapturedRequest
     const parsed = capabilitySchema.safeParse(item);
     if (!parsed.success) return [];
     const capability = { ...parsed.data, requests: parsed.data.requests.map(normalized) };
-    return isUsable(capability, origin) ? [{ ...capability, requests: capability.requests.map((request) => withRecordedHeaders(request, recorded, origin)) }] : [];
+    return isUsable(capability, recorded, origin) ? [{ ...capability, requests: capability.requests.map((request) => withRecordedHeaders(request, recorded, origin)) }] : [];
   });
   const unsaved = unsavedCapabilities(app, capabilities).slice(0, maximumCapabilities);
   if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `MCParrot found no tools on ${origin}. Explore more pages, then try again.`);
@@ -272,9 +314,12 @@ export async function GET(request: Request) {
   if (!appId.success) return Response.json({ error: "Choose an app first." }, { status: 400 });
   try {
     const app = await savedApp(userId, appId.data);
-    const discovery = await storage().get<Discovery>(discoveryKey(app.id)).catch((error) => {
+    const stored = await storage().get<unknown>(discoveryKey(app.id)).catch((error) => {
       throw new StorageUnavailable("Storage could not be reached. Try again in a moment.", { cause: error });
     });
+    const parsed = stored === null ? undefined : storedDiscoverySchema.safeParse(stored);
+    if (parsed && !parsed.success) Sentry.logger.warn("Skipped a malformed stored discovery");
+    const discovery = parsed?.success ? parsed.data : null;
     return Response.json({ discovery: discovery && { ...discovery, capabilities: unsavedCapabilities(app, discovery.capabilities) } });
   } catch (error) {
     if (error instanceof DiscoveryError) return Response.json({ error: error.message }, { status: error.status });
@@ -294,14 +339,19 @@ export async function POST(request: Request) {
 
     Sentry.logger.info("Discovery started", { requestCount: requests.length, savedTaskCount: app.tasks.length });
     const result = await askDiscoveryAgent(discoveryPrompt(app, requests), apiKey, requests.length);
-    if (result.status !== "finished" || !result.result) {
+    if (result.status !== "finished") {
+      Sentry.logger.warn("Discovery agent did not finish", { status: result.status });
+      Sentry.captureException(new Error(`Discovery agent run ${result.status}`));
+      return Response.json({ error: "Claude could not finish reading the requests. Try again." }, { status: 502 });
+    }
+    if (!result.result) {
       Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
       return Response.json({ error: "MCParrot found no tools. Explore more pages, then try again." }, { status: 502 });
     }
     const latestApp = await savedApp(userId, appId);
     const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp, requests) };
     Sentry.logger.info("Discovery finished", { capabilityCount: discovery.capabilities.length });
-    await storage().set(discoveryKey(app.id), discovery).catch((error) => Sentry.captureException(error));
+    await storage().eval(saveDiscovery, [`app-owner:${app.id}`, discoveryKey(app.id)], [JSON.stringify(discovery)]).catch((error) => Sentry.captureException(error));
     return Response.json(discovery);
   } catch (error) {
     if (error instanceof StorageUnavailable) return Response.json({ error: error.message }, { status: 503 });
