@@ -1,7 +1,8 @@
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
 import { appIdSchema } from "../../../lib/capabilities";
-import { viewImage } from "../../../lib/view-image";
+import { ImageError, viewImage } from "../../../lib/view-image";
 import { ownedApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -16,8 +17,13 @@ export async function POST(request: Request) {
   const app = await ownedApp(userId, body.data.appId);
   if (!app) return Response.json({ error: "This app no longer exists in MCParrot." }, { status: 404 });
   try {
-    return Response.json(await viewImage(app, body.data.url));
+    const view = await viewImage(app, body.data.url);
+    if (view.signIn) return Response.json({ error: view.text }, { status: 409 });
+    return Response.json(view);
   } catch (error) {
-    return Response.json({ error: (error as Error).message }, { status: 502 });
+    if (error instanceof ImageError && !error.cause) return Response.json({ error: error.message }, { status: 502 });
+    Sentry.captureException(error);
+    if (!(error instanceof ImageError)) Sentry.logger.warn("Image read failed", { appId: app.id, reason: "unexpected" });
+    return Response.json({ error: "MCParrot could not read the image. Try again." }, { status: 500 });
   }
 }
