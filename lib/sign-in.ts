@@ -110,10 +110,12 @@ async function signIn(app: Website & { browserProfileId: string }, login: Login,
   }, waitMilliseconds);
   Sentry.logger.info("Automatic sign-in finished", { appId: app.id, outcome });
   let browser: Awaited<ReturnType<typeof sessionBrowser>> | undefined;
+  let lookupFailed = false;
   if (sessionId) {
     try {
       browser = await sessionBrowser(sessionId);
     } catch (error) {
+      lookupFailed = true;
       Sentry.logger.warn("Sign-in browser lookup failed", { appId: app.id, reason: errorReason(error) });
     }
   }
@@ -122,16 +124,19 @@ async function signIn(app: Website & { browserProfileId: string }, login: Login,
     return codeSentMessage;
   }
   const browserId = browser?.id;
+  if (outcome === "signed_in") {
+    if (lookupFailed) throw new Error(signInFailedMessage);
+    if (browserId) await stopBrowser(browserId);
+    await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
+    return;
+  }
   if (browserId) await ignoreErrors(() => stopBrowser(browserId));
   if (outcome === "password_rejected") {
     await Redis.fromEnv().set(rejectedKey(app.id), hash);
     throw new Error(passwordRejectedMessage);
   }
-  if (outcome !== "signed_in") {
-    await Redis.fromEnv().set(cooldownKey(app.id), hash, { ex: failedCooldownSeconds });
-    throw new Error(timedOut ? signInTimedOutMessage : signInFailedMessage);
-  }
-  await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
+  await Redis.fromEnv().set(cooldownKey(app.id), hash, { ex: failedCooldownSeconds });
+  throw new Error(timedOut ? signInTimedOutMessage : signInFailedMessage);
 }
 
 async function waitingForCode(appId: string) {
@@ -146,10 +151,21 @@ async function waitingForCode(appId: string) {
   return false;
 }
 
-async function signInOnce(app: Website, login: Login, deadline: number) {
+async function withSignInLock<T>(appId: string, work: () => Promise<T>) {
   const redis = Redis.fromEnv();
   const nonce = randomUUID();
-  if (await redis.set(lockKey(app.id), nonce, { nx: true, ex: signInLockSeconds }) === null) return signInInProgressMessage;
+  if (await redis.set(lockKey(appId), nonce, { nx: true, ex: signInLockSeconds }) === null) return signInInProgressMessage;
+  try {
+    return await work();
+  } finally {
+    await ignoreErrors(async () => {
+      if (await redis.get(lockKey(appId)) === nonce) await redis.del(lockKey(appId));
+    });
+  }
+}
+
+const signInOnce = (app: Website, login: Login, deadline: number) => withSignInLock(app.id, async () => {
+  const redis = Redis.fromEnv();
   try {
     if (await waitingForCode(app.id)) return codeSentMessage;
     const hash = loginHash(app, login);
@@ -163,12 +179,8 @@ async function signInOnce(app: Website, login: Login, deadline: number) {
     if (userMessages.has((error as Error).message)) throw error;
     Sentry.logger.warn("Automatic sign-in failed", { appId: app.id, reason: errorReason(error) });
     throw new Error(signInFailedMessage);
-  } finally {
-    await ignoreErrors(async () => {
-      if (await redis.get(lockKey(app.id)) === nonce) await redis.del(lockKey(app.id));
-    });
   }
-}
+});
 
 export async function readSigningIn(app: Website, read: (app: Website) => Promise<string>) {
   const deadline = Date.now() + callBudgetMilliseconds;
@@ -185,7 +197,7 @@ export async function readSigningIn(app: Website, read: (app: Website) => Promis
   return deadline - Date.now() < rereadMilliseconds ? signInFinishedMessage : read(signedIn);
 }
 
-export async function submitVerificationCode(app: Website, code: string) {
+export const submitVerificationCode = (app: Website, code: string) => withSignInLock(app.id, async () => {
   const pending = await readPendingSignIn(app.id);
   if (!pending) throw new Error(noPendingSignInMessage);
   let outcome = "failed";
@@ -204,9 +216,15 @@ export async function submitVerificationCode(app: Website, code: string) {
     await Redis.fromEnv().expire(pendingKey(app.id), pendingSignInSeconds);
     return codeRejectedMessage;
   }
-  await ignoreErrors(() => stopBrowser(pending.browserId));
+  let stopped = true;
+  try {
+    await stopBrowser(pending.browserId);
+  } catch (error) {
+    stopped = false;
+    Sentry.logger.warn("Sign-in browser stop failed", { appId: app.id, reason: errorReason(error) });
+  }
   await Redis.fromEnv().del(pendingKey(app.id));
-  if (outcome !== "signed_in") throw new Error(signInFailedMessage);
+  if (outcome !== "signed_in" || !stopped) throw new Error(signInFailedMessage);
   await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
   return signInFinishedMessage;
-}
+});
