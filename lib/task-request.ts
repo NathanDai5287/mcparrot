@@ -14,7 +14,8 @@ export const requestPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskReques
 export function isOnWebsite(address: string | URL, website: string) {
   const { protocol, hostname, port } = new URL(address);
   const site = new URL(website);
-  return protocol === site.protocol && port === site.port && (hostname === site.hostname || hostname.endsWith(`.${site.hostname}`));
+  const siteHostname = site.hostname.replace(/^www\./, "");
+  return protocol === site.protocol && port === site.port && (hostname === siteHostname || hostname.endsWith(`.${siteHostname}`));
 }
 
 export const isGetRequest = (request: TaskRequest) => request.method.toUpperCase() === "GET";
