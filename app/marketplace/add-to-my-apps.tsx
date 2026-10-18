@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 
-export function AddToMyApps({ listingId, signedIn }: { listingId: string; signedIn: boolean }) {
+export function AddToMyApps({ listingId, signedIn, myAppId }: { listingId: string; signedIn: boolean; myAppId?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  if (myAppId) return <span className="listing-action"><span className="badge">In your apps</span><a className="button" href={`/apps/${myAppId}`}>Open</a></span>;
   if (!signedIn) return <a className="button" href={`/sign-in?redirect_url=${encodeURIComponent(`/marketplace#${listingId}`)}`}>Sign in to add</a>;
 
   async function add() {

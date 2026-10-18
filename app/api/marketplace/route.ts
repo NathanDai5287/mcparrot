@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
 import { appIdSchema } from "../../../lib/capabilities";
-import { installListing, ListingRejected, listingDescriptionSchema, publishApp, readListings, unpublishApp } from "../../../lib/marketplace";
+import { AlreadyInstalled, installListing, ListingRejected, listingDescriptionSchema, publishApp, readListings, unpublishApp } from "../../../lib/marketplace";
 import { ownedApp, WorkspaceLimit } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   try {
     return Response.json(await apply(userId, action.data));
   } catch (error) {
+    if (error instanceof AlreadyInstalled) return Response.json({ error: error.message, appId: error.appId }, { status: 409 });
     if (error instanceof ListingRejected || error instanceof WorkspaceLimit) return Response.json({ error: error.message }, { status: 409 });
     throw error;
   }

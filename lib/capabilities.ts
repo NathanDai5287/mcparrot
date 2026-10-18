@@ -29,6 +29,7 @@ export type Website = {
   ordering?: Ordering;
   connectionTokenHash?: string;
   listing?: { id: string; publishedAt: string; description: string };
+  installedFrom?: string;
 };
 
 export const maxApps = 100;
@@ -73,4 +74,5 @@ export const storedWebsiteSchema = z.object({
     requests: z.array(z.object({ method: z.string(), urlPattern: z.string() })),
     inputs: z.array(z.object({ name: z.string() })),
   })),
+  installedFrom: appIdSchema.optional(),
 });
