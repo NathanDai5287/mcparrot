@@ -5,7 +5,7 @@ import { automaticSignInOf, type AutomaticSignIn, type Website } from "../lib/ca
 import { SetupCard } from "./setup-card";
 
 type AppChanges = Partial<Pick<Website, "browserProfileId" | "signedInAt" | "loginSavedAt">>;
-type SaveAutomaticSignIn = (automaticSignIn: AutomaticSignIn) => Promise<unknown>;
+type SaveAutomaticSignIn = (automaticSignIn: AutomaticSignIn) => Promise<{ apps?: Website[]; error?: string }>;
 type SignInBrowser = { appId: string; browserId: string; liveUrl: string; startedAt: number };
 
 const signInMinutes = 15;
@@ -27,6 +27,13 @@ function rememberSignInBrowser(appId: string, browser: SignInBrowser | null) {
   } catch {}
 }
 
+export async function stopStoredSignIn(appId: string) {
+  const browser = storedSignInBrowser(appId);
+  if (!browser) return;
+  await fetch(`/api/sign-in?browserId=${encodeURIComponent(browser.browserId)}&appId=${encodeURIComponent(appId)}&finished=false`, { method: "DELETE" }).catch(() => null);
+  rememberSignInBrowser(appId, null);
+}
+
 function openSignInWindow(url?: string) {
   const popup = window.open("", "mcparrot-sign-in", "popup,width=1280,height=860");
   if (!popup) return null;
@@ -45,6 +52,15 @@ function SignInSection({ app, onChange, onAutomaticSignIn }: { app: Website; onC
     rememberSignInBrowser(app.id, nextBrowser);
     setBrowser(nextBrowser);
   }
+
+  useEffect(() => {
+    if (!browser) return;
+    const timer = window.setTimeout(() => {
+      saveBrowser(null);
+      setError("The sign-in browser closed after 15 minutes. Select Sign in to website to try again.");
+    }, browser.startedAt + signInMinutes * 60_000 - Date.now());
+    return () => window.clearTimeout(timer);
+  }, [browser]);
 
   async function startSignIn() {
     const popup = openSignInWindow();
@@ -70,6 +86,12 @@ function SignInSection({ app, onChange, onAutomaticSignIn }: { app: Website; onC
     const response = await fetch(`/api/sign-in?browserId=${encodeURIComponent(signInBrowser.browserId)}&appId=${encodeURIComponent(app.id)}${finished ? "" : "&finished=false"}`, { method: "DELETE" }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
     setBusy(false);
+    if (!finished && response?.status === 404) {
+      popupRef.current?.close();
+      popupRef.current = null;
+      saveBrowser(null);
+      return;
+    }
     if (!response?.ok) {
       setError(result.error ?? (finished ? "MCParrot could not save the sign-in. Select Done signing in again." : "MCParrot could not stop the sign-in browser. Select Cancel again."));
       return;
@@ -151,7 +173,7 @@ function GoogleAccountForm({ app, onSave }: { app: Website; onSave: SaveAutomati
     setError("");
     const saved = await onSave(googleEmail ? { method: "google", googleEmail } : { method: "google" });
     setBusy(false);
-    if (!saved) setError("MCParrot could not save the Google account. Check the email, then try again.");
+    if (!saved.apps) setError(saved.error || "MCParrot could not save the Google account. Check the email, then try again.");
   }
 
   return <form className="editor" onSubmit={save}>
@@ -181,7 +203,7 @@ function AutomaticSignInChoice({ app, onChange, onSave }: { app: Website; onChan
     setError("");
     const saved = await onSave(nextMethod === current.method ? current : { method: nextMethod });
     setSavingMethod(null);
-    if (!saved) setError("MCParrot could not save this choice. Try again.");
+    if (!saved.apps) setError(saved.error || "MCParrot could not save this choice. Try again.");
   }
 
   return <div className="automatic-sign-in">

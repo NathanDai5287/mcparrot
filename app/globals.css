@@ -51,7 +51,7 @@ h1, h2, h3, p { margin: 0; }
 .sidebar-link { width: 100%; padding: 8px 10px; border-radius: 6px; color: var(--ink); font-size: 13px; text-decoration: none; }
 .sidebar-link:hover { background: #e8eeeb; }
 .sidebar-link[aria-current="page"] { background: #e0eae5; color: var(--accent); font-weight: 600; }
-a.wordmark { text-decoration: none; }
+a.wordmark, a.sidebar-app, a.app-row { text-decoration: none; }
 .status-dot { width: 8px; height: 8px; flex-shrink: 0; border: 1.5px solid #8d9a97; border-radius: 50%; }
 .status-dot.signed-in { border-color: var(--accent); background: var(--accent); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
