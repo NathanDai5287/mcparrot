@@ -68,6 +68,7 @@ export const sentryOptions = {
     /^The total changed from /,
     /^Ordering is off for this app/,
     /^No order with this ID is waiting/,
+    /already has a tool with this name or page/,
   ],
   dataCollection: {
     userInfo: false,
