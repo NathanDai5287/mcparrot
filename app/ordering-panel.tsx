@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { maxOrderLimitUsd, type Ordering, type Website } from "../lib/capabilities";
 import type { Cart, OrderView } from "../lib/order";
 import { SetupCard } from "./setup-card";
 import { cachedJson, forgetCachedJson, orderUrl } from "./json-cache";
 
-type LinkView = { connected: boolean; mode: "test" | "live" | null } | null;
-type OrderAction = { action: "prepare"; request: string } | { action: "place" | "cancel"; orderId: string };
+type LinkView = { connected: boolean; mode: "test" | "live" | null; hasConnection: boolean } | null;
+type OrderAction = { action: "prepare"; request: string } | { action: "place"; orderId: string; approvedTotal: number } | { action: "cancel"; orderId: string };
 
 const pollMilliseconds = 5000;
 const dollars = (amount: number) => `$${amount.toFixed(2)}`;
+const isActive = (order: OrderView | null) => !!order && ["preparing", "ready", "placing"].includes(order.status);
 
 const orderStatusText: Record<OrderView["status"], string> = {
   preparing: "Browser Use is building the cart. This can take a few minutes.",
@@ -25,8 +26,9 @@ function linkStatusText(link: LinkView | undefined) {
   if (link === undefined) return "Checking Browser Use Pay with Link…";
   if (!link) return "MCParrot could not read the Pay with Link status.";
   if (!link.connected) return "Pay with Link is not connected. Connect Link under Integrations in Browser Use.";
-  if (link.mode === "test") return "Pay with Link is connected in test mode.";
-  return "Pay with Link is in live mode. Live mode is blocked, so MCParrot will not place orders.";
+  if (link.mode === "live") return "Pay with Link is in live mode. Live mode is blocked, so MCParrot will not place orders.";
+  if (link.mode === "test" && link.hasConnection) return "Pay with Link is connected in test mode.";
+  return "MCParrot could not confirm the Pay with Link mode, so it will not place orders.";
 }
 
 function CartSummary({ cart }: { cart: Cart }) {
@@ -64,12 +66,13 @@ function OrderingSettings({ app, onSave }: { app: Website; onSave: (ordering: Or
 }
 
 function TestOrder({ app, order, busy, onAction }: { app: Website; order: OrderView | null; busy: boolean; onAction: (action: OrderAction) => void }) {
+  const enabled = app.ordering?.enabled ?? false;
+  const cart = order?.cart;
   function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onAction({ action: "prepare", request: String(new FormData(event.currentTarget).get("request")).trim() });
   }
 
-  const active = order && ["preparing", "ready", "placing"].includes(order.status);
   return <div className="order-test">
     <h3>Test order</h3>
     {order && <>
@@ -77,12 +80,12 @@ function TestOrder({ app, order, busy, onAction }: { app: Website; order: OrderV
       {order.problem && <p className="pilot-error">{order.problem}</p>}
       {order.confirmation && <p>Confirmation: {order.confirmation}</p>}
       {order.cart && <CartSummary cart={order.cart} />}
-      {active && <div className="form-actions">
-        {order.status === "ready" && order.cart && <button className="button primary" disabled={busy} onClick={() => onAction({ action: "place", orderId: order.orderId })}>{busy ? "Working…" : `Place order for ${dollars(order.cart.total)}`}</button>}
+      {isActive(order) && <div className="form-actions">
+        {enabled && order.status === "ready" && cart && <button className="button primary" disabled={busy} onClick={() => onAction({ action: "place", orderId: order.orderId, approvedTotal: cart.total })}>{busy ? "Working…" : `Place order for ${dollars(cart.total)}`}</button>}
         <button className="button" disabled={busy} onClick={() => onAction({ action: "cancel", orderId: order.orderId })}>Cancel order</button>
       </div>}
     </>}
-    {!active && <form className="editor" onSubmit={prepare}>
+    {enabled && !isActive(order) && <form className="editor" onSubmit={prepare}>
       <label htmlFor={`order-request-${app.id}`}>What to order</label>
       <textarea id={`order-request-${app.id}`} name="request" maxLength={1000} required placeholder="For example, one large pepperoni pizza from a restaurant near me" />
       <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Starting…" : "Prepare order"}</button></div>
@@ -95,34 +98,46 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
   const [order, setOrder] = useState<OrderView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [refreshError, setRefreshError] = useState("");
+  const latestAction = useRef(0);
+  const latestRefresh = useRef(0);
+  const refreshesInFlight = useRef(0);
 
-  const show = useCallback(async () => {
+  const show = useCallback(async (poll = false) => {
+    if (poll && refreshesInFlight.current) return;
+    const id = ++latestRefresh.current;
+    const startedAfter = latestAction.current;
+    refreshesInFlight.current++;
     const reply = await cachedJson(orderUrl(app.id)).catch(() => null);
-    if (!reply?.ok) return;
-    const result = reply.body as { link: LinkView; order: OrderView | null };
-    setLink(result.link);
-    setOrder(result.order);
+    refreshesInFlight.current--;
+    if (id !== latestRefresh.current || startedAfter !== latestAction.current) return;
+    const result = (reply?.body ?? {}) as { link?: LinkView; order?: OrderView | null; error?: string };
+    setLink(result.link ?? null);
+    if (result.order !== undefined) setOrder(result.order);
+    setRefreshError(reply?.ok && !result.error ? "" : result.error ?? "MCParrot could not check the order. It will try again.");
   }, [app.id]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((poll = false) => {
     forgetCachedJson(orderUrl(app.id));
-    return show();
+    return show(poll);
   }, [app.id, show]);
 
-  useEffect(() => { show(); }, [show]);
+  useEffect(() => { show().then(() => refresh()); }, [show, refresh]);
 
   const waiting = order?.status === "preparing" || order?.status === "placing";
   useEffect(() => {
     if (!waiting) return;
-    const timer = setInterval(refresh, pollMilliseconds);
+    const timer = setInterval(() => refresh(true), pollMilliseconds);
     return () => clearInterval(timer);
   }, [waiting, refresh]);
 
   async function send(action: OrderAction) {
+    latestAction.current++;
     setBusy(true);
     setError("");
     const response = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: app.id, ...action }) }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
+    latestAction.current++;
     setBusy(false);
     forgetCachedJson(orderUrl(app.id));
     if (response?.ok) return setOrder(result.order);
@@ -134,7 +149,8 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
     <p>Let your agent order from {app.name} with Pay with Link. You always approve the total first.</p>
     <p>{linkStatusText(link)}</p>
     <OrderingSettings app={app} onSave={onSave} />
-    {app.ordering?.enabled && <TestOrder app={app} order={order} busy={busy} onAction={send} />}
+    {(app.ordering?.enabled || isActive(order)) && <TestOrder app={app} order={order} busy={busy} onAction={send} />}
     {error && <p className="pilot-error" role="alert">{error}</p>}
+    {refreshError && <p className="pilot-error" role="status">{refreshError}</p>}
   </SetupCard>;
 }
