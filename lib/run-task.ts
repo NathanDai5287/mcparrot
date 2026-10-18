@@ -11,6 +11,9 @@ const networkQuietTimeout = 5_000;
 const shortPageWait = 2_000;
 const pageLoadTimeout = requestTimeout - networkQuietTimeout - shortPageWait;
 const shortPageCharacters = 200;
+const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const maximumImageSide = 1600;
+const maximumImageCharacters = 1_500_000;
 const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your humanity|kpsdk|kasada|akamai/i;
 const csrfRefusal = /forgery|invalid authenticity token|csrf[^<\n]{0,40}(fail|invalid|missing|mismatch|expired)|(invalid|missing|bad)[^<\n]{0,20}csrf/i;
 const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
@@ -22,7 +25,7 @@ export const csrfRefusedMessage = "The website refused the request because its p
 
 export type TaskInputs = Record<string, string | undefined>;
 
-type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "failed";
+type Reason = "signed_out" | "blocked" | "csrf_refused" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "missing_step_value" | "refused" | "not_image" | "image_too_large" | "failed";
 
 type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
 
@@ -209,15 +212,45 @@ async function readRequests(page: Page, website: string, requests: RequestFiller
   return results.join("\n\n");
 }
 
-async function runRequests(app: Website, requests: RequestFiller[]) {
+function readImage(page: Page, website: string, url: string) {
+  return Sentry.startSpan({ name: "image.read" }, async (span) => {
+    const navigation = await page.goto(url, { waitUntil: "load", timeout: requestTimeout });
+    requireOnWebsite(page, website);
+    const status = navigation?.status() ?? 200;
+    if (status === 401 || status === 403) throw refusal(await page.content(), "cf-mitigated" in (navigation?.headers() ?? {}));
+    if (status >= 400) throw httpError("GET", url, status);
+    const contentType = navigation?.headers()["content-type"]?.split(";")[0].trim().toLowerCase() ?? "";
+    if (!imageTypes.includes(contentType)) throw new TaskError("not_image", `${withoutQuery(url)} is not a PNG, JPEG, WebP, or GIF image, so MCParrot did not read it.`);
+    const dataUrl = await page.evaluate(async (maximumSide) => {
+      const image = document.querySelector("img")!;
+      await image.decode();
+      const scale = Math.min(1, maximumSide / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+      const context = canvas.getContext("2d")!;
+      context.fillStyle = "white";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.9);
+    }, maximumImageSide);
+    span.setAttribute("image.data.size", dataUrl.length);
+    if (dataUrl.length > maximumImageCharacters) throw new TaskError("image_too_large", "This image is too large for MCParrot to read, even after shrinking it.");
+    return dataUrl;
+  });
+}
+
+async function inSignedInBrowser(app: Website, read: (page: Page) => Promise<string>) {
   if (!app.browserProfileId) throw signedOut();
   const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
   try {
-    return await withPage(browser.cdpUrl!, (page) => readRequests(page, new URL(app.url).origin, requests));
+    return await withPage(browser.cdpUrl!, read);
   } finally {
     await stopBrowser(browser.id).catch((error: Error) => Sentry.logger.warn("Browser stop failed", { appId: app.id, reason: sanitized(error.message) }));
   }
 }
+
+const runRequests = (app: Website, requests: RequestFiller[]) => inSignedInBrowser(app, (page) => readRequests(page, new URL(app.url).origin, requests));
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -258,4 +291,9 @@ export function addressOnWebsite(app: Website, url: string) {
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
   return logOutcome("Page read", { appId: app.id }, () => runRequests(app, [() => ({ method: "GET", url: address.href })]));
+}
+
+export function readImageDataUrl(app: Website, url: string) {
+  const address = addressOnWebsite(app, url);
+  return logOutcome("Image read", { appId: app.id }, () => inSignedInBrowser(app, (page) => readImage(page, new URL(app.url).origin, address.href)));
 }

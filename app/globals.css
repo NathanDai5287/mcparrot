@@ -249,6 +249,8 @@ a.button { text-decoration: none; }
 .listing-action .pilot-error { margin-top: 0; font-size: 12px; }
 .shared-preview { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; }
 .setup-card .shared-preview p { max-width: none; margin-top: 8px; color: var(--ink); }
+.viewed-image { display: block; max-width: 100%; margin-top: 14px; border: 1px solid var(--line); }
+.setup-card .viewed-image-text { white-space: pre-wrap; color: var(--ink); overflow-wrap: anywhere; }
 .shared-preview ul { margin: 8px 0 0; padding-left: 18px; }
 .shared-preview li { margin-top: 10px; overflow-wrap: anywhere; }
 .sign-in-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }

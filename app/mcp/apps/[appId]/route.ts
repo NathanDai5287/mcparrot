@@ -10,6 +10,7 @@ import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
 import { isGetRequest } from "../../../../lib/task-request";
+import { viewImage } from "../../../../lib/view-image";
 import { findApp } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -111,6 +112,12 @@ function appServer(app: Website, orderLimitUsd?: number) {
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
+  server.registerTool("view_image", {
+    title: `Read an image on ${app.name}`,
+    description: `Read one image on ${website} or its subdomains and return its text and numbers and a short description of any chart. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
+    inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
+    annotations: { readOnlyHint: true },
+  }, async ({ url }) => textResult((await viewImage(app, url)).text));
   server.registerTool("save_task", {
     title: `Save a tool for ${app.name}`,
     description: `Save a new tool for ${app.name} that reads a page with GET or sends one POST request, such as a GraphQL query. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern and bodyPattern, and give one input for each placeholder. When the request needs a value that an earlier JSON response returns, such as a cart ID, list those requests in earlierRequests and use {stepN.path.to.value} for that value, where step1 is the first earlier request and array positions are numbers; these placeholders need no input. MCParrot refuses any request that looks like checkout or payment. The tool appears in a new chat.`,

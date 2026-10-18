@@ -1,10 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { Agent, CursorAgentError, JsonlLocalAgentStore, type Run, type RunResult, type SDKAgent } from "@cursor/sdk";
+import { CursorAgentError } from "@cursor/sdk";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
+import { claudeModelName, runClaudeAgent } from "../../../lib/claude-agent";
 import { appIdSchema, maximumBodyLength, type Capability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
 import { isAllowedRequest, isOnWebsite, requestPlaceholders, usesOnlyEarlierSteps } from "../../../lib/task-request";
@@ -233,66 +231,6 @@ function capabilitiesFrom(reply: string, app: Website, recorded: CapturedRequest
   return unsaved;
 }
 
-function agentOptions(apiKey: string, cwd: string, storeDir: string, sandbox: boolean) {
-  return {
-    apiKey,
-    model: { id: "claude-opus-5-5", params: [{ id: "context", value: "300k" }, { id: "effort", value: "low" }, { id: "fast", value: "true" }] },
-    tools: [],
-    local: { cwd, settingSources: [], sandboxOptions: { enabled: sandbox }, store: new JsonlLocalAgentStore(storeDir) },
-  };
-}
-
-function isSandboxUnsupported(error: unknown) {
-  return error instanceof Error && /sandboxing is not supported/i.test(error.message);
-}
-
-async function runDiscoveryAgent(prompt: string, apiKey: string): Promise<RunResult> {
-  const dirs: string[] = [];
-  let agent: SDKAgent | undefined;
-  let run: Run | undefined;
-  let timedOut = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = () => new DiscoveryError("timeout", 504, "Finding tools took too long. Try again, or explore fewer pages.");
-  const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
-  const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
-  const start = async (sandbox: boolean) => {
-    agent = await Agent.create(agentOptions(apiKey, dirs[0], dirs[1], sandbox));
-    if (timedOut) throw timeout();
-    return agent.send(prompt);
-  };
-  const work = (async () => {
-    dirs.push(await mkdtemp(join(tmpdir(), "discover-")));
-    dirs.push(await mkdtemp(join(tmpdir(), "discover-store-")));
-    if (timedOut) throw timeout();
-    run = await start(true).catch(async (error) => {
-      if (!isSandboxUnsupported(error)) throw error;
-      await dispose();
-      return start(false);
-    });
-    if (timedOut) await run.cancel();
-    return run.wait();
-  })();
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      timedOut = true;
-      reject(timeout());
-    }, discoveryDeadlineMs);
-  });
-  try {
-    return await Promise.race([work, deadline]);
-  } finally {
-    clearTimeout(timer);
-    if (timedOut) {
-      await run?.cancel().catch(() => {});
-      await removeDirs();
-      void work.catch(() => {}).finally(async () => { await dispose(); await removeDirs(); });
-    } else {
-      await dispose();
-      await removeDirs();
-    }
-  }
-}
-
 function askDiscoveryAgent(prompt: string, apiKey: string, requestCount: number) {
   return Sentry.startSpan({
     name: "discover.agent",
@@ -300,11 +238,11 @@ function askDiscoveryAgent(prompt: string, apiKey: string, requestCount: number)
     attributes: {
       "gen_ai.operation.name": "invoke_agent",
       "gen_ai.agent.name": "MCParrot discovery",
-      "gen_ai.request.model": "claude-opus-5-5-low-fast",
+      "gen_ai.request.model": claudeModelName,
       "discover.request_count": requestCount,
     },
   }, async (span) => {
-    const result = await runDiscoveryAgent(prompt, apiKey);
+    const result = await runClaudeAgent(prompt, apiKey, discoveryDeadlineMs, () => new DiscoveryError("timeout", 504, "Finding tools took too long. Try again, or explore fewer pages."));
     span.setAttributes({ "discover.status": result.status, "gen_ai.response.size": result.result?.length ?? 0 });
     return result;
   });
