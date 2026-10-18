@@ -9,7 +9,7 @@ export const ignoreErrors = async (work: () => Promise<unknown>) => { try { awai
 
 export const startBrowser = (profileId: string, timeoutMinutes: number) =>
   Sentry.startSpan({ name: "browser_use.start", attributes: { "browser_use.timeout_minutes": timeoutMinutes } }, () =>
-    browserUse().browsers.create({ profileId, timeout: timeoutMinutes }));
+    browserUse().browsers.create({ profileId, timeout: timeoutMinutes, metadata: { profileId } }));
 
 export const stopBrowser = (browserId: string) =>
   Sentry.startSpan({ name: "browser_use.stop" }, () => browserUse().browsers.stop(browserId));

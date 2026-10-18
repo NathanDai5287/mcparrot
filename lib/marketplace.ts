@@ -1,10 +1,12 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { appIdSchema, capabilitySchema, websiteSchema, type Website } from "./capabilities";
 import { displayName } from "./account";
-import { changeApps, storage, updateStoredApp } from "./workspace";
+import { AppNotFound, changeApps, storage, updateStoredApp } from "./workspace";
 
 const marketplaceKey = "marketplace";
 const listingKey = (listingId: string) => `listing:${listingId}`;
+const listingIdFor = (appId: string) => createHash("sha256").update(appId).digest("hex").slice(0, 32);
 const maxListings = 200;
 const maxListingTasks = 100;
 const maxListingCharacters = 200_000;
@@ -36,7 +38,7 @@ const summary = ({ ownerId, tasks, ...shared }: Listing): ListingSummary => ({ .
 export async function publishApp(userId: string, app: Website, description: string) {
   if (app.tasks.length > maxListingTasks) throw new ListingRejected(`Only apps with at most ${maxListingTasks} tasks can be published. Delete some tasks first.`);
   const listing: Listing = {
-    id: app.listing?.id ?? crypto.randomUUID(),
+    id: listingIdFor(app.id),
     ownerId: userId,
     publisher: await displayName(userId),
     name: app.name,
@@ -50,13 +52,23 @@ export async function publishApp(userId: string, app: Website, description: stri
   const redis = storage();
   if (!app.listing && await redis.scard(marketplaceKey) >= maxListings) throw new ListingRejected("The marketplace is full. Try again later.");
   await redis.multi().set(listingKey(listing.id), listing).sadd(marketplaceKey, listing.id).exec();
-  return updateStoredApp(app.id, { listing: { id: listing.id, publishedAt: listing.publishedAt, description } });
+  try {
+    const apps = await updateStoredApp(app.id, { listing: { id: listing.id, publishedAt: listing.publishedAt, description } });
+    if (app.listing && app.listing.id !== listing.id) await removeListings(app.listing.id);
+    return apps;
+  } catch (error) {
+    if (!(error instanceof AppNotFound)) throw error;
+    await removeListings(listing.id);
+    throw new ListingRejected("This app no longer exists in MCParrot.");
+  }
 }
 
-export const removeListing = (listingId: string) => storage().multi().del(listingKey(listingId)).srem(marketplaceKey, listingId).exec();
+const removeListings = (...listingIds: string[]) => storage().multi().del(...listingIds.map(listingKey)).srem(marketplaceKey, ...listingIds).exec();
+
+export const removeAppListing = (app: Website) => removeListings(listingIdFor(app.id), ...(app.listing ? [app.listing.id] : []));
 
 export async function unpublishApp(app: Website) {
-  if (app.listing) await removeListing(app.listing.id);
+  await removeAppListing(app);
   return updateStoredApp(app.id, { listing: undefined });
 }
 

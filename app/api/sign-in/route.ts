@@ -46,7 +46,9 @@ export async function DELETE(request: Request) {
   const appId = searchParams.get("appId");
   const finished = searchParams.get("finished") !== "false";
   if (!browserId || !appId) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
-  if (!await ownedApp(userId, appId)) return Response.json({ error: "App not found." }, { status: 404 });
+  const profileId = (await ownedApp(userId, appId))?.browserProfileId;
+  const browser = profileId && await browserUse().browsers.get(browserId).catch(() => undefined);
+  if (!browser || browser.metadata.profileId !== profileId) return Response.json({ error: "Sign-in browser not found." }, { status: 404 });
   try {
     await stopBrowser(browserId).catch(async (error) => {
       if ((await browserUse().browsers.get(browserId)).status !== "stopped") throw error;

@@ -1,7 +1,7 @@
 import { isOwner, signedInUserId } from "../../../lib/account";
 import { stopBrowser } from "../../../lib/browser-use";
 import type { Website } from "../../../lib/capabilities";
-import { removeListing } from "../../../lib/marketplace";
+import { removeAppListing } from "../../../lib/marketplace";
 import { pendingOrderKey, stopOrder } from "../../../lib/order";
 import { addTasks, replaceTask } from "../../../lib/save-task";
 import { AppNotFound, changeApp, changeApps, deleteStoredApp, discoveryKey, migrateLegacyWorkspace, ownedApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
@@ -42,7 +42,7 @@ async function deleteApp(app: Website) {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
   const apps = await deleteStoredApp(app.id, appKeys(app.id));
-  if (app.listing) await removeListing(app.listing.id);
+  await removeAppListing(app);
   if (pending?.browserId) {
     try {
       await stopBrowser(pending.browserId);
