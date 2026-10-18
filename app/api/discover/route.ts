@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { Agent, CursorAgentError, JsonlLocalAgentStore, type Run, type RunResult, type SDKAgent } from "@cursor/sdk";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { signedInUserId } from "../../../lib/account";
 import { appIdSchema, type Capability, type Discovery, type Task, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
-import { discoveryKey, readWorkspace, storage, StorageUnavailable } from "../../../lib/workspace";
+import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -285,17 +286,18 @@ async function readBody(request: Request) {
   return result.data;
 }
 
-async function savedApp(appId: string) {
-  const app = (await readWorkspace())?.find((storedApp) => storedApp.id === appId);
+async function savedApp(userId: string, appId: string) {
+  const app = await ownedApp(userId, appId);
   if (!app) throw new DiscoveryError("app_not_found", 404, "This app no longer exists. It may have been deleted.");
   return app;
 }
 
 export async function GET(request: Request) {
+  const userId = await signedInUserId();
   const appId = appIdSchema.safeParse(new URL(request.url).searchParams.get("appId"));
   if (!appId.success) return Response.json({ error: "Choose an app first." }, { status: 400 });
   try {
-    const app = await savedApp(appId.data);
+    const app = await savedApp(userId, appId.data);
     const discovery = await storage().get<Discovery>(discoveryKey(app.id)).catch((error) => {
       throw new StorageUnavailable("Storage could not be reached. Try again in a moment.", { cause: error });
     });
@@ -308,12 +310,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const userId = await signedInUserId();
   const apiKey = process.env.CURSOR_API_KEY;
   if (!apiKey) return Response.json({ error: "Discovery is not set up. Add CURSOR_API_KEY to the server environment." }, { status: 500 });
   try {
     const { appId, requests } = await readBody(request);
     if (!requests.length) return Response.json({ error: "Explore the website first so there are requests to read." }, { status: 400 });
-    const app = await savedApp(appId);
+    const app = await savedApp(userId, appId);
 
     Sentry.logger.info("Discovery started", { requestCount: requests.length, savedTaskCount: app.tasks.length });
     const result = await askComposer(discoveryPrompt(app, requests), apiKey, requests.length);
@@ -321,7 +324,7 @@ export async function POST(request: Request) {
       Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
       return Response.json({ error: "Composer returned no capabilities. Explore more pages, then try again." }, { status: 502 });
     }
-    const latestApp = await savedApp(appId);
+    const latestApp = await savedApp(userId, appId);
     const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp) };
     Sentry.logger.info("Discovery finished", { capabilityCount: discovery.capabilities.length });
     await storage().set(discoveryKey(app.id), discovery).catch((error) => Sentry.captureException(error));

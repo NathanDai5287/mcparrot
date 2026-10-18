@@ -27,6 +27,8 @@ export type Website = {
   signedInAt?: string;
   loginSavedAt?: string;
   ordering?: Ordering;
+  connectionTokenHash?: string;
+  listing?: { id: string; publishedAt: string; description: string };
 };
 
 export const maxApps = 100;

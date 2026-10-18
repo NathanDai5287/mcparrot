@@ -1,7 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { signedInUserId } from "../../../lib/account";
 import { CredentialKeyError, credentialKey, deleteLogin, saveLogin } from "../../../lib/login";
-import { readWorkspace, updateStoredApp } from "../../../lib/workspace";
+import { ownedApp, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ async function loginHosts(appId: string, website: URL) {
 }
 
 export async function PUT(request: Request) {
+  const userId = await signedInUserId();
   try {
     credentialKey();
   } catch (error) {
@@ -27,7 +29,7 @@ export async function PUT(request: Request) {
   const body = LoginBody.safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Enter a username and a password to save the login." }, { status: 400 });
   const { appId, username, password } = body.data;
-  const app = (await readWorkspace())?.find((stored) => stored.id === appId);
+  const app = await ownedApp(userId, appId);
   if (!app) return Response.json({ error: "This app no longer exists in MCParrot." }, { status: 404 });
   const website = URL.parse(app.url);
   if (website?.protocol !== "https:" && website?.protocol !== "http:") return Response.json({ error: "The app's website address must start with http:// or https://." }, { status: 400 });
@@ -39,8 +41,10 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const userId = await signedInUserId();
   const appId = new URL(request.url).searchParams.get("appId");
   if (!appId) return Response.json({ error: "Choose an app to delete its login." }, { status: 400 });
+  if (!await ownedApp(userId, appId)) return Response.json({ error: "This app no longer exists in MCParrot." }, { status: 404 });
   await deleteLogin(appId);
   await updateStoredApp(appId, { loginSavedAt: undefined });
   Sentry.logger.info("Login deleted", { appId });

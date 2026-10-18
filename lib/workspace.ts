@@ -3,14 +3,26 @@ import { Redis } from "@upstash/redis";
 import { z } from "zod";
 import { appIdSchema, capabilitySchema, maxApps, maxTasksPerApp, orderingSchema, storedWebsiteSchema, websiteSchema, type Website } from "./capabilities";
 
-const workspaceKey = "workspace";
+const legacyWorkspaceKey = "workspace";
+const workspaceKey = (userId: string) => `workspace:${userId}`;
+const appOwnerKey = (appId: string) => `app-owner:${appId}`;
 const changeAttempts = 20;
 const retryPause = () => new Promise((resolve) => setTimeout(resolve, 20 + Math.random() * 80));
 
 const compareAndSet = `local current = redis.call("GET", KEYS[1]) or ""
 if current ~= ARGV[1] then return 0 end
+local lastClaim = 1 + tonumber(ARGV[3])
+for index = 2, lastClaim do if redis.call("EXISTS", KEYS[index]) == 1 then return -1 end end
 if ARGV[2] ~= current then redis.call("SET", KEYS[1], ARGV[2]) end
-for index = 2, #KEYS do redis.call("DEL", KEYS[index]) end
+for index = 2, lastClaim do redis.call("SET", KEYS[index], ARGV[4]) end
+for index = lastClaim + 1, #KEYS do redis.call("DEL", KEYS[index]) end
+return 1`;
+
+const moveApps = `if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+if (redis.call("GET", KEYS[2]) or "") ~= ARGV[2] then return 0 end
+redis.call("SET", KEYS[2], ARGV[3])
+for index = 3, #KEYS do redis.call("SET", KEYS[index], ARGV[4]) end
+redis.call("DEL", KEYS[1])
 return 1`;
 
 export const workspaceOperationSchema = z.discriminatedUnion("operation", [
@@ -72,37 +84,84 @@ function checkLimits(before: Website[], after: Website[]) {
   if (full) throw new WorkspaceLimit(`${full.name} holds at most ${maxTasksPerApp} tasks. Delete a task first.`);
 }
 
-const readStoredWorkspace = () => stored((redis) => redis.get<string>(workspaceKey));
+const readStoredWorkspace = (key: string) => stored((redis) => redis.get<string>(key));
 
-export async function readWorkspace() {
-  const apps = parseApps(await readStoredWorkspace());
+export async function readWorkspace(userId: string) {
+  const apps = parseApps(await readStoredWorkspace(workspaceKey(userId)));
   return apps && wellFormed(apps);
 }
 
-async function changeStoredApps(change: (apps: Website[]) => Website[], deleteKeys: string[], keepMalformed: (app: unknown) => boolean) {
+export const appOwner = (appId: string) => stored((redis) => redis.get<string>(appOwnerKey(appId)));
+
+export async function findApp(appId: string) {
+  const ownerId = await appOwner(appId);
+  const app = ownerId ? (await readWorkspace(ownerId))?.find((candidate) => candidate.id === appId) : undefined;
+  return ownerId && app ? { app, ownerId } : null;
+}
+
+export async function ownedApp(userId: string, appId: string) {
+  const found = await findApp(appId);
+  return found?.ownerId === userId ? found.app : undefined;
+}
+
+type KeyChanges = { deleteKeys?: string[]; newAppIds?: string[]; keepMalformed?: (app: unknown) => boolean };
+
+export async function changeApps(userId: string, change: (apps: Website[]) => Website[], { deleteKeys = [], newAppIds = [], keepMalformed = () => true }: KeyChanges = {}) {
+  const key = workspaceKey(userId);
+  const claimKeys = newAppIds.map(appOwnerKey);
   for (let attempt = 0; attempt < changeAttempts; attempt++) {
     if (attempt) await retryPause();
-    const raw = await readStoredWorkspace();
+    const raw = await readStoredWorkspace(key);
     const current = parseApps(raw) ?? [];
     const valid = wellFormed(current);
     const apps = change(valid);
     checkLimits(valid, apps);
     const unchanged = raw === null && !apps.length;
     const next = unchanged ? "" : JSON.stringify([...apps, ...current.filter((app) => !isWellFormed(app) && keepMalformed(app))]);
-    if (await stored((redis) => redis.eval(compareAndSet, [workspaceKey, ...deleteKeys], [raw ?? "", next])) === 1) return wellFormed(apps);
+    const result = await stored((redis) => redis.eval(compareAndSet, [key, ...claimKeys, ...deleteKeys], [raw ?? "", next, String(claimKeys.length), userId]));
+    if (result === -1) throw new WorkspaceLimit("An app with this id already exists.");
+    if (result === 1) return wellFormed(apps);
   }
   throw new StorageUnavailable("Storage is busy with other changes. Try again in a moment.");
 }
 
-export const changeApps = (change: (apps: Website[]) => Website[], deleteKeys: string[] = []) => changeStoredApps(change, deleteKeys, () => true);
+async function ownerOf(appId: string) {
+  const ownerId = await appOwner(appId);
+  if (!ownerId) throw new AppNotFound("This app no longer exists. It may have been deleted.");
+  return ownerId;
+}
 
-export const deleteStoredApp = (appId: string, deleteKeys: string[]) =>
-  changeStoredApps((apps) => apps.filter((app) => app.id !== appId), deleteKeys, (app) => (app as { id?: unknown } | null)?.id !== appId);
+export const deleteStoredApp = async (appId: string, deleteKeys: string[]) =>
+  changeApps(await ownerOf(appId), (apps) => apps.filter((app) => app.id !== appId), {
+    deleteKeys: [appOwnerKey(appId), ...deleteKeys],
+    keepMalformed: (app) => (app as { id?: unknown } | null)?.id !== appId,
+  });
 
-export const changeApp = (appId: string, change: (app: Website) => Website) =>
-  changeApps((apps) => {
+export const changeApp = async (appId: string, change: (app: Website) => Website) =>
+  changeApps(await ownerOf(appId), (apps) => {
     if (!apps.some((app) => app.id === appId)) throw new AppNotFound("This app no longer exists. It may have been deleted.");
     return apps.map((app) => app.id === appId ? change(app) : app);
   });
 
 export const updateStoredApp = (appId: string, changes: Partial<Website>) => changeApp(appId, (app) => ({ ...app, ...changes }));
+
+export async function moveWorkspace(fromKey: string, userId: string) {
+  const toKey = workspaceKey(userId);
+  for (let attempt = 0; attempt < changeAttempts; attempt++) {
+    if (attempt) await retryPause();
+    const [from, to] = await stored((redis) => Promise.all([redis.get<string>(fromKey), redis.get<string>(toKey)]));
+    if (from === null) return;
+    const movedApps = parseApps(from) ?? [];
+    const currentApps = parseApps(to) ?? [];
+    const currentIds = new Set(currentApps.map((app) => app?.id));
+    const merged = [...currentApps, ...movedApps.filter((app) => !currentIds.has(app?.id))];
+    const ownerKeys = movedApps.filter(isWellFormed).map((app) => appOwnerKey(app.id));
+    if (await stored((redis) => redis.eval(moveApps, [fromKey, toKey, ...ownerKeys], [from, to ?? "", JSON.stringify(merged), userId])) === 1) {
+      Sentry.logger.info("Workspace moved to an account", { appCount: movedApps.length });
+      return;
+    }
+  }
+  throw new StorageUnavailable("Storage is busy with other changes. Try again in a moment.");
+}
+
+export const migrateLegacyWorkspace = (userId: string) => moveWorkspace(legacyWorkspaceKey, userId);
