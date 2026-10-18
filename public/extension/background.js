@@ -1,9 +1,10 @@
 const dashboardOrigins = ["https://mcparrot.vercel.app", "http://localhost:4317"];
 const maximumRequests = 150;
-const maximumStringLength = 80;
-const maximumArrayItems = 2;
-const maximumSampleLength = 3000;
-const maximumTextSampleLength = 400;
+const maximumStringLength = 400;
+const maximumArrayItems = 5;
+const maximumSampleLength = 12000;
+const maximumTextSampleLength = 1600;
+const maximumPageSampleLength = 8000;
 const maximumUrlLength = 2000;
 const maximumBodyLength = 30000;
 const maximumHeaderLength = 200;
@@ -11,22 +12,18 @@ const retentionDays = 30;
 const tidyIntervalMilliseconds = 86400000;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
-const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "client-identifier", "github-verified-fetch", "notion-client-version", "x-apollo-operation-name", "x-channel-id", "x-client-identifier", "x-experience-id", "x-notion-active-user-header", "x-requested-with", "x-restli-protocol-version"];
+const browserHeaderNames = new Set(["accept-charset", "accept-encoding", "access-control-request-headers", "access-control-request-method", "connection", "content-length", "content-type", "cookie", "cookie2", "date", "dnt", "expect", "host", "keep-alive", "origin", "referer", "set-cookie", "te", "trailer", "transfer-encoding", "upgrade", "user-agent", "via"]);
+const browserHeaderPrefix = /^(sec-|proxy-|:)/;
 const tokenHeaderName = /auth|token|jwt|session|api-?key/i;
-const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify", "idp", "passcode"]);
+const authenticationWords = new Set(["login", "logout", "signin", "signout", "password", "oauth", "oauth2", "saml", "saml2", "sso", "mfa", "otp", "2fa", "idp", "passcode"]);
 const authenticationHost = /^(login|logon|signin|auth|sso|idp)\.|\.(okta|oktapreview|auth0)\.com$/i;
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
-const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
-const exactSecretParameters = new Set(["code", "key"]);
-const secretKeyWords = new Set(["auth", "refresh", "access", "passcode", "pwd", "otp"]);
-const sessionSecretNames = new Set(["session", "sessionid", "sessiontoken", "sessionkey", "sid", "jsessionid", "phpsessid"]);
-const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|bearer|cookie|credential|signature/i;
+const secretNameText = /token|secret|passw|apikey|privatekey|cookie|authorization|csrf|xsrf|jsessionid|phpsessid/;
 const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const bearerText = /\bbearer\s+[\w\-.~+/]+=*/gi;
-const secretName = "(?:[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|credential|signature|authorization)[\\w-]*|(?<![\\w-])(?:session[_-]?id|jsessionid|phpsessid)(?![\\w-]))";
+const secretName = "(?:[\\w-]*(?:token|secret|password|passwd|api[_-]?key|private[_-]?key|cookie|csrf|xsrf|authorization)[\\w-]*|(?<![\\w-])(?:jsessionid|phpsessid)(?![\\w-]))";
 const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|<[^<>\\s]*>|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
 const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
-const longValueText = /[\w+=\-~]{32,}/g;
 const secretStringArgumentText = new RegExp(`\\b(${secretName})(\\s*:\\s*)"[^"]*"`, "gi");
 const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
@@ -54,34 +51,20 @@ function isAuthenticationPath(pathname) {
   return hasWord(wordsOf(pathname), authenticationWords);
 }
 
-function isSessionSecretName(name) {
-  return sessionSecretNames.has(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
-}
-
 function isSecretKey(key) {
-  return secretKeyText.test(key) || hasWord(wordsOf(key), secretKeyWords) || isSessionSecretName(key);
-}
-
-function isHighEntropy(text) {
-  if (text.length < 32 || !/^[\w+=\-~]+$/.test(text) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false;
-  const hex = /^[0-9a-f]+$/i.test(text);
-  if (!hex && !(/[a-z]/.test(text) && /[A-Z]/.test(text) && /\d/.test(text))) return false;
-  const counts = {};
-  for (const character of text) counts[character] = (counts[character] ?? 0) + 1;
-  const entropy = Object.values(counts).reduce((total, count) => total - (count / text.length) * Math.log2(count / text.length), 0);
-  return entropy >= (hex ? 3 : 3.5);
+  return secretNameText.test(key.toLowerCase().replace(/[^a-z0-9]/g, ""));
 }
 
 function looksSecret(text) {
-  return /^\s*(bearer|basic)\s/i.test(text) || new RegExp(`^${jwtText.source}$`).test(text) || isHighEntropy(text);
+  return /^\s*(bearer|basic)\s/i.test(text) || new RegExp(`^${jwtText.source}$`).test(text);
 }
 
 function redactText(text) {
-  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretElementText, "$1redacted$3").replace(secretAssignmentText, (_, name, separator, value) => `${name}${separator}${/^["']/.test(value) ? `${value[0]}redacted${value[0]}` : "redacted"}`).replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
+  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretElementText, "$1redacted$3").replace(secretAssignmentText, (_, name, separator, value) => `${name}${separator}${/^["']/.test(value) ? `${value[0]}redacted${value[0]}` : "redacted"}`);
 }
 
 function redactGraphqlDocument(text) {
-  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretStringArgumentText, '$1$2"redacted"').replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
+  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretStringArgumentText, '$1$2"redacted"');
 }
 
 function redact(value, key = "") {
@@ -120,8 +103,13 @@ function contentTypeOf(headers = {}) {
   return Object.entries(headers).find(([name]) => name.toLowerCase() === "content-type")?.[1]?.slice(0, 200);
 }
 
-function replayedHeaders(headers = {}) {
-  return Object.fromEntries(Object.entries(headers).filter(([name, value]) => replayedHeaderNames.includes(name.toLowerCase()) && value.length <= maximumHeaderLength && !looksSecret(value)));
+function isRecordedHeader(name, value) {
+  const lowerName = name.toLowerCase();
+  return !browserHeaderNames.has(lowerName) && !browserHeaderPrefix.test(lowerName) && !isSecretKey(name) && value.length <= maximumHeaderLength && !looksSecret(value);
+}
+
+function recordedHeaders(headers = {}) {
+  return Object.fromEntries(Object.entries(headers).filter(([name, value]) => isRecordedHeader(name, value)));
 }
 
 function findLocalStorageTokens(values, maximumDepth, maximumLength) {
@@ -167,7 +155,7 @@ function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
   url.pathname = url.pathname.split("/").map((segment) => isSecretSegment(segment) ? "redacted" : segment).join("/");
-  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || isSessionSecretName(name) || exactSecretParameters.has(name.toLowerCase()) || looksSecret(value)) url.searchParams.set(name, "redacted");
+  for (const [name, value] of [...url.searchParams]) if (isSecretKey(name) || looksSecret(value)) url.searchParams.set(name, "redacted");
   return url.href.slice(0, maximumUrlLength);
 }
 
@@ -215,7 +203,7 @@ function rememberRequest({ requestId, request }) {
   const pattern = url.origin + pathPattern(url);
   if (pattern.length > maximumUrlLength) return;
   const tokenValues = Object.entries(request.headers ?? {}).filter(([name, value]) => tokenHeaderName.test(name) && value);
-  const requestHeaders = replayedHeaders(request.headers);
+  const requestHeaders = recordedHeaders(request.headers);
   const captured = { method: request.method, url: withoutSecrets(request.url), rawUrl: request.url, pattern, ...(tokenValues.length ? { tokenValues } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}) };
   if (request.method === "GET") return pendingRequests.set(requestId, captured);
   const requestContentType = contentTypeOf(request.headers);
@@ -278,12 +266,13 @@ async function recordRequest(tabId, requestId) {
   const request = pendingRequests.get(requestId);
   pendingRequests.delete(requestId);
   if (!request?.data) return;
-  const { postData, hasPostData, tokenValues, data, rawUrl, ...captured } = request;
+  const { postData, hasPostData, tokenValues, requestHeaders = {}, data, rawUrl, ...captured } = request;
   const sentBody = await requestBody(tabId, requestId, { postData, hasPostData });
   const operation = digestOf(operationOf({ url: rawUrl, body: sentBody }));
   const body = await chrome.debugger.sendCommand({ tabId }, "Network.getResponseBody", { requestId }).catch(() => undefined);
   const tokenHeaders = await tokenHeadersOf(tabId, tokenValues);
-  await save(tabId, { ...captured, ...(operation ? { operation } : {}), ...(tokenHeaders.length ? { tokenHeaders } : {}), ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
+  const plainHeaders = Object.fromEntries(Object.entries(requestHeaders).filter(([name]) => !tokenHeaders.some(({ header }) => header === name.toLowerCase())));
+  await save(tabId, { ...captured, ...(operation ? { operation } : {}), ...(Object.keys(plainHeaders).length ? { requestHeaders: plainHeaders } : {}), ...(tokenHeaders.length ? { tokenHeaders } : {}), ...(sentBody ? { body: bodyOf(sentBody) } : {}), sample: body && !body.base64Encoded ? sampleOf(body.body) : "" });
 }
 
 async function recordPage(tabId) {
@@ -293,7 +282,7 @@ async function recordPage(tabId) {
   const url = new URL(page.url);
   const pattern = url.origin + pathPattern(url);
   if (!url.protocol.startsWith("http") || authenticationHost.test(url.hostname) || isAuthenticationPath(url.pathname) || pattern.length > maximumUrlLength) return;
-  const sample = redactText(page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength * 2)).slice(0, maximumSampleLength);
+  const sample = redactText(page.text.replace(/\s+/g, " ").trim().slice(0, maximumPageSampleLength * 2)).slice(0, maximumPageSampleLength);
   await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern, status: page.status, contentType: page.contentType, sample });
 }
 
