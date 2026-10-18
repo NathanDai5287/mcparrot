@@ -4,7 +4,7 @@ import type { Page } from "playwright-core";
 import { timed, withWarmPage, type RunSteps } from "./browser-use";
 import { compactAnswer } from "./compact-answer";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
-import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
+import { bodyPlaceholderPattern, isAllowedRequest, isGetRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
 
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
@@ -42,7 +42,7 @@ type FilledRequest = { method: string; url: string; body?: string; contentType?:
 type RequestFiller = (responses: string[]) => FilledRequest;
 
 class TaskError extends Error {
-  constructor(readonly reason: Reason, message: string) {
+  constructor(readonly reason: Reason, message: string, readonly retryable = false) {
     super(message);
   }
 }
@@ -191,7 +191,7 @@ function readPageText(page: Page, website: string, url: string, steps: RunSteps,
 }
 
 function httpError(method: string, url: string, status: number) {
-  return new TaskError("http_error", `${status >= 500 ? retryOnce : ""}${method} ${withoutQuery(url)} returned ${status}`);
+  return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`, status >= 500);
 }
 
 async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
@@ -204,12 +204,12 @@ async function readRequest(page: Page, website: string, request: FilledRequest, 
   const { method, url } = request;
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
-  if (response.failed === "timeout") throw new TaskError("timeout", `${retryOnce}${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
+  if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`, true);
   if (response.redirected && looksSignedOut(response.url)) throw signedOut();
   if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `${doNotRetry}This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
-  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${retryOnce}${method} ${withoutQuery(url)} could not be sent.`);
+  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, status: response.status, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
   return readPageAt(page, website, url, steps, step);
 }
@@ -297,7 +297,7 @@ function failureReason(error: Error): Reason {
   return "failed";
 }
 
-function logOutcome(name: string, attributes: Record<string, string | number | boolean>, read: (steps: RunSteps) => Promise<string>) {
+function logOutcome(name: string, attributes: Record<string, string | number | boolean>, read: (steps: RunSteps) => Promise<string>, readOnly = true) {
   return Sentry.startSpan({ name: "task.run", attributes: { "task.kind": name } }, async () => {
     const steps: RunSteps = {};
     try {
@@ -307,8 +307,8 @@ function logOutcome(name: string, attributes: Record<string, string | number | b
     } catch (error) {
       const reason = failureReason(error as Error);
       Sentry.logger.warn(`${name} failed`, { ...attributes, ...steps, signedOut: reason === "signed_out", reason });
-      if (error instanceof TaskError) throw error;
-      throw new TaskError(reason, (reason === "timeout" || reason === "fetch_failed" ? retryOnce : "") + sanitized((error as Error).message));
+      const failure = error instanceof TaskError ? error : new TaskError(reason, sanitized((error as Error).message), reason === "timeout" || reason === "fetch_failed");
+      throw readOnly && failure.retryable ? new TaskError(failure.reason, retryOnce + failure.message) : failure;
     }
   });
 }
@@ -317,7 +317,7 @@ export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, (steps) => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
     return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields ?? [], needsHomePage(task.requests), fullAnswer);
-  });
+   }, task.requests.every(isGetRequest));
 }
 
 export function addressOnWebsite(app: Website, url: string) {

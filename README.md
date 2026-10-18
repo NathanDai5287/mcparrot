@@ -381,7 +381,7 @@ A 401 or 403 whose text says that a CSRF or forgery check failed or that the aut
 These messages never include the response text, and neither case starts an automatic sign-in.
 When the app signs in again automatically, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 Otherwise, the tool fails with a message that tells the user to open MCParrot and select **Sign in to website** on the app or choose how it signs in again automatically.
-So ChatGPT knows whether a failed call is worth repeating, a signed-out, bot-check, protection-code, off-site, or payment refusal starts with `Do not retry; tell the user:`, and a timeout, a request that could not be sent, or a status of 500 or higher starts with `Retry once now.`; the signed-out text keeps that start when an order reports it.
+So ChatGPT knows whether a failed call is worth repeating, a signed-out, bot-check, protection-code, off-site, or payment refusal starts with `Do not retry; tell the user:`, and a timeout or a status of 500 or higher starts with `Retry once now.` only when every request in the tool is a GET, so a retry never sends a website change twice; the signed-out text keeps that start when an order reports it.
 
 Assistants can combine taught tools in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
