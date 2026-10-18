@@ -36,11 +36,11 @@ socket.addEventListener("error", () => {});
 
 const inspectPage = `(() => {
   const visible = (element) => element && element.getClientRects().length > 0;
-  if (location.origin === 'https://bcourses.berkeley.edu' && document.querySelector('#global_nav_profile_link')) return { stage: 'signed_in', message: 'Canvas sign-in succeeded.' };
+  if (location.origin === 'https://bcourses.berkeley.edu' && document.querySelector('#global_nav_profile_link')) return { stage: 'signed_in', message: 'Website sign-in succeeded.' };
   if (location.origin === 'https://auth.berkeley.edu' && location.pathname === '/cas/login') {
     const rejected = [...document.querySelectorAll('#msg,.errors,.alert-danger,[role=alert]')].some(element => visible(element) && /invalid|incorrect|failed|locked|try again/i.test(element.textContent));
-    if (rejected) return { stage: 'rejected', message: 'Berkeley rejected the sign-in. Continue manually in the Canvas window.' };
-    if (document.querySelector('#username') && document.querySelector('#password')) return { stage: 'credentials', message: 'Berkeley sign-in is ready.' };
+    if (rejected) return { stage: 'rejected', message: 'The website rejected the sign-in. Continue manually in the teaching browser window.' };
+    if (document.querySelector('#username') && document.querySelector('#password')) return { stage: 'credentials', message: 'The sign-in page is ready.' };
   }
   if (location.protocol !== 'https:' || !location.hostname.endsWith('.duosecurity.com')) return { stage: 'waiting', message: 'Waiting for the school sign-in page.' };
   const rejected = [...document.querySelectorAll('[role=alert],.error-message,.alert-danger')].some(element => visible(element) && /invalid|incorrect|expired|try again/i.test(element.textContent));
@@ -54,7 +54,7 @@ const inspectPage = `(() => {
 
 async function evaluate(sessionId, expression) {
   const result = await command("Runtime.evaluate", { expression, returnByValue: true }, sessionId);
-  if (result.exceptionDetails) throw new Error("This school sign-in step is unavailable. Continue manually in the Canvas window.");
+  if (result.exceptionDetails) throw new Error("This sign-in step is unavailable. Continue manually in the teaching browser window.");
   return result.result.value;
 }
 
@@ -67,7 +67,7 @@ async function inspectAuthentication() {
     const state = await evaluate(sessionId, inspectPage);
     if (state.stage !== "waiting") return { state, sessionId };
   }
-  return { state: { stage: "waiting", message: "Waiting for a supported sign-in page. You can continue manually in the Canvas window." } };
+  return { state: { stage: "waiting", message: "Waiting for a supported sign-in page. You can continue manually in the teaching browser window." } };
 }
 
 async function submitCredentials(sessionId, credentials) {
@@ -110,8 +110,8 @@ async function advanceSignIn(credentials) {
     authentication = state;
     if (["signed_in", "verification_required", "rejected"].includes(state.stage)) return authentication;
     if (state.stage === "credentials") {
-      if (passwordAttempted) return { stage: "manual_required", message: "The password was already submitted once. Check the Canvas window; automatic retries are disabled." };
-      if (!credentials.username || !credentials.password) return { stage: "manual_required", message: "Automatic credentials are unavailable. Sign in manually in the Canvas window." };
+      if (passwordAttempted) return { stage: "manual_required", message: "The password was already submitted once. Check the teaching browser window; automatic retries are disabled." };
+      if (!credentials.username || !credentials.password) return { stage: "manual_required", message: "Automatic credentials are unavailable. Sign in manually in the teaching browser window." };
       await submitCredentials(sessionId, credentials);
     }
     if (state.stage === "trust") await selectVerification(sessionId, state.stage);
@@ -119,7 +119,7 @@ async function advanceSignIn(credentials) {
     if (state.stage === "other_options" && !optionsOpened && !smsRequested) await selectVerification(sessionId, state.stage);
     await delay(650);
   }
-  return { stage: "manual_required", message: smsRequested ? "The text option was requested once. Check the Canvas window, then select Check sign-in." : "The school did not offer a supported text-code step. Continue manually in the Canvas window, then check sign-in." };
+  return { stage: "manual_required", message: smsRequested ? "The text option was requested once. Check the teaching browser window, then select Check sign-in." : "The website did not offer a supported text-code step. Continue manually in the teaching browser window, then check sign-in." };
 }
 
 async function submitCode(code) {
@@ -164,8 +164,8 @@ async function handle(request, response) {
   let payload;
   try {
     payload = decryptEnvelope(input.envelope);
-    if (input.name === "continue_canvas_signin") authentication = await advanceSignIn(payload);
-    if (input.name === "submit_canvas_code") authentication = await submitCode(payload.code);
+    if (input.name === "continue_signin") authentication = await advanceSignIn(payload);
+    if (input.name === "submit_signin_code") authentication = await submitCode(payload.code);
     response.end(JSON.stringify(authentication));
   } finally {
     if (payload) for (const key of Object.keys(payload)) delete payload[key];
@@ -175,7 +175,7 @@ async function handle(request, response) {
 
 async function start() {
   await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", reject, { once: true }); });
-  createServer((request, response) => { handle(request, response).catch(() => { response.statusCode = 400; response.end(JSON.stringify({ stage: "manual_required", message: "The automatic sign-in step failed. Continue manually in the Canvas window." })); }); }).listen(4324, "127.0.0.1");
+  createServer((request, response) => { handle(request, response).catch(() => { response.statusCode = 400; response.end(JSON.stringify({ stage: "manual_required", message: "The automatic sign-in step failed. Continue manually in the teaching browser window." })); }); }).listen(4324, "127.0.0.1");
 }
 
 start().catch(() => process.exit(1));

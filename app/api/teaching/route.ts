@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { operateTeaching, readSession, signSession, teachingOperations, type TeachingOperation } from "../../../lib/cloud-teaching";
+import { operateTeaching, readSession, signSession, teachingOperations, websiteOriginFromUrl, type TeachingOperation } from "../../../lib/cloud-teaching";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
   const cookieName = `__Host-mcparrot-${input.appId}-${input.taskId}`;
   const session = readSession(request.cookies.get(cookieName)?.value, input.appId, input.taskId);
   try {
-    const result = await operateTeaching(input.name as TeachingOperation, session, input.appId, input.taskId, input.arguments);
+    const websiteOrigin = websiteOriginFromUrl(input.websiteUrl);
+    const result = await operateTeaching(input.name as TeachingOperation, session, input.appId, input.taskId, input.arguments, websiteOrigin);
     const response = NextResponse.json(result.state, { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
     if (result.session) response.cookies.set(cookieName, signSession(result.session), { httpOnly: true, secure: true, sameSite: "strict", path: "/", expires: new Date(result.session.expiresAt) });
     if (input.name === "end_teaching_session") response.cookies.set(cookieName, "", { httpOnly: true, secure: true, path: "/", maxAge: 0 });

@@ -56,12 +56,12 @@ export function ExplorationPanel({ appId, taskId, websiteUrl, active }: { appId:
     return () => window.removeEventListener("focus", refresh);
   }, [active, appId, supported]);
 
-  if (!supported) return <section className="teaching-pilot"><h2>Start with Berkeley Canvas</h2><p>The first extension supports Canvas course reading pages. Other websites need capture support before they can suggest actions.</p></section>;
+  if (!supported) return <section className="teaching-pilot"><h2>This website is not supported yet</h2><p>The extension does not observe reading routes on this website yet. Other websites need capture support before they can suggest actions.</p></section>;
 
   return <>
-    <section className="teaching-pilot" aria-label="Explore Canvas in your browser" aria-busy={busy}>
-      <h2>{state.recording ? "Explore Canvas in the other tab" : connected ? "Explore in your own browser" : "Set up your browser once"}</h2>
-      <p>{state.recording ? "Browse your course pages. Return here when you are ready to review the observed reading actions." : "Use your normal Canvas sign-in without a streamed browser. You do not need to create tasks one by one."}</p>
+    <section className="teaching-pilot" aria-label="Explore the website in your browser" aria-busy={busy}>
+      <h2>{state.recording ? "Explore the website in the other tab" : connected ? "Explore in your own browser" : "Set up your browser once"}</h2>
+      <p>{state.recording ? "Browse the pages you use. Return here when you are ready to review the observed reading actions." : "Use your normal website sign-in without a streamed browser. You do not need to create tasks one by one."}</p>
       {!connected && <>
         <ol>
           <li><a href="/downloads/mcparrot-explorer.zip" download>Download MCParrot Explorer</a>, then extract the downloaded ZIP.</li>
@@ -69,10 +69,10 @@ export function ExplorationPanel({ appId, taskId, websiteUrl, active }: { appId:
           <li>Enable <strong>Developer mode</strong>, select <strong>Load unpacked</strong>, and choose the extracted folder containing <strong>manifest.json</strong>.</li>
           <li>Reload this page.</li>
         </ol>
-        <p className="field-help">Chrome or Edge only. This private extension is not in the extension store. It observes supported reading routes only in the Canvas tab you open here.</p>
+        <p className="field-help">Chrome or Edge only. This private extension is not in the extension store. It observes supported reading routes only in the tab you open here.</p>
       </>}
       <div className="pilot-controls">
-        {connected && <button className="button primary" disabled={busy} onClick={() => operate(state.recording ? "stop" : "start")}>{busy ? "Updating exploration…" : state.recording ? "Review suggested actions" : state.candidates.length ? "Continue exploring Canvas" : "Open Canvas and explore"}</button>}
+        {connected && <button className="button primary" disabled={busy} onClick={() => operate(state.recording ? "stop" : "start")}>{busy ? "Updating exploration…" : state.recording ? "Review suggested actions" : state.candidates.length ? "Continue exploring" : "Open website and explore"}</button>}
         <button className="button" disabled={busy} onClick={() => operate("status")}>{connected ? "Refresh observations" : "Check extension"}</button>
         {connected && <span role="status">{state.candidates.length} observed reading routes{state.recording ? " · Exploring" : ""}</span>}
       </div>

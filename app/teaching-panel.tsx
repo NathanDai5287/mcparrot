@@ -25,14 +25,13 @@ export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appI
   const [testFailed, setTestFailed] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const browserWindow = useRef<Window | null>(null);
-  const supported = new URL(websiteUrl).origin === "https://bcourses.berkeley.edu";
 
   async function operate(name: string, input?: object) {
     setBusy(true);
     setError("");
     if (name === "test_saved_request") setTestFailed(true);
     try {
-      const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, arguments: input }) });
+      const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, websiteUrl, arguments: input }) });
       const next = await response.json();
       if (!response.ok) {
         if (next.hasSession) setState((previous) => ({ ...previous, expiresAt: next.expiresAt }));
@@ -72,15 +71,13 @@ export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appI
     event.preventDefault();
     const code = verificationCode;
     setVerificationCode("");
-    await operate("submit_canvas_code", { code });
+    await operate("submit_signin_code", { code });
   }
 
   useEffect(() => {
-    if (!active || !supported) return;
+    if (!active) return;
     void operate("get_teaching_status");
   }, [active, appId, taskId]);
-
-  if (!supported) return <section className="teaching-pilot"><h2>Start with Berkeley Canvas</h2><p>This first hosted reading test supports Berkeley Canvas. Other websites still need recording support.</p></section>;
 
   const step = !state.ready ? "connect" : state.recording || state.candidates.length === 0 ? "teach" : "review";
   const selected = state.candidates.find(({ id }) => id === selectedId);
@@ -92,16 +89,16 @@ export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appI
     <ol className="teaching-progress"><li aria-current={step === "connect" ? "step" : undefined}>Connect</li><li aria-current={step === "teach" ? "step" : undefined}>Explore</li><li aria-current={step === "review" ? "step" : undefined}>Review</li></ol>
     {!state.ready && <div className="teaching-step">
       <h2>No earlier cloud session is connected</h2>
-      <p>Use the extension above to explore Canvas. New cloud exploration sessions are not opened here.</p>
+      <p>Use the extension above to explore this website. New cloud exploration sessions are not opened here.</p>
     </div>}
     {state.ready && <>
       <div className="teaching-step">
-        <h2>{state.recording ? "Explore the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "Canvas is ready" : "Continue Canvas sign-in"}</h2>
-        <p>{state.recording ? "Visit the course pages you use in the Canvas window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without navigating Canvas again." : authentication?.stage === "signed_in" ? "Use the normal-browser exploration above for new observations. This older session remains available for sign-in recovery and earlier reading tests." : "We can enter your saved Berkeley sign-in details. You complete the text-code check here."}</p>
+        <h2>{state.recording ? "Explore the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "The website is ready" : "Continue sign-in"}</h2>
+        <p>{state.recording ? "Visit the pages you use in the teaching browser window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without opening the website again." : authentication?.stage === "signed_in" ? "Use the normal-browser exploration above for new observations. This older session remains available for sign-in recovery and earlier reading tests." : "We can enter your saved sign-in details when automatic sign-in is configured. You complete any text-code check here."}</p>
         <div className="pilot-controls">
-          {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open Canvas window</button>}
+          {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open teaching browser</button>}
           {state.recording && <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Stop earlier recording</button>}
-          <span>{state.recording ? "Recording course reading requests" : `${state.candidates.length} observed requests`}</span>
+          <span>{state.recording ? "Recording reading requests" : `${state.candidates.length} observed requests`}</span>
         </div>
       </div>
       {!state.recording && state.candidates.length === 0 && authentication?.stage !== "signed_in" && <div className="pilot-review">
@@ -110,9 +107,9 @@ export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appI
           <label htmlFor={`verification-${appId}-${taskId}`}>Text verification code</label>
           <input id={`verification-${appId}-${taskId}`} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required />
           <button className="button primary" disabled={busy} type="submit">{busy ? "Checking code…" : "Submit code"}</button>
-        </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_canvas_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
-        {verificationRequired && <button className="button" disabled={busy} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button>}
-        <p className="field-help">You can also continue manually in the Canvas window. We never approve your phone verification for you.</p>
+        </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
+        {verificationRequired && <button className="button" disabled={busy} onClick={() => operate("continue_signin")}>Check sign-in</button>}
+        <p className="field-help">You can also continue manually in the teaching browser window. We never approve your phone verification for you.</p>
       </div>}
       {state.candidates.length > 0 && !state.recording && <div className="pilot-candidates">
         <h3>Observed reading actions · {state.candidates.length}</h3>
@@ -129,7 +126,7 @@ export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appI
         <p>This session and its observed requests remain available here until the session ends. Only reading requests are supported.</p>
         <p>Task publication and assistant connections are not available yet. Use the extension above for new exploration.</p>
         {selected && <label htmlFor={`course-${appId}-${taskId}`}>Test another course ID<input id={`course-${appId}-${taskId}`} inputMode="numeric" pattern="[0-9]+" value={courseId} onChange={(event) => setCourseId(event.target.value)} /></label>}
-        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
+        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
       </details>
     </>}
     {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The earlier browser connection ended. End this session and use the extension above for exploration.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}

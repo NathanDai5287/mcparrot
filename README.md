@@ -382,10 +382,11 @@ Neither value is sent to the browser, stored in the repository, or included in r
 
 A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
 New exploration uses the extension and cannot create a hosted teaching browser.
-An earlier session can reopen its popup, attempt private Canvas sign-in, review captured requests, run reading tests, or end the session.
-Select **Open Canvas window** to focus or reopen the same hosted session without restarting it or deleting its captures.
+An earlier session can reopen its popup, attempt private sign-in, review captured requests, run reading tests, or end the session.
+The UI sends the app website address with each teaching request; the recorder stores its origin in the hosted session.
+Select **Open teaching browser** to focus or reopen the same hosted session without restarting it or deleting its captures.
 If the browser blocks the popup, allow popups for MCParrot and select the button again.
-The recorder observes only supported same-origin Canvas GET requests and syllabus navigation; it excludes authentication traffic and request bodies.
+The recorder observes only supported same-origin GET requests and syllabus navigation for that website origin; it excludes authentication traffic and request bodies.
 The pilot returns request labels and numeric course inputs, not raw headers, cookies, or course content.
 Each task has one named hosted recorder; repeated connection attempts reuse the task session instead of creating another paid browser.
 
@@ -397,13 +398,13 @@ A test obtains matching cookies privately and sends the observed GET request wit
 It reports a result count or a syllabus-page check without storing the returned course data.
 The user can change the numeric course input for a second reading test.
 
-The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, `end_teaching_session`, `continue_canvas_signin`, and `submit_canvas_code`.
+The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, `end_teaching_session`, `continue_signin`, and `submit_signin_code`.
 The UI calls those operations; authenticated remote MCP exposure remains a parity gap and must use the same operations.
 This pilot does not infer unvisited actions, publish suggested tasks, provide a multi-user credential vault, or support another school automatically.
 Cloud school sign-in, live capture, and direct replay require Nathan's production demonstration before their gaps can close; see the [status page](STATUS.md).
 
 
-## Private Canvas sign-in
+## Private hosted sign-in
 
 The private pilot reads `CANVAS_USERNAME` and `CANVAS_PASSWORD` from Sensitive Vercel production environment variables.
 These values belong to the single protected pilot owner; they are not a general credential-storage service.
@@ -417,9 +418,9 @@ The helper checks actual Duo controls and selects text verification for the appr
 It requests that text option once, opens the supported method selector when needed, and skips optional device trust.
 The user enters the code into MCParrot's code form; the helper submits it once for that explicit user action.
 A rejected code requires the user to enter a current code and submit again.
-Unsupported school policies or verification methods require manual action in the existing Canvas window; no phone approval is automated.
+Unsupported school policies or verification methods require manual action in the existing teaching browser window; no phone approval is automated.
 **Check sign-in** observes the current page and continues supported steps without another password attempt or text request.
-After Canvas authentication is detected, existing captured requests remain available for reading tests.
+After website sign-in is detected, existing captured requests remain available for reading tests.
 
 Credentials and codes travel to the private Sandbox as AES-GCM encrypted envelopes, never as plaintext command arguments or files.
 The helper decrypts them only in memory and clears its payload after the action.

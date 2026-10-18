@@ -34,14 +34,14 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
 | Local Berkeley sign-in diagnostic | dormant | A live test completed CalNet sign-in, SMS verification, and Canvas access, and the session survived a reload |
 | Local headless browser launcher | dormant | `browser-local.mjs` started the headless Chrome profile that the live sign-in test used |
-| Cloud Canvas sign-in | gap | Protected saved-credential and in-app SMS operations exist; automatic remote checks and Nathan’s production sign-in test must pass |
+| Cloud hosted sign-in | gap | Protected saved-credential and in-app SMS operations exist; automatic remote checks and Nathan’s production sign-in test must pass |
 | Automatic Duo steps in the diagnostic | gap | Code exists, but a full clean rerun of the automatic focus, SMS, and trust steps has not run |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it and no live run is recorded |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
 | Local teaching connection controls | dormant | Earlier local pairing code remains outside the product UI; the production-only workflow must not launch a local helper |
 | Local reading request capture | dormant | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
 | Hosted teaching controls | gap | The hosted browser opens in a separate popup; reopening uses the same session and captures. Automatic checks pass; Nathan’s sign-in, capture, and replay demonstration must pass |
-| Explore-first workspace | shipped | Each website offers Explore website without a task form; review displays all observed reading requests. Hosted type and build checks validate the interface; the live Canvas proof remains a gap |
+| Explore-first workspace | shipped | Each website offers Explore website without a task form; review displays all observed reading requests. Hosted type and build checks validate the interface; the live hosted demonstration remains a gap |
 | Explore more in one session | gap | Continue exploring appends requests without clearing candidates; Nathan must prove capture and replay in production |
 | Desired-action notes | shipped | Optional notes stay in this browser and do not create tools or imply support |
 | Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; hosted teaching still needs a live demonstration |

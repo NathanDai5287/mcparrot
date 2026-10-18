@@ -7,7 +7,12 @@ import { resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 
 const origin = "http://127.0.0.1:4323";
-const schoolOrigin = "https://bcourses.berkeley.edu";
+let schoolOrigin = process.env.MCPARROT_WEBSITE_ORIGIN;
+try {
+  const session = JSON.parse(await readFile("session.json", "utf8"));
+  if (session.websiteOrigin) schoolOrigin = session.websiteOrigin;
+} catch {}
+if (!schoolOrigin) throw new Error("Set MCPARROT_WEBSITE_ORIGIN or create session.json with websiteOrigin.");
 const profile = process.env.MCPARROT_BROWSER_PROFILE ?? resolve(".local/headless-profile");
 const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 let commandId = 0;

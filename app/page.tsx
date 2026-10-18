@@ -14,7 +14,6 @@ type Screen =
   | { view: "teach"; app: Website; task: Task };
 
 const sampleApps: Website[] = [
-  { id: "canvas", name: "Canvas", url: "https://bcourses.berkeley.edu", sample: true, tasks: [] },
   { id: "youtube", name: "YouTube", url: "https://www.youtube.com", sample: true, tasks: [] },
 ];
 
@@ -81,10 +80,10 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
   return (
     <form className="editor" onSubmit={submit}>
       <label htmlFor="app-name">App name</label>
-      <input id="app-name" name="name" placeholder="For example, Canvas" required maxLength={80} pattern=".*\S.*" autoFocus />
+      <input id="app-name" name="name" placeholder="For example, Course portal" required maxLength={80} pattern=".*\S.*" autoFocus />
       <label htmlFor="website-url">Website address</label>
       <input id="website-url" name="url" type="url" placeholder="https://your-website.com" required aria-describedby="url-help" />
-      <p className="field-help" id="url-help">Use the address you normally visit. The first hosted teaching test supports Berkeley Canvas.</p>
+      <p className="field-help" id="url-help">Use the address you normally visit in your browser.</p>
       <div className="form-actions"><button className="button primary" type="submit">Create app</button><button className="button" type="button" onClick={onCancel}>Cancel</button></div>
     </form>
   );
