@@ -26,6 +26,7 @@ Each submission needs all four of these items:
 3. A demo video of two to three minutes that walks through the features and how they work.
 4. A complete Devpost page with a summary, the technologies used, and links such as designs and API docs.
 
+The [Devpost submission page](public/docs/devpost.html), deployed at [https://mcparrot.vercel.app/docs/devpost.html](https://mcparrot.vercel.app/docs/devpost.html), holds the project description we submit.
 The work must be original, follow the hackathon rules, and be completed within the hackathon time period.
 
 ## Official judging criteria
