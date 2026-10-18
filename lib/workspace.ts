@@ -159,7 +159,7 @@ export const changeApp = async (appId: string, change: (app: Website) => Website
 
 export const updateStoredApp = (appId: string, changes: Partial<Website>) => changeApp(appId, (app) => ({ ...app, ...changes }));
 
-export async function moveWorkspace(fromKey: string, userId: string) {
+async function moveWorkspace(fromKey: string, userId: string) {
   const toKey = workspaceKey(userId);
   for (let attempt = 0; attempt < changeAttempts; attempt++) {
     if (attempt) await retryPause();
