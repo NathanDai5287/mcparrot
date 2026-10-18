@@ -305,16 +305,19 @@ A tool's requests run in order, and a later request can use a value from an earl
 For example, a DoorDash tool "Add item to cart" can get the cart in its first request and send `{step1.data.cart.id}` in its second.
 A step placeholder is not a tool input, and it is filled and encoded the same way as an input, with a non-text value, such as a number or an object, written as JSON.
 When the earlier response is not JSON, is longer than 100,000 characters, or has no value at that path, the tool stops with an error that names the step and the path.
-When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
+When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, then waits up to 5 seconds for its network requests to stop and 2 more seconds when its visible text is shorter than 200 characters, so pages that JavaScript builds return their text, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
-Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
+Each request and page read, including these waits, has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
 An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`, ignoring a leading `www.` on the website's host, so `https://www.doordash.com` also accepts `doordash.com` and `api.doordash.com`.
 A request with `tokenHeaders` reads each named local storage key inside the website's page when it runs and sends its value under the header name, such as Ed's `x-token` from `authToken`; the value never leaves the page, so it never reaches the server, the tool result, logs, or Sentry.
 A request to a subdomain runs from the website's page as a cross-origin `fetch`; it sends no cookies when it sends a token header, because websites such as Ed allow any origin but refuse cross-origin requests with cookies, and otherwise it includes cookies, so it works only when that subdomain allows it.
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 
-The tool treats the website as signed out when that origin lands on a sign-in page, a request returns 401 or 403, or a request or opened page redirects to a sign-in page.
+The tool treats the website as signed out when that origin lands on a sign-in page, a request or opened page redirects to a sign-in page, or a request or opened page returns 401 or 403 that is not one of the two cases below.
+A 401 or 403 with a `cf-mitigated` header or a bot-check page, such as Cloudflare's "Just a moment", a captcha, "Prove your humanity", Kasada, or Akamai, fails with a message that the website blocked the automated browser.
+A 401 or 403 whose text says that a CSRF or forgery check failed or that the authenticity token is invalid fails with a message that the website refused the request's protection code and that the user must record that page again with MCParrot Explorer.
+These messages never include the response text, and neither case starts an automatic sign-in.
 When the app signs in again automatically, MCParrot then signs in by itself, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 Otherwise, the tool fails with a message that tells the user to open MCParrot and select **Sign in to website** on the app or choose how it signs in again automatically.
 
