@@ -64,6 +64,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
 | Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
 | Second website support | aspirational | Teach and run a task on a second website with the same product flow |
+| Shared app marketplace | aspirational | Let owners share a website app with its saved tasks so other people can reuse it; a shared app must contain only the app address and task definitions, never saved logins, Browser Use profiles, or recorded samples; Nathan added it on October 17, 2026 |
 
 A syntax check does not prove that a live browser task works, so it never counts as evidence that a browser capability is shipped.
 
@@ -142,3 +143,4 @@ For how the demo must present Browser Use and Sentry to judges, see [hackathon j
 | 5. Prove reconnection | Preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
 | 6. Prove general use | Teach a task on a second website | Reuse the same product flow without a website-specific architecture |
 | 7. Prepare the demo | Show teaching, assistant use, and the Sentry-backed improvement | Complete the demonstrated flow and explain its limits |
+| 8. Share apps | Add owner authentication, then let owners share an app with its task definitions | Another owner reuses a shared app's tasks with their own sign-in |
