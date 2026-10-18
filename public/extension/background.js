@@ -268,7 +268,7 @@ function save(tabId, captured) {
     const { active } = await chrome.storage.session.get("active");
     if (active?.tabId !== tabId) return;
     const requests = await readRequests(active.appId);
-    if (requests.length >= maximumRequests || requests.some((request) => request.method === captured.method && request.pattern === captured.pattern && request.operation === captured.operation)) return;
+    if (requests.length >= maximumRequests || requests.some((request) => request.method === captured.method && request.pattern === captured.pattern && (request.operation ?? digestOf(operationOf(request))) === captured.operation)) return;
     await chrome.storage.local.set({ [explorationKey(active.appId)]: { recordedAt: Date.now(), requests: [...requests, captured] } });
   }).catch((error) => chrome.storage.session.set({ saveError: `Could not save a recorded request: ${error.message}` }));
 }
