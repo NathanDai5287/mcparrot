@@ -6,7 +6,7 @@ import type { Website } from "../../../lib/capabilities";
 import { removeAppListing } from "../../../lib/marketplace";
 import { pendingOrderKey, stopOrder } from "../../../lib/order";
 import { addTasks, replaceTask } from "../../../lib/save-task";
-import { AppNotFound, changeApp, changeApps, deleteStoredApp, discoveryKey, migrateLegacyWorkspace, ownedApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
+import { AppNotFound, appOwner, changeApp, changeApps, deleteStoredApp, discoveryKey, migrateLegacyWorkspace, ownedApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -69,7 +69,9 @@ async function deleteApp(app: Website) {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
   const apps = await deleteStoredApp(app.id, appKeys(app.id));
-  await cleanUp(() => removeAppListing(app));
+  await cleanUp(async () => {
+    if (!await appOwner(app.id)) await removeAppListing(app);
+  });
   await stopWarmBrowser(app.id);
   const { browserId } = pending ?? {};
   if (browserId) await cleanUp(() => stopBrowser(browserId));
