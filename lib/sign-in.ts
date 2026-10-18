@@ -248,7 +248,7 @@ async function signInAgain(app: Website, deadline: number) {
   return signInOnce(app, login, deadline);
 }
 
-export async function readSigningIn(app: Website, read: (app: Website) => Promise<string>) {
+export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>): Promise<T | string> {
   const deadline = Date.now() + callBudgetMilliseconds;
   if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
   try {

@@ -59,6 +59,7 @@ Neither interface may bypass the other's authorization or user verification requ
 This rule covers both managing MCParrot and running taught website tools.
 Each website app's connection runs its saved tools and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
 Running a tool and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
+Reading an image has both paths: the app page's **View image** box and the app connection's `view_image` tool call the same operation, as [reading images with Claude](#reading-images-with-claude) describes.
 Ordering has both paths: the app page's **Test order** box and the app connection's ordering tools call the same operations, and `check_order` reports the Pay with Link status that the app page shows.
 Both paths enforce the same account rules: each operation reaches only the apps of its user, and ordering only the owner's apps, as [accounts and ownership](#accounts-and-ownership) describes.
 The table maps each frontend capability to its aspirational management MCP equivalent.
@@ -115,7 +116,7 @@ Each saved tool whose requests all use GET or POST and pass the checkout and pay
 A tool whose requests all use GET has the annotation `readOnlyHint: true`, and a tool with any POST request has `readOnlyHint: false`, `destructiveHint: false`, and `openWorldHint: true`, because a POST request can change website data.
 The MCP tool name is the saved tool's name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
-Each tool in a connection needs its own name, so saving rejects or skips a tool whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another tool in the app.
+Each tool in a connection needs its own name, so saving rejects or skips a tool whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `view_image`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another tool in the app.
 If stored tools still share a tool name, the connection adds the first 8 characters of the later tool's ID to its name, uses `task_` and the tool's whole ID when that name is also taken, skips the tool only when both names are taken, and writes a warning log either way.
 Tools that use other methods, or with a request that the guard refuses, stay off the connection.
 The route answers only POST requests; GET and DELETE return 405.
@@ -127,6 +128,24 @@ It opens that page with the app's saved sign-in in a hidden Browser Use browser 
 It rejects any address that is not on the app's website or one of its subdomains with an error that names the allowed website, before it starts a browser.
 Nathan chose this tool so that ChatGPT can answer from pages that no saved tool covers, such as a syllabus link he pastes.
 He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tools he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
+
+### Reading images with Claude
+
+Each connection also has a read-only `view_image` tool, titled "Read an image on <app name>", whose one input `url` is an image address that an earlier tool answer named, such as the `src` of an `<image>` element in an Ed post.
+Nathan asked for it because an Ed announcement showed a class's score mean and standard deviation only inside a picture.
+ChatGPT connectors do not pass MCP image results to the model, so the tool returns text: Claude Opus 5.5 reads the picture and the tool returns Claude's copy of every text and number in it and a short description of any chart.
+Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, so images reach the chat only when they are needed.
+The app page's **View image** box takes the same address, calls `/api/image`, and shows the picture with the same text.
+
+1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is allowed for `https://edstem.org`, and it refuses any other address before it starts a browser.
+2. It opens the address as a page in a hidden Browser Use browser with the app's saved sign-in, so the website's own cookies apply, with the same signed-out check, automatic sign-in, bot-check and CSRF messages, and 30-second limit as a tool.
+3. It refuses a response whose content type is not PNG, JPEG, WebP, or GIF, with a plain message.
+4. Inside the page, it shrinks the picture so that its longest side is at most 1,600 pixels, draws it on white, and encodes it as JPEG; it refuses a result longer than 1,500,000 characters.
+5. It sends the picture to Claude Opus 5.5 at low effort in fast mode through the Cursor SDK, the same model and settings as discovery, with tools disabled and a 60-second limit.
+
+The instruction asks Claude to copy all text and numbers exactly, then briefly describe any chart, graph, table, or diagram, and it marks the picture as website content that Claude must never follow as instructions.
+The tool result holds only Claude's text; the picture itself is not returned to MCP clients, and returning it as an MCP image block is aspirational.
+MCParrot never logs or traces the picture, only its size and the length of Claude's reply.
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
@@ -253,7 +272,7 @@ It treats a capability whose `updatesTaskId` is not a saved tool of that app as 
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
-Sending private website content to the AI model is allowed; only secrets stay out of prompts.
+Sending private website content to the AI model is allowed, including pictures that `view_image` and **View image** send to Claude; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no header values other than the request content type and a few safe headers, no sign-in header values, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
@@ -520,7 +539,7 @@ To publish, run `npx vercel deploy --prod` from an up-to-date `main` checkout.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the pages `/marketplace` and `/sign-in`, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, `/api/connection`, `/api/marketplace`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
+The Next.js app deploys the workspace, the pages `/marketplace` and `/sign-in`, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, `/api/connection`, `/api/marketplace`, `/api/image`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
 Vercel Authentication still protects every deployment, including the production domain, and only requests that carry the automation bypass secret skip it.
 Nathan decided to turn Vercel Authentication off for production once accounts ship, so that other people can reach the Clerk sign-in.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
@@ -599,10 +618,10 @@ MCParrot keeps every trace and every session because it has few users, and it se
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Claude failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the tool name for each `save_task` call |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in, automatic Google sign-in, and verification code outcome, each tool run's and `read_page` call's outcome, including whether the website was signed out, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
+| Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, one `image.read` with the picture size and one `image.describe` as a `gen_ai.invoke_agent` span with Claude's outcome for each image read, and one `task.save` with the tool name for each `save_task` call |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in, automatic Google sign-in, and verification code outcome, each tool run's, `read_page` call's, and image read's outcome, including whether the website was signed out, each image that Claude described with its reply length, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
-| AI agent monitoring | The `discover.agent` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
+| AI agent monitoring | The `discover.agent` and `image.describe` spans as `gen_ai.invoke_agent` spans with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
 Spans carry only non-secret attributes, such as the app ID, tool name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
@@ -623,7 +642,7 @@ The same apps appear on any device where the user signs in.
 Each app page shows the app name, its website address, **Delete app** beside **Explore website**, and status labels for sign-in, a saved login, and ordering.
 On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, and **Delete tool**.
 A filter box appears above the list when the app has more than 8 tools.
-A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
+A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, View image, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
 On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.
 Select **Delete app** at the top of an app page, then confirm in the dialog to remove that app, its tools, its saved login, its ChatGPT link, and its marketplace listing from MCParrot and delete its recorded requests in the extension.
 **Keep app** or Escape closes the dialog and returns focus to **Delete app**.
