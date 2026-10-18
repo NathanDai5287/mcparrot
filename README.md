@@ -152,12 +152,12 @@ The tool result holds only Claude's text; the picture itself is not returned to 
 MCParrot never logs or traces the picture, only its size and the length of Claude's reply.
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
-Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
+Its description tells ChatGPT to call it only when the user asks to save or reuse a page or request, replacing values that change with `{placeholders}`, one input each.
 Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, an optional `earlierRequests` list of up to 9 requests with the same four request fields, `inputs` as a list of name, description, and example, `returns`, and an optional `keepFields` list, as [using saved tools](#using-saved-tools) describes, which become the tool's requests in the same tool shape as a chosen tool, with the earlier requests first as steps 1, 2, and so on, and the main request last.
-Its description tells ChatGPT to use earlier requests with [step placeholders](#using-saved-tools) when a request needs a value, such as a cart ID, that an earlier JSON response returns.
+The `earlierRequests` description tells ChatGPT to use [step placeholders](#using-saved-tools) for a value, such as a cart ID, that an earlier JSON response returns.
 It rejects a URL pattern that is not on the app's website or one of its subdomains, a body on a GET request, a request that the checkout and payment guard refuses, a step placeholder that does not name an earlier request, placeholders other than step placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request list, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
-Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
+ChatGPT saves a tool only when the user asks, because an automatic save after each `read_page` added a second write call, and often a confirmation, to the turn, while the saved tool helps only in a later chat.
 
 Nathan chose a private connection link for each app instead of MCP sign-in.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?token=<token>`, where the token is 32 random bytes that MCParrot creates when the user selects **Create link** or **Regenerate link** on the app page.

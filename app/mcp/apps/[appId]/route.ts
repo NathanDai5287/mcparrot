@@ -126,7 +126,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
   }, async ({ url }) => textResult((await viewImage(app, url)).text));
   server.registerTool("save_task", {
     title: `Save a tool for ${app.name}`,
-    description: `Save a new tool for ${app.name} that reads a page with GET or sends one POST request, such as a GraphQL query. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern and bodyPattern, and give one input for each placeholder. When the request needs a value that an earlier JSON response returns, such as a cart ID, list those requests in earlierRequests and use {stepN.path.to.value} for that value, where step1 is the first earlier request and array positions are numbers; these placeholders need no input. MCParrot refuses any request that looks like checkout or payment. The tool appears in a new chat.`,
+    description: `Save a page or one POST request on ${app.name} as a reusable tool for future chats. Call it only when the user asks to save or reuse it. Replace values that change with {placeholders}, one input each.`,
     inputSchema: {
       name: z.string().describe("A short plain tool name, such as Read course syllabus."),
       description: z.string().describe("What the tool does, in one plain sentence."),
@@ -134,10 +134,10 @@ function appServer(app: Website, orderLimitUsd?: number) {
       urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
       bodyPattern: z.string().optional().describe("Only for POST: the request body, usually JSON, with {placeholders} inside string values, such as {\"query\":\"…\",\"variables\":{\"search\":\"{search}\"}}."),
       contentType: z.string().optional().describe("Only for POST: the body's content type. It defaults to application/json."),
-      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first, in order, as step1, step2, and so on, with the same fields as the main request, which runs last. A later request uses a value from an earlier response with {step1.cart.id} or {step2.items.0.id}."),
+      earlierRequests: z.array(z.object({ method: z.enum(["GET", "POST"]).optional(), urlPattern: z.string(), bodyPattern: z.string().optional(), contentType: z.string().optional() })).max(9).optional().describe("Optional requests that run first as step1, step2, and so on; use {step1.cart.id} for a value from one."),
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
       returns: z.string().describe("What the tool returns, in a few words."),
-      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths in the last response that the answer keeps, such as threads[].title or data.store.menu[].items[].price, where [] means every array element. Leave it out to keep every field."),
+      keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths the answer keeps, such as threads[].title."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
