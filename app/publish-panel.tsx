@@ -2,10 +2,18 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useState, type FormEvent } from "react";
-import type { Website } from "../lib/capabilities";
+import type { TaskRequest, Website } from "../lib/capabilities";
 import { SetupCard } from "./setup-card";
 
 type MarketplaceAction = { action: "publish"; appId: string; description: string } | { action: "unpublish"; appId: string };
+
+const requestText = ({ method, urlPattern, bodyPattern, contentType, headers = {}, tokenHeaders = [] }: TaskRequest) => [
+  `${method} ${urlPattern}`,
+  bodyPattern !== undefined && `with body ${bodyPattern}`,
+  contentType && `as ${contentType}`,
+  Object.keys(headers).length > 0 && `with headers ${Object.entries(headers).map(([name, value]) => `${name}: ${value}`).join("; ")}`,
+  tokenHeaders.length > 0 && `with ${tokenHeaders.map(({ header, fromLocalStorage }) => `${header} from local storage ${fromLocalStorage}`).join("; ")}`,
+].filter(Boolean).join(" ");
 
 function SharedPreview({ app, publisher }: { app: Website; publisher: string }) {
   return <div className="shared-preview">
@@ -16,8 +24,8 @@ function SharedPreview({ app, publisher }: { app: Website; publisher: string }) 
     <p><strong>Tools:</strong> {app.tasks.length === 0 && "none"}</p>
     <ul>{app.tasks.map((task) => <li key={task.id}>
       <strong>{task.name}</strong>: {task.description}
-      <span className="website-address">Requests: {task.requests.map((request) => `${request.method} ${request.urlPattern}`).join(", ")}</span>
-      <span className="website-address">Inputs: {task.inputs.map((input) => `${input.name} (${input.description} For example, ${input.example}.)`).join(", ") || "none"} · Returns: {task.returns}</span>
+      <span className="website-address">Requests: {task.requests.map((request, index) => `Step ${index + 1}: ${requestText(request)}`).join(" · ")}</span>
+      <span className="website-address">Inputs: {task.inputs.map((input) => `${input.name} (${input.description} For example, ${input.example}.)`).join(", ") || "none"} · Returns: {task.returns}{task.keepFields?.length ? ` · Answer fields: ${task.keepFields.join(", ")}` : ""}</span>
     </li>)}</ul>
   </div>;
 }
@@ -50,7 +58,7 @@ export function PublishPanel({ app, onApps }: { app: Website; onApps: (apps: Web
   const errorMessage = error && <p className="pilot-error" role="alert">{error}</p>;
   return <SetupCard title="Marketplace" status={app.listing ? "Published" : "Not published"}>
     {reviewing ? <>
-      <p>Everything below becomes public. Your logins and link stay private.</p>
+      <p>The name, address, description, publisher, and tool names become public. Anyone who adds the app gets everything below. Your logins and link stay private.</p>
       <form className="editor" onSubmit={publish}>
         <label htmlFor={`listing-description-${app.id}`}>Short description</label>
         <textarea id={`listing-description-${app.id}`} name="description" maxLength={500} required defaultValue={app.listing?.description} placeholder="For example, read your courses, assignments, and syllabus on Canvas" />
