@@ -26,7 +26,7 @@ h1, h2, h3, p { margin: 0; }
 
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 232px; padding: 29px 20px; background: #f1f4f3; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .wordmark { display: flex; gap: 10px; align-items: center; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 16px; font-weight: 650; letter-spacing: -0.035em; text-align: left; }
-.wordmark svg { width: 29px; height: 29px; color: var(--accent); }
+.wordmark img { width: 29px; height: 29px; }
 .sidebar-apps-link { display: none; padding: 8px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--accent); font-size: 13px; font-weight: 600; }
 .sidebar-apps-link:hover { background: #e0eae5; }
 .sidebar-apps { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 40px -8px 0; }
@@ -186,7 +186,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
   .sidebar-footer { flex-direction: row; align-items: center; margin: 0 0 0 auto; padding: 0; border-top: 0; }
   .sidebar-link { width: auto; }
   .wordmark { font-size: 14px; }
-  .wordmark svg { width: 25px; height: 25px; }
+  .wordmark img { width: 25px; height: 25px; }
   .page { margin-left: 0; }
   .topbar { min-height: 49px; padding: 14px 22px; font-size: 11px; }
   .preview-label { font-size: 10px; }

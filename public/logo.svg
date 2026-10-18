@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="125 135 1005 995" role="img" aria-labelledby="title desc">
+  <title id="title">MCParrot</title>
+  <desc id="desc">A teal letter P with a parrot profile in its counter, on a soft green rounded square.</desc>
+  <rect x="125" y="135" width="1005" height="995" rx="275" fill="#EDF3EF"/>
+  <g fill="#12675D">
+    <path d="M372 1013V482C372 369 449 280 567 280H716C798 280 855 326 878 406C821 366 782 346 733 346C649 346 585 412 585 502V645C680 641 741 603 756 526C811 540 855 581 855 627C855 698 785 748 691 748H585C563 920 500 999 372 1013Z"/>
+    <path d="M833 411C884 424 923 464 923 514C923 559 905 599 885 634C882 573 835 527 757 503C768 465 796 431 833 411Z"/>
+    <circle cx="726" cy="420" r="24"/>
+  </g>
+</svg>
