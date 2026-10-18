@@ -26,7 +26,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
 | [Ordering with Pay with Link](#ordering-with-pay-with-link) | How ChatGPT and the app page place test-mode orders that Browser Use pays for with Stripe Link |
-| [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, storage, and the service architecture |
+| [Production deployment setup](#production-deployment-setup) | Publishing on request, hosting, storage, and the service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, and recordings |
 | [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
 | [Workspace navigation behavior](#workspace-navigation-behavior) | Stable app addresses, Back and Forward, and deleting an app |
@@ -383,7 +383,8 @@ When a payment run fails for another reason, the order may still have gone throu
 
 The Vercel project `mcparrot` is linked to the public GitHub repository on the existing Hobby plan.
 Its production branch is `main`.
-Each push starts a deployment; other branches receive preview deployments.
+Pushes do not start deployments, because Nathan chose to publish only when he asks, so `vercel.json` turns off Git deployments.
+To publish, run `npx vercel deploy --prod` from an up-to-date `main` checkout.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 

@@ -74,7 +74,7 @@ A syntax check does not prove that a live browser task works, so it never counts
 ## Shipped work evidence
 
 The dashboard uses the Calm workspace design, with light surfaces, teal actions, and a simple website list.
-It runs locally and at [mcparrot.vercel.app](https://mcparrot.vercel.app), where Vercel publishes each push to `main`.
+It runs locally and at [mcparrot.vercel.app](https://mcparrot.vercel.app), where it updates only when Nathan asks for a deployment from `main`.
 The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
 In that check, the dashboard and its JavaScript assets returned successfully, and the local sign-in and private-state paths returned 404.
 
