@@ -532,11 +532,12 @@ Nathan decided that MCParrot has real accounts, so other people can use it with 
 Users sign in with Google through Clerk, which Nathan installed from the Vercel Marketplace; the `/sign-in` page shows Clerk's sign-in box, and the sidebar has an account button to sign out.
 The dashboard and every `/api` route need a signed-in user, except the marketplace page and its read route, and `/docs`, `/monitoring`, `/sign-in`, and the app connections at `/mcp/apps/<app-id>` are public; each connection checks its own token.
 Each page and route checks the session itself, because Clerk deprecates path matching in middleware, and `proxy.ts` runs Clerk's middleware and still rejects cross-site `/api` writes.
-A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards.
+A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards, except `/api/workspace`, which returns 401 with "Sign in again to use MCParrot."
 
 Each user has one workspace under the Redis key `workspace:<user-id>`, and the key `app-owner:<app-id>` records which user owns each app.
 Every route and connection finds the app's owner from that key, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
 Creating an app sets its owner key in the same atomic step as the workspace change and fails when the key already exists, and deleting an app removes the key in the same way.
+A workspace holds at most 4,000,000 characters, and a change that would grow it past that returns 409 with "Your workspace is too large to save more. Delete some tools or apps first."
 
 The owner is the account whose verified primary email matches `MCPARROT_OWNER_EMAIL`.
 The first time the owner opens the dashboard, MCParrot moves the older single `workspace` value to `workspace:<owner-id>` and writes an owner key for each of its apps, in one atomic Redis step that runs only while the older value exists, so it runs once.
@@ -684,7 +685,8 @@ On wide screens the app's tools fill the main column, one row each with its name
 A filter box appears above the list when the app has more than 8 tools.
 A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, View image, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
 On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.
-Select **Delete app** at the top of an app page, then confirm in the dialog to remove that app, its tools, its saved login, its ChatGPT link, and its marketplace listing from MCParrot and delete its recorded requests in the extension.
+Select **Delete app** at the top of an app page, then confirm in the dialog to remove that app, its tools, its saved login, its ChatGPT link, its marketplace listing, its Browser Use profile with the website sign-in, and its rejected-login and sign-in cooldown records from MCParrot and delete its recorded requests in the extension.
+MCParrot removes the listing first and keeps the app when that fails; after the app is gone, stopping its browsers and order and deleting its profile are best-effort, and failures go to Sentry.
 **Keep app** or Escape closes the dialog and returns focus to **Delete app**.
 Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
