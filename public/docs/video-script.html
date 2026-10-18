@@ -69,18 +69,18 @@
 
       <section id="narration">
         <h2>Full Narration</h2>
-        <p>Read this straight through as one voiceover, at a calm pace. It runs about two and a half minutes. Each bracket names what is on screen, and is not read aloud.</p>
-        <p><em>[Slide 1: the hook]</em><br>So many websites I use every day make me click through a slow interface just to do something simple. To check one deadline on Canvas, I sign in, wait for a two-factor code, find the course, open assignments, and wait for every page to load. Ordering on DoorDash and topping up my DeepSeek credits are just as slow.</p>
+        <p>Read this straight through as one voiceover, at a calm pace. It runs about two and a half minutes at a calm pace. Each bracket names what is on screen, and is not read aloud.</p>
+        <p><em>[Slide 1: the hook]</em><br>Too many websites make me click through a slow interface to do something simple. To check one Canvas deadline, I sign in, wait for a two-factor code, find the course, and open assignments. DoorDash and topping up DeepSeek credits are just as slow.</p>
         <p><em>[Slide 2: the rule]</em><br>So I built MCParrot around one rule: anything you can do by clicking through a website, you should be able to do by asking your agent.</p>
-        <p><em>[Slide 3: the insight]</em><br>In the age of AI, the front end matters less and less. Anyone can vibe-code an interface. What really drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly.</p>
-        <p><em>[Slide 4, then clip 1: exploring and finding tools]</em><br>It works in two phases. First, you browse the website in a monitored browser, and MCParrot records every API request the site makes. Then an LLM reads those requests and turns them into tools for the MCP server. After that, you create one link and connect it to the agent of your choice.</p>
+        <p><em>[Slide 3: the insight]</em><br>Anyone can vibe-code an interface now. What drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly.</p>
+        <p><em>[Slide 4, then clip 1: exploring and finding tools]</em><br>It works in two phases. First, you browse the site while MCParrot records its API requests. Then an LLM turns those requests into tools. You create one link and connect it to any agent.</p>
         <p><em>[Clip 2: the Browser Use sign-in window]</em><br>It even works on sites that need you to sign in. Browser Use keeps a cloud browser signed in as you, across sessions.</p>
         <p><em>[Slide 5, then clip 3: Chess.com]</em><br>Here are a few MCP servers I made with it. For Chess.com, I asked for my last ten games and the rating of each opponent: seven wins, two losses, and one draw.</p>
         <p><em>[Slide 6, then clip 4: Gradescope and Ed]</em><br>Here, my agent used two servers at once: Gradescope for my midterm score, and Ed for the class mean and standard deviation, which it read from a chart image. I'm point eight one standard deviations above the mean.</p>
         <p><em>[Slide 7, then clip 5: Canvas signs back in]</em><br>In this one, Canvas had signed me out. A Browser Use agent signed back in, asked me for my two-factor code, and once I sent it, it finished and listed my assignments.</p>
         <p><em>[Slide 8, then clip 6: DoorDash]</em><br>And here, it added a pizza to my DoorDash cart without placing the order. When I say yes, it checks out with Stripe Pay with Link, within my spending limit.</p>
-        <p><em>[Slide 9: the stack]</em><br>MCParrot isn't a browser bot that clicks through screens. Here's the stack, from front to back. The front end is a Next.js and React app on Vercel, with Clerk for accounts. A Chrome extension records each site's API requests through the Chrome DevTools Protocol. The back end is Next.js server routes plus an MCP server that any agent can connect to. Upstash Redis stores the apps, the tools, and encrypted logins. Claude, through the Cursor SDK, is the LLM we use today to turn recordings into tools and to read images. Browser Use runs the signed-in cloud browsers, which we drive with Playwright. Stripe Pay with Link handles checkout, and Sentry watches every call for errors and slow steps.</p>
-        <p><em>[Slide 10: the close]</em><br>MCParrot turns every website into data for your agent. So, what's next? First: what if every new tool tested itself before your agent ever used it? Second: what if you could add a new website just by asking, with no recording at all? And third: what if you could run MCParrot itself from your agent? Try it at mcparrot dot vercel dot app.</p>
+        <p><em>[Slide 9: the stack]</em><br>The stack: a Next.js app on Vercel, a Chrome extension that records API requests, an LLM that turns them into tools, an MCP server any agent can use, Redis for storage, and Browser Use to stay signed in.</p>
+        <p><em>[Slide 10: the close]</em><br>Next: tools that test themselves, adding websites just by asking, and running MCParrot from your agent. Try it at mcparrot dot vercel dot app.</p>
       </section>
 
       <section id="rules">
@@ -106,7 +106,7 @@
               <tr>
                 <th scope="row">0:00–0:14</th>
                 <td>Slide 1, the hook: Canvas, DoorDash, and DeepSeek click trails.</td>
-                <td>"So many websites I use every day make me click through a slow interface just to do something simple. To check one deadline on Canvas, I sign in, wait for a two-factor code, find the course, open assignments, and wait for every page to load. Ordering on DoorDash and topping up my DeepSeek credits are just as slow."</td>
+                <td>"Too many websites make me click through a slow interface to do something simple. To check one Canvas deadline, I sign in, wait for a two-factor code, find the course, and open assignments. DoorDash and topping up DeepSeek credits are just as slow."</td>
                 <td>Zoom on each row as it is named. Optional: open on two seconds of clip 7, the face cam intro.</td>
               </tr>
               <tr>
@@ -118,7 +118,7 @@
               <tr>
                 <th scope="row">0:23–0:34</th>
                 <td>Slide 3: "The interface is cheap. The data is what matters."</td>
-                <td>"In the age of AI, the front end matters less and less. Anyone can vibe-code an interface. What really drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly."</td>
+                <td>"Anyone can vibe-code an interface now. What drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly."</td>
                 <td>Zoom on the assignment data box.</td>
               </tr>
               <tr>
@@ -130,7 +130,7 @@
               <tr>
                 <th scope="row">0:38–0:52</th>
                 <td>Clip 1: the Explore page, <strong>Find what this site can do</strong>, and the tools list.</td>
-                <td>"First, you browse the website in a monitored browser, and MCParrot records every API request the site makes. Then an LLM reads those requests and turns them into tools for the MCP server. After that, you create one link and connect it to the agent of your choice."</td>
+                <td>"First, you browse the site while MCParrot records its API requests. Then an LLM turns those requests into tools. You create one link and connect it to any agent."</td>
                 <td>Speed-ramp the wait while tools are found. Lower third: "An LLM finds the tools".</td>
               </tr>
               <tr>
@@ -166,13 +166,13 @@
               <tr>
                 <th scope="row">2:14–2:21</th>
                 <td>Slide 9: "Not a browser bot. A full stack from clicks to API."</td>
-                <td>"MCParrot isn't a browser bot that clicks through screens. Here's the stack, from front to back. The front end is a Next.js and React app on Vercel, with Clerk for accounts. A Chrome extension records each site's API requests through the Chrome DevTools Protocol. The back end is Next.js server routes plus an MCP server that any agent can connect to. Upstash Redis stores the apps, the tools, and encrypted logins. Claude, through the Cursor SDK, is the LLM we use today to turn recordings into tools and to read images. Browser Use runs the signed-in cloud browsers, which we drive with Playwright. Stripe Pay with Link handles checkout, and Sentry watches every call for errors and slow steps."</td>
-                <td>Hold slide 9 for about 30 seconds. Optionally show each tool's logo as it is named: Next.js, Vercel, Clerk, Chrome, Upstash, Claude, Browser Use, Playwright, Stripe, Sentry.</td>
+                <td>"The stack: a Next.js app on Vercel, a Chrome extension that records API requests, an LLM that turns them into tools, an MCP server any agent can use, Redis for storage, and Browser Use to stay signed in."</td>
+                <td>Hold slide 9 for about 12 seconds.</td>
               </tr>
               <tr>
                 <th scope="row">2:21–2:32</th>
                 <td>Slide 10, the close, held for 2 seconds after the last word.</td>
-                <td>"MCParrot turns every website into data for your agent. So, what's next? First: what if every new tool tested itself before your agent ever used it? Second: what if you could add a new website just by asking, with no recording at all? And third: what if you could run MCParrot itself from your agent? Try it at mcparrot dot vercel dot app."</td>
+                <td>"Next: tools that test themselves, adding websites just by asking, and running MCParrot from your agent. Try it at mcparrot dot vercel dot app."</td>
                 <td>Optional: end on clip 7, the face cam outro, instead of holding the slide.</td>
               </tr>
             </tbody>
