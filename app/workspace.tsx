@@ -4,7 +4,6 @@ import { UserButton } from "@clerk/nextjs";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
-import { ImagePanel } from "./image-panel";
 import { OrderingPanel } from "./ordering-panel";
 import { PublishPanel } from "./publish-panel";
 import type { DiscoveredCapability, Task, TokenHeader, Website } from "../lib/capabilities";
@@ -301,7 +300,6 @@ export default function Workspace() {
               <aside className="setup-rail" aria-label="Setup">
                 <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onAutomaticSignIn={(automaticSignIn) => changeWorkspace({ operation: "setAutomaticSignIn", appId: screen.app.id, automaticSignIn })} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
-                <ImagePanel key={`image-${screen.app.id}`} app={screen.app} />
                 {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
               </aside>
             </div>
