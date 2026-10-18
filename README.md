@@ -20,7 +20,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | The management connection and one connection per website app |
 | [Teaching website tasks](#teaching-website-tasks) | How a user explores a website, finds what it can do, and chooses tasks |
-| [Discovery data sent to Gemini](#discovery-data-sent-to-gemini) | The agreed exception that sends short response samples to Gemini |
+| [Discovery data sent to Gemini](#discovery-data-sent-to-gemini) | What discovery sends to Gemini and what it never includes |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
@@ -93,11 +93,11 @@ Authenticate each connection, and restrict it to the owner's authorized apps and
 The product supplies each address and setup instructions, and users add and authorize the connections in their compatible assistant.
 Do not promise automatic connector installation or identical support across assistant clients.
 
-Management through MCP must also start teaching sessions, return secure browser links, report status, and resume supported work.
-By default the user browses the website while recording, although an authorized agent could use the same browser session where supported.
+Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tasks, report status, and request sign-in recovery.
+An agent can start exploration, but the user browses the website in the explore tab.
 An agent cannot replace required personal verification.
 For example, Duo is a sign-in check that asks the user to approve a request on their phone, and only the user can approve it.
-Keep passwords and verification codes in the secure browser or verification flow, never in assistant messages.
+Keep passwords and verification codes in MCParrot's private verification flow, never in assistant messages.
 
 ## Teaching website tasks
 
@@ -149,8 +149,8 @@ The first milestone supports reading only, and discovery must not automatically 
 ## Discovery data sent to Gemini
 
 Discovery sends the recorded requests, including their truncated response samples, to Google Gemini `gemini-flash-latest` through the server route `/api/discover`.
-Nathan explicitly chose short real-value samples because they make Gemini's suggestions more accurate.
-This is the one agreed exception to the rule that keeps private website content out of prompts.
+Nathan chose short real-value samples because they make Gemini's suggestions more accurate.
+Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
 The server reads `GEMINI_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Vercel Authentication protects the production site, so only Nathan can start discovery.
@@ -160,7 +160,7 @@ If the key is missing or the Gemini call fails, the exploration screen shows a c
 
 During teaching, also called parroting, the user browses a normal Chrome or Edge tab with the MCParrot Explorer extension.
 The extension records only in the tab that the user opens through **Open website and explore**.
-The user signs in normally and completes personal verification; no cloud browser stream is used for normal exploration.
+The user signs in normally and completes personal verification; exploration does not use a cloud browser.
 
 During MCP use, the product must never open a visible website browser window.
 It runs direct API requests where supported and uses a hidden browser only for steps that require browser state or sign-in recovery.
@@ -238,7 +238,7 @@ The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.
 The Next.js app deploys the workspace, the discovery route at `/api/discover`, and the HTML guides at `/docs`.
 Vercel Authentication protects every deployment, including the production domain.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
-Next.js serves the guides as public static files from `public/`, so they must never contain secrets or private website content.
+Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
 The dashboard saves app names, website addresses, and chosen tasks in this browser’s local storage.
 This supports refresh and direct app links without a database.
@@ -252,11 +252,11 @@ The following table describes the complete product; the [status page](STATUS.md)
 
 | Part | Choice | Purpose |
 | --- | --- | --- |
-| App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, teaching, verification, and task status |
+| App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, verification, and task status |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
 | Capability discovery | Google Gemini through a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud | Sign in and pass authentication when tasks run through MCP later |
-| Recording and task execution | Application-owned request capture and HTTP execution | Turn demonstrated tasks into verified API request sequences |
+| Task execution | Application-owned HTTP execution | Run chosen tasks as verified API request sequences |
 | Assistant connection | Official MCP TypeScript SDK, authenticated Streamable HTTP | Provide a remote MCP address for compatible assistants |
 | Persistent storage | Hosted PostgreSQL | Store user-owned connections, task definitions, and operation status |
 | Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
@@ -265,7 +265,7 @@ The user installs MCParrot Explorer in Chrome or Edge once and manages explorati
 Browser Use later hosts sign-in and authentication during MCP use, and our app shows progress and verification controls.
 A Vercel request must not wait for a whole browser session to finish.
 For work that takes longer than one request, store durable operation status and let clients check progress.
-The exact recording interface, secure session transfer, and long-task coordination still need technical proof.
+Secure session transfer and long-task coordination still need technical proof.
 
 ## Authentication and private data
 
@@ -277,13 +277,12 @@ Vercel deployment access alone does not establish product ownership for each cre
 Only the authentication worker may decrypt the selected app's password for its approved login origin; neither the UI nor MCP can read it back.
 Deleting saved login details removes the credential record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
-The only private website content allowed in a prompt is the truncated discovery samples described in [discovery data sent to Gemini](#discovery-data-sent-to-gemini).
-Recordings can contain passwords and private website content, so record only the network data that the task needs.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in traffic.
 Define how long recordings are kept and how they are deleted before you store captures in production.
 
 Sentry is a service that collects errors, traces, and logs to help find problems.
 Send task status, duration, and sanitized errors to Sentry.
-Do not send credentials, verification codes, request bodies with private data, or student content.
+Do not send credentials, cookies, tokens, or verification codes.
 Do not assume that a Browser Use profile alone gives a secure way to transfer tokens.
 
 ## Workspace navigation behavior

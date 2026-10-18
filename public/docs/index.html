@@ -90,13 +90,13 @@
             </tbody>
           </table>
         </div>
-        <p>A hidden browser must stay available while you complete phone verification. Vercel handles short requests, so that browser needs a separate host. Passwords, browser profiles, and private website content stay outside the public deployment. These guides are part of the website too.</p>
+        <p>A hidden browser must stay available while you complete phone verification. Vercel handles short requests, so that browser needs a separate host. Passwords and browser profiles stay outside the public deployment. These guides are part of the website too.</p>
       </section>
 
       <section id="idea">
         <h2>How the product works</h2>
         <p>You create an app for one website, browse its pages, and review several suggested tasks from that session. Your assistant, such as ChatGPT, then uses all the tasks of a website app through one MCP connection. MCP is a standard way for an assistant to find and use the tools that you saved in another app, and each task you test and enable becomes one of those tools. The product is intended for many websites, not one fixed example.</p>
-        <p>During teaching, also called parroting, MCParrot Explorer records the data requests a website makes in a normal Chrome or Edge tab. During later assistant use, no visible website browser opens. The app uses saved website requests where supported and a hidden browser for steps that need one. You enter any supported sign-in recovery details or verification codes inside our app. No cloud browser stream is used for normal exploration.</p>
+        <p>During teaching, also called parroting, MCParrot Explorer records the data requests a website makes in a normal Chrome or Edge tab. During later assistant use, no visible website browser opens. The app uses saved website requests where supported and a hidden browser for steps that need one. You enter any supported sign-in recovery details or verification codes inside our app. Exploration does not use a cloud browser.</p>
         <div class="table-wrap">
           <table>
             <caption>One website, several tasks</caption>
@@ -135,7 +135,7 @@
 
       <section id="gemini">
         <h2>What Gemini sees</h2>
-        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and their short samples to Google Gemini. You chose real short samples because they help Gemini make better suggestions. This is the one agreed exception to our rule that keeps private website content away from AI services. Nothing goes to Gemini until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
+        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and their short samples to Google Gemini. You chose real short samples because they help Gemini make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Gemini until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
         <p>Only you can use this feature, because Vercel asks you to sign in before you can open the website. If Gemini is not set up or does not answer, the page shows a clear error message.</p>
       </section>
 

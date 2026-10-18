@@ -72,7 +72,6 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Chosen tasks are not tested or published tools and cannot perform website actions.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
-- Discovery sends truncated response samples to Gemini, which is the agreed exception described in [discovery data sent to Gemini](README.md#discovery-data-sent-to-gemini).
 
 ## Aspirational work order
 

@@ -72,7 +72,7 @@ Commit and push checked changes directly to the `main` branch of the [MCParrot G
 Do not ask Nathan before you commit or push.
 A code change is checked when `npm run check` and `npm run build` pass.
 Make small commits with clear messages that describe the result users see.
-Never commit secrets, `.env` files, browser profiles, or private website content.
+Never commit secrets, `.env` files, or browser profiles.
 
 Keep `main` ready for a demo at all times, because judges see the public repository and the demo runs from it.
 Use a separate branch and a GitHub pull request instead of pushing to `main` in these cases:

@@ -57,8 +57,8 @@
         <h2>An example conversation</h2>
         <aside class="note">
           <strong class="note-label">Example</strong>
-          <p><strong>You:</strong> “I perform the task, and the app records the requests.”</p>
-          <p><strong>Agent:</strong> “You demonstrate each task during teaching. Your assistant later repeats the saved requests.”</p>
+          <p><strong>You:</strong> “I browse the website, and the app records the requests.”</p>
+          <p><strong>Agent:</strong> “You explore once, Gemini suggests tasks from the requests, and you choose the ones to keep. Your assistant later repeats them.”</p>
           <p><strong>Next question:</strong> “What happens when the login expires?”</p>
         </aside>
         <p>In this example, the last question makes us decide how sign-in recovery works before we build it. If we only agreed on the words “browser automation,” too much would stay unexplained.</p>
@@ -85,7 +85,7 @@
 
       <section id="changes">
         <h2>Saving and sharing changes</h2>
-        <p>When an agent finishes a change, the agent saves it straight into the main copy of the project on GitHub, the website that stores the project and its history. The agent does not ask you first. Before it saves, it runs only the project's fast automatic checks. Each saved step is small and has a short note that says what changed for the user. Agents never save passwords, keys, sign-in data, or private website content.</p>
+        <p>When an agent finishes a change, the agent saves it straight into the main copy of the project on GitHub, the website that stores the project and its history. The agent does not ask you first. Before it saves, it runs only the project's fast automatic checks. Each saved step is small and has a short note that says what changed for the user. Agents never save passwords, keys, or sign-in data.</p>
         <p>The main copy must always be ready for a demo, because judges can see it and the demo runs from it. For riskier work, an agent uses a branch, which is a separate copy where it can work without changing the main copy. When the work is ready, the agent opens a pull request, which is a request to move the branch's changes into the main copy after a review. Agents use a branch and a pull request in these cases:</p>
         <ul>
           <li>Several agents work at the same time on the same part of the project. Each agent gets its own branch, but agents that work on clearly separate parts can save to the main copy.</li>

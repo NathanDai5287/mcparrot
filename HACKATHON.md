@@ -62,7 +62,7 @@ For example, the Commit Fellowship requires a supplemental form.
 
 | Sponsor | Challenge | Why it matches |
 | --- | --- | --- |
-| Browser Use | Best Use of Browser Use | The product uses hosted interactive browsers for sign-in and browser-dependent steps |
+| Browser Use | Best Use of Browser Use | Browser Use signs in and passes authentication when saved tasks run through MCP; this use is aspirational |
 | Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; the demo must show how that evidence changed what we built |
 | Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents |
 
@@ -82,13 +82,15 @@ Pursue these only if the demo supports them.
 Devpost also lists many MLH category prizes, such as Gemini, Snowflake, ElevenLabs, Vultr, Solana, Tiger Data, and a GoDaddy domain.
 It also lists sponsor cash prizes from companies such as Visa, Workday, Even Realities, Espressif, and veri.studio.
 Target one of these prizes only if the demo integrates that technology in a meaningful way.
+Discovery uses Gemini to find what a website can do, so the MLH Gemini prize fits if the demo shows discovery.
 The authoritative prize amounts and rules are in each prize's own description on Devpost and on the event site.
 Devpost lists the LA Hacks grand prize amounts as TBD, so confirm them at [ai.lahacks.com](https://ai.lahacks.com).
 
 ## Demo planning implications
 
 Prove one complete path before building a wide interface.
-The strongest path shows a task taught once, its verified replay, and an assistant calling it through MCP.
+The strongest path explores a website once, lets Gemini find what it can do, and chooses a task.
+It then shows that task's verified replay and an assistant calling it through MCP.
 This path addresses technical depth and execution better than a polished interface without working features.
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.
 Canvas is an example of that user's website, not the only one.
@@ -98,3 +100,4 @@ Judges penalize polish that hides parts that do not work, so never present an as
 Plan the Devpost text, a clean public repository, and a video that shows the same flow that judges see live.
 To claim the Sentry prize, show evidence from Tracing, Logs, Replay, or another allowed product, not only caught errors.
 To claim the Browser Use prize, show a working web agent and the people it serves.
+Browser Use is reserved for sign-in during MCP use, so this prize needs the MCP server first.

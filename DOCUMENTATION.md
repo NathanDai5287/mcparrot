@@ -73,7 +73,7 @@ Keep examples, defaults, failure states, and limitations the same in both forms.
 Build the HTML guides with the ICP-docs visual language and the local stylesheet in `public/docs/assets/`.
 Do not depend on a generator from another repository.
 When you add, rename, or remove a document, update the document table in the [agent entry point](AGENTS.md) in the same change.
-Keep secrets and private website content out of all documentation.
+Keep secrets, such as passwords, cookies, tokens, and API keys, out of all documentation.
 
 ## Document Documentation
 

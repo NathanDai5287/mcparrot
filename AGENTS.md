@@ -24,5 +24,4 @@ Read the product specification and the collaboration process before material wor
 Follow the [documentation guide](DOCUMENTATION.md) whenever you add or change a document.
 Give every user capability an equal path through the UI and through MCP, as the [UI and MCP parity section](README.md#ui-and-mcp-parity) describes.
 Use only the status words in the [documentation guide](DOCUMENTATION.md#use-status-vocabulary), and update the [status page](STATUS.md) when a capability's status changes.
-Keep secrets and private website content out of prompts, logs, traces, documentation, and source control.
-The one exception is the truncated response samples that discovery sends to Gemini, as [discovery data sent to Gemini](README.md#discovery-data-sent-to-gemini) describes.
+Keep secrets, such as passwords, cookies, tokens, API keys, and `.env` files, out of prompts, logs, traces, documentation, and source control.
