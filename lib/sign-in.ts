@@ -269,13 +269,10 @@ async function readAfterOtherSignIn<T>(app: Website, read: (app: Website) => Pro
   const released = await signInReleased(app.id, deadline - rereadMilliseconds);
   Sentry.logger.info("Waited for another sign-in", { appId: app.id, released, waitedMs: Date.now() - started });
   if (!released) return signInInProgressText(call?.toolName);
-  const storedApp = (await findApp(app.id))?.app ?? app;
-  if (usesPassword(storedApp) && await waitingForCode(storedApp.id)) return codeSentMessage;
-  return read(storedApp);
+  return readSigningIn((await findApp(app.id))?.app ?? app, read, call, deadline);
 }
 
-export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>, call?: ToolCall): Promise<T | string> {
-  const deadline = Date.now() + callBudgetMilliseconds;
+export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>, call?: ToolCall, deadline = Date.now() + callBudgetMilliseconds): Promise<T | string> {
   if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
   try {
     return await read(app);
