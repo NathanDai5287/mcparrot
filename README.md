@@ -58,7 +58,10 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Open a website app | `get_app` |
 | Create a website app | `create_app` |
 | Browse or open draft tasks | `list_tasks`, `get_task` |
-| Enter a task and open teaching preview | `create_task` |
+| Open a website exploration | `create_teaching_session` |
+| Save optional desired-action notes | `save_exploration_notes` |
+| Review observed reading actions | `get_teaching_status` |
+| Continue exploration without clearing captures | `resume_recording` |
 | Save a task draft | `save_draft` |
 | Delete an app and its drafts | `delete_app` |
 
@@ -98,20 +101,26 @@ Keep passwords and verification codes in the secure browser or verification flow
 
 ## Teaching website tasks
 
-The agreed discovery experience is aspirational; the [status page](STATUS.md) records the evidence and gaps.
+The workspace starts with website exploration, without a task-name form; the [status page](STATUS.md) records the evidence and gaps.
 One recording session can suggest several tasks, rather than requiring a separate demonstration for each task.
 
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Select **Explore website** to open a visible teaching browser window.
-4. Sign in there and complete any required verification, such as Duo.
-5. Start recording and browse the pages you want the app to understand.
-6. Stop recording and review the suggested task cards from that session.
-7. Confirm each task's name, description, variable inputs, and expected result.
-8. Test each task with changed inputs and compare its result with the website.
-9. Publish only the tasks whose tests pass, then connect the supplied authenticated MCP address to a compatible assistant.
+3. Select **Explore website**, then connect the visible teaching browser window.
+4. Optionally list desired actions in plain words; these notes do not create working tasks.
+5. Sign in there and complete any required verification, such as Duo.
+6. Select **Start exploring** and browse the pages you want the app to understand.
+7. Select **Review suggested actions** to see all observed reading requests together.
+8. Select **Continue exploring** to add more observations without removing earlier captures.
+9. Confirm each task's name, description, variable inputs, and expected result.
+10. Test each task with changed inputs and compare its result with the website.
+11. Publish only the tasks whose tests pass, then connect the supplied authenticated MCP address to a compatible assistant.
 
-For example, browsing Canvas assignments, announcements, and course materials could suggest several reading tasks in one session.
+The Canvas pilot displays observed course-reading requests and syllabus navigation as candidate actions.
+It labels requests by their route; it does not infer complete task meanings or prove unvisited features.
+Desired-action notes stay in this browser and remain unavailable until separately discovered and tested.
+The broader task review, grouping, and publication experience remains aspirational.
+For example, browsing Canvas assignments and course materials can expose several reading requests in one session.
 A task that lists assignments could accept a course and a date range as inputs.
 The user should not need to record the same navigation again for each proposed task.
 Changing a supported input must not require another recording after the changed-input test passes.
@@ -246,7 +255,9 @@ Do not assume that a Browser Use profile alone gives a secure way to transfer to
 
 ## Workspace navigation behavior
 
-App and task pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/tasks/<task-id>`.
+App, exploration, and older task pages have stable addresses under `/apps/<app-id>`, `/apps/<app-id>/explore`, and `/apps/<app-id>/tasks/<task-id>`.
+Each app exploration uses a stable `explore` session key; older task sessions remain separate and accessible.
+The older `/tasks/new` address opens exploration without requiring a task form.
 Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores local draft metadata.
 These addresses do not transfer a browser’s saved apps to another user or device.
 Select **Delete app** inside an app, then confirm inline to remove that app and its drafts from this browser.

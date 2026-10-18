@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 const browserApi = "https://api.browser-use.com/api/v4/browsers";
 const sessionDuration = 30 * 60 * 1000;
-export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "stop_recording", "test_saved_request", "end_teaching_session", "continue_canvas_signin", "submit_canvas_code"] as const;
+export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "resume_recording", "stop_recording", "test_saved_request", "end_teaching_session", "continue_canvas_signin", "submit_canvas_code"] as const;
 export type TeachingOperation = typeof teachingOperations[number];
 type Session = { sandboxName: string; browserId: string; appId: string; taskId: string; expiresAt: number };
 type TeachingResult = { session?: Session; state: Record<string, unknown> };
