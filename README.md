@@ -519,7 +519,7 @@ Each page and route checks the session itself, because Clerk deprecates path mat
 A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards.
 
 Each user has one workspace under the Redis key `workspace:<user-id>`, and the key `app-owner:<app-id>` records which user owns each app.
-Every route and connection finds the app's owner from that key, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
+Every route and connection finds the app's owner from that key, a connection reads the owner key and the workspace in one Redis script, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
 Creating an app sets its owner key in the same atomic step as the workspace change and fails when the key already exists, and deleting an app removes the key in the same way.
 
 The owner is the account whose verified primary email matches `MCPARROT_OWNER_EMAIL`.

@@ -25,6 +25,10 @@ for index = 3, #KEYS do redis.call("SET", KEYS[index], ARGV[4]) end
 redis.call("DEL", KEYS[1])
 return 1`;
 
+const ownerAndWorkspace = `local ownerId = redis.call("GET", KEYS[1])
+if not ownerId then return false end
+return {ownerId, redis.call("GET", ARGV[1] .. ownerId)}`;
+
 export const workspaceOperationSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("createApp"), app: websiteSchema }),
   z.object({ operation: z.literal("deleteApp"), appId: appIdSchema }),
@@ -95,8 +99,9 @@ export async function readWorkspace(userId: string) {
 export const appOwner = (appId: string) => stored((redis) => redis.get<string>(appOwnerKey(appId)));
 
 export async function findApp(appId: string) {
-  const ownerId = await appOwner(appId);
-  const app = ownerId ? (await readWorkspace(ownerId))?.find((candidate) => candidate.id === appId) : undefined;
+  const [ownerId, raw] = await stored((redis) => redis.eval<string[], [string, string?] | null>(ownerAndWorkspace, [appOwnerKey(appId)], [workspaceKey("")])) ?? [];
+  const apps = parseApps(raw ?? null);
+  const app = ownerId && apps ? wellFormed(apps).find((candidate) => candidate.id === appId) : undefined;
   return ownerId && app ? { app, ownerId } : null;
 }
 
