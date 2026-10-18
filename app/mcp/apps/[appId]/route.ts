@@ -18,8 +18,10 @@ export const maxDuration = 300;
 
 const fullAnswerInput = z.boolean().optional().describe("Set true only if a field you need is missing from the answer.");
 
+const isIdInput = (name: string) => /(^|_)id$|I[dD]$/.test(name);
+
 function inputSchema(task: Task) {
-  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput };
+  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, isIdInput(input.name) ? z.string().describe(`${input.description} For example, ${input.example}.`) : z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput };
 }
 
 const serverInstructions = (app: Website) => `Tools read ${app.name} as the signed-in user. Call the saved tool that matches the request directly; one call returns the whole answer. Use read_page only when no saved tool fits. Answers are already shortened; set fullAnswer only if a needed field is missing. If a result says the site is signed out, tell the user and stop. Run independent tools at once.`;
