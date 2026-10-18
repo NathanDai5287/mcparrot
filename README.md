@@ -195,7 +195,7 @@ Saving adds the ticked new capabilities to the app's current tools, skipping any
 A request matches another when its method, address, and body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
 A request list matches another when it has the same requests in the same order, so a tool "Add item to cart" that first gets the cart can sit beside a tool "Get cart" with only that request.
 Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or request breaks those rules, is skipped.
-Selecting a tool on the app page shows its inputs, its result, its **Answer fields**, which list its `keepFields` or say **All**, and each request's step number, method, URL pattern, and body pattern, so a `{step1...}` placeholder points to a visible request.
+Selecting a tool on the app page shows its inputs, its result, its **Answer fields**, which list its `keepFields` or say **All**, and each request's step number, method, URL pattern, body pattern, and token headers, such as `authorization as Bearer local storage userToken field value`, without their values, so a `{step1...}` placeholder points to a visible request.
 
 The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another discovery run.
 The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
@@ -214,13 +214,17 @@ It records data requests, such as fetch and XHR requests and other JSON or XML r
 Nathan chose to also record each whole page that loads in the tab, such as a server-rendered Canvas syllabus, because those pages never make a separate data request.
 A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts.
-It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `session`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
+It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
+The word `session` alone is not a sign-in word, so it records chat and meeting paths such as `/api/v0/chat_session/create` and `/sessions/{id}`.
 For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 30,000 characters so that a whole GraphQL query fits, and the value of the request's `Content-Type` header as `requestContentType`.
 For every data request, including a GET, it also records, as `requestHeaders`, only these request headers when their value does not look like a secret: `accept`, `apollographql-client-name`, `apollographql-client-version`, `client-identifier`, `github-verified-fetch`, `notion-client-version`, `x-apollo-operation-name`, `x-channel-id`, `x-client-identifier`, `x-experience-id`, `x-notion-active-user-header`, `x-requested-with`, and `x-restli-protocol-version`.
 These headers have fixed or non-secret values that websites such as LinkedIn, GitHub, Instacart, and Notion require on their GET requests.
 For any request, when a request header whose name contains `auth`, `token`, `jwt`, `session`, or `apikey`, such as Ed's `x-token`, has a value that equals a value in the page's local storage, it records, as `tokenHeaders`, only the header name and the name of that local storage key, such as `{ "header": "x-token", "fromLocalStorage": "authToken" }`; it never records the value.
+Before it compares, it removes a `Bearer `, `Token `, or `JWT ` scheme from the header value and records that scheme as `prefix`.
+When a local storage value is JSON, it also looks for the token in its string fields up to three levels deep and records the field path as `path`, so `Authorization: Bearer abc` with `{"value":"abc"}` under `userToken` becomes `{ "header": "authorization", "fromLocalStorage": "userToken", "prefix": "Bearer ", "path": "value" }`.
 It never records any other request header, such as `authorization` or `cookie`, any value of a sign-in header, any response header, or cookies.
-It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
+It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, or `auth`.
+For session names, both the extension and `/api/discover` redact only the exact names `session`, `sessionid`, `session_token`, `session_key`, `sid`, `jsessionid`, and `phpsessid`, in any letter case and with any separator, so names such as `chat_session_id` keep their values.
 A value looks like a secret when it is a JWT, a `Bearer` or `Basic` value, or a long random-looking string, and text samples and request bodies also lose values after secret names such as `password=` or `api_key:`.
 A JSON request body keeps its whole structure, such as a GraphQL query, and only loses its secret-looking values; it is not shortened like a response sample.
 In a GraphQL `query` text, both the extension and `/api/discover` redact only quoted values after secret names, such as `password: "…"`, JWTs, and random-looking strings, so variable declarations such as `$token: String` stay intact.
@@ -231,7 +235,7 @@ A page sample keeps the first 3,000 characters of its visible text, with spaces 
 Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.6.1, asks only for the `storage` and `debugger` permissions and no host permissions.
+The extension, version 0.7.0, asks only for the `storage` and `debugger` permissions and no host permissions.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
@@ -239,6 +243,7 @@ To update, remove the old MCParrot Explorer from the extensions page, then load 
 Version 0.4.0 does not record request bodies, and version 0.5.0 cuts each body to 2,000 characters, which cuts off most GraphQL queries, so a POST tool found from those recordings can fail until the user loads version 0.6.0, explores again, and finds tools again.
 Versions before 0.6.0 do not record `tokenHeaders`, so tools on a website that signs requests with a header, such as Ed, need a new recording with version 0.6.0 and a new discovery run.
 Versions before 0.6.1 do not record `requestHeaders` for GET requests, so a GET tool on a website that requires one of those headers, such as LinkedIn, needs a new recording with version 0.6.1 and a new discovery run.
+Versions before 0.7.0 skip paths with the word `session` and record no `tokenHeaders` for a `Bearer` value or a token inside JSON, so such websites need a new recording with version 0.7.0 and a new discovery run.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
@@ -277,7 +282,7 @@ When nothing is new or better, the result is an empty list, unless the app has n
 Nathan chose short real-value samples because they make Claude's suggestions more accurate.
 Sending private website content to the AI model is allowed, including pictures that `view_image` and **View image** send to Claude; only secrets stay out of prompts.
 Nathan allowed `view_image` and **View image**, and only them, to open `https` pictures on any website, because websites such as Ed keep pictures on a separate image server; those pictures open without the user's sign-in, so the other website receives the browser's address and the picture address but no cookies or tokens.
-The data leaves the browser only when the user selects **Find what this site can do**, and it contains no header values other than the request content type and a few safe headers, no sign-in header values, no cookies, and no sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no header values other than the request content type and a few safe headers, no sign-in header values, no cookies, and no sign-in and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample or a request body.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
@@ -343,7 +348,7 @@ Every saved tool has an optional `fullAnswer` input, which ChatGPT is told to us
 A JSON text value longer than 2,000 characters ends with `… [N more characters]`, and a compacted response longer than 20,000 characters ends with `[answer shortened: N more characters]`.
 Each request and page read, including these waits, has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
 An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`, ignoring a leading `www.` on the website's host, so `https://www.doordash.com` also accepts `doordash.com` and `api.doordash.com`.
-A request with `tokenHeaders` reads each named local storage key inside the website's page when it runs and sends its value under the header name, such as Ed's `x-token` from `authToken`; the value never leaves the page, so it never reaches the server, the tool result, logs, or Sentry.
+A request with `tokenHeaders` reads each named local storage key inside the website's page when it runs and sends its value under the header name, such as Ed's `x-token` from `authToken`; with a `path`, it parses the stored JSON and reads that field, and it puts any `prefix`, such as `Bearer `, before the value; the value never leaves the page, so it never reaches the server, the tool result, logs, or Sentry.
 A request to a subdomain runs from the website's page as a cross-origin `fetch`; it sends no cookies when it sends a token header, because websites such as Ed allow any origin but refuse cross-origin requests with cookies, and otherwise it includes cookies, so it works only when that subdomain allows it.
 Nathan chose the 20,000-character limit after compaction because long answers slowed ChatGPT down; on a made-up Ed thread of 44,947 characters, compaction removed 31% before that limit, and on a made-up DoorDash GraphQL response of 79,219 characters, it removed 64%.
 On October 18, 2026, tables cut a made-up 30-thread Ed list from 9,301 to 5,735 GPT tokens and a made-up DoorDash home feed from 8,362 to 5,515 tokens, both counted before the limit, and `keepFields` for each tool's purpose cut them to 1,896 and 2,227 tokens.
@@ -360,7 +365,7 @@ Assistants can combine taught tools in new ways without another recording.
 For example, an assistant could combine assignment and course-material tools to prepare a study list.
 An unsupported action needs further discovery; a successful example does not establish support for all related actions.
 
-Some requests depend on header tokens that are not stored as a plain local storage value, such as a `Bearer` value or a token in memory, and some websites block reuse of a recorded request.
+Some requests depend on header tokens that are not in local storage as a plain value or a JSON field, such as a token kept only in memory or in session storage, and some websites block reuse of a recorded request.
 Those tools fail when they run, and they need a separate browser path or must stay unused.
 Measure speed against an agent navigating the website before you claim an improvement.
 

@@ -123,9 +123,10 @@ function fetchInPage(page: Page, request: FilledRequest) {
         const csrfHeaderName = pageValue("meta[name=_csrf_header]")?.toLowerCase();
         const linkedInToken = cookieValue((name) => name === "JSESSIONID")?.replace(/^"|"$/g, "");
         const csrfHeaders = { ...(csrfToken ? { "x-csrftoken": csrfToken, "x-csrf-token": csrfToken, "x-xsrf-token": csrfToken, ...(csrfHeaderName ? { [csrfHeaderName]: csrfToken } : {}) } : {}), ...(linkedInToken?.startsWith("ajax:") ? { "csrf-token": linkedInToken } : {}) };
-        const tokens = Object.fromEntries(tokenHeaders.flatMap(({ header, fromLocalStorage }) => {
-          const value = localStorage.getItem(fromLocalStorage);
-          return value ? [[header, value]] : [];
+        const tokens = Object.fromEntries(tokenHeaders.flatMap(({ header, fromLocalStorage, prefix = "", path }) => {
+          const stored = localStorage.getItem(fromLocalStorage);
+          const value = stored && path ? path.split(".").reduce<unknown>((data, field) => (data as Record<string, unknown> | undefined)?.[field], JSON.parse(stored)) : stored;
+          return typeof value === "string" && value ? [[header, prefix + value]] : [];
         }));
         const credentials = Object.keys(tokens).length && new URL(address).origin !== location.origin ? "omit" : "include";
         const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...csrfHeaders };
