@@ -3,6 +3,7 @@ const stringCharacters = 2_000;
 const tableRows = 3;
 const sharedColumnShare = 0.6;
 const noiseKey = /^__typename$|tracking(?![-_]?(?:number|url|link|code|status|id))|analytics|telemetry|experiment|logging/i;
+const opaqueToken = /^(?![./])(?![\w\-.=+/]*\.[a-z]\w{1,4}$)[\w\-.=+/]{80,}$/i;
 const markup = /<\/?[a-z][\w:-]*(\s[^<>]*)?\/?>/i;
 const namedEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
 
@@ -21,7 +22,7 @@ const shortString = (text: string) => text.length > stringCharacters ? `${text.s
 const isPresent = (value: unknown) => value !== null && value !== "" && !(typeof value === "object" && Object.keys(value).length === 0);
 
 function compacted(value: unknown): unknown {
-  if (typeof value === "string") return shortString(markup.test(value) ? plainText(value) : value);
+  if (typeof value === "string") return opaqueToken.test(value) ? null : shortString(markup.test(value) ? plainText(value) : value);
   if (Array.isArray(value)) return value.map(compacted).filter(isPresent);
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).filter(([key]) => !noiseKey.test(key)).map(([key, item]) => [key, compacted(item)]).filter(([, item]) => isPresent(item)));
@@ -52,27 +53,67 @@ function table(items: unknown[]) {
   const columns = [...new Set(rows.flatMap(Object.keys))];
   const filledCells = rows.reduce((count, row) => count + Object.keys(row).length, 0);
   if (filledCells < columns.length * rows.length * sharedColumnShare) return undefined;
-  return [columns, ...rows.map((row) => columns.map((column) => row[column]))].map((line) => line.map(cell).join(" | ")).join("\n");
+  const constant = columns.filter((column) => rows.every((row) => column in row && JSON.stringify(row[column]) === JSON.stringify(rows[0][column])));
+  const varying = constant.length < columns.length ? columns.filter((column) => !constant.includes(column)) : columns;
+  const shared = varying === columns ? [] : [`every row: ${constant.map((column) => `${column}=${cell(rows[0][column])}`).join("; ")}`];
+  return { lines: [...shared, ...[varying, ...rows.map((row) => varying.map((column) => row[column]))].map((line) => line.map(cell).join(" | "))], headLines: shared.length + 1 };
 }
 
-function rendered(value: unknown): string {
-  if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${rendered(item)}`).join(",")}}`;
-  if (!Array.isArray(value)) return JSON.stringify(value);
+type Rendered = { text: string; tables: { start: number; lineEnds: number[]; headLines: number }[] };
+
+function render(value: unknown, out: Rendered) {
+  if (isRecord(value)) {
+    out.text += "{";
+    Object.entries(value).forEach(([key, item], index) => {
+      out.text += `${index ? "," : ""}${JSON.stringify(key)}:`;
+      render(item, out);
+    });
+    out.text += "}";
+    return;
+  }
+  if (!Array.isArray(value)) {
+    out.text += String(JSON.stringify(value));
+    return;
+  }
   const rows = table(value);
-  return rows === undefined ? `[${value.map(rendered).join(",")}]` : `[\n${rows}\n]`;
+  out.text += "[";
+  if (rows === undefined) value.forEach((item, index) => {
+    if (index) out.text += ",";
+    render(item, out);
+  });
+  else {
+    const start = out.text.length;
+    out.tables.push({ start, lineEnds: rows.lines.map((line) => (out.text += `\n${line}`).length), headLines: rows.headLines });
+    out.text += "\n";
+  }
+  out.text += "]";
+}
+
+function rendered(value: unknown) {
+  const out: Rendered = { text: "", tables: [] };
+  render(value, out);
+  return out;
 }
 
 function compactBody(body: string, keepFields: string[]) {
   try {
     const parsed: unknown = JSON.parse(body);
     const filtered = keepFields.length ? compacted(picked(parsed, keepFields.map(fieldPath))) : undefined;
-    return rendered(filtered !== undefined && isPresent(filtered) ? filtered : compacted(parsed));
+    const whole = compacted(parsed);
+    const isFiltered = filtered !== undefined && isPresent(filtered) && JSON.stringify(filtered) !== JSON.stringify(whole);
+    return { ...rendered(isFiltered ? filtered : whole), isFiltered };
   } catch {
-    return markup.test(body) ? plainText(body) : body;
+    return { text: markup.test(body) ? plainText(body) : body, tables: [], isFiltered: false };
   }
 }
 
+
 export function compactAnswer(body: string, keepFields: string[] = []) {
-  const text = compactBody(body, keepFields);
-  return text.length > answerCharacters ? `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters]` : text;
+  const { text, tables, isFiltered } = compactBody(body, keepFields);
+  if (text.length <= answerCharacters) return text;
+  const narrowRequest = `${isFiltered ? "fullAnswer adds the other fields but not more of this answer" : "fullAnswer will not show more"}. Ask the user to narrow the request.`;
+  const cutTable = tables.find(({ start, lineEnds }) => start <= answerCharacters && lineEnds.at(-1)! > answerCharacters);
+  if (!cutTable) return `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters were cut. ${narrowRequest}]`;
+  const shownLines = cutTable.lineEnds.filter((end) => end <= answerCharacters);
+  return `${text.slice(0, shownLines.at(-1) ?? cutTable.start)}\n[showing ${Math.max(0, shownLines.length - cutTable.headLines)} of ${cutTable.lineEnds.length - cutTable.headLines} rows; the rest were cut. ${narrowRequest}]`;
 }
