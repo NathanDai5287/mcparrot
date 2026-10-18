@@ -36,7 +36,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
-| Explore any website | gap | MCParrot Explorer 0.3.0 records data requests with short response samples and whole pages with a short visible-text sample in the opened tab; syntax checks pass, and on October 17, 2026 its page snapshot returned the address, status 200, `text/html`, and visible text in local headless Chrome; Nathan's live recording demonstration must pass |
+| Explore any website | gap | MCParrot Explorer 0.4.0 records data requests with short response samples and whole pages with a short visible-text sample in the opened tab; syntax checks pass, and on October 17, 2026 its page snapshot returned the address, status 200, `text/html`, and visible text in local headless Chrome; Nathan's live recording demonstration must pass |
 | Capability discovery with Cursor Composer | shipped | `/api/discover` returned three capabilities with inputs from three sample requests in a direct Node check through the Cursor SDK on October 17, 2026; discovery on Vercel and from a live recording needs Nathan's demonstration |
 | Choose and save tasks | shipped | The checklist adds ticked, edited capabilities to the app's tasks and skips duplicates; on October 17, 2026, a direct Node check with an in-memory Redis replacement kept a task that `save_task` had saved after a dashboard with an older copy added tasks; Nathan tests the live flow |
 | MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026; a later check that day answered an initialize request for protocol version 2026-07-28 with version 2025-11-25 and listed `submit_verification_code` |
@@ -60,7 +60,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
 | Sentry Tracing | gap | Spans cover Composer discovery (`discover.composer`), Browser Use start and stop, the CDP connection, each automatic sign-in and verification code agent run with its outcome (`browser_use.agent_sign_in`, `browser_use.agent_verification_code`), each request a task or `read_page` runs (`task.request`), each HTML page opened as text (`page.read`), and each `save_task` call (`task.save`); traces from the deployed app need Nathan's use |
 | Sentry Logs | gap | Discovery started and finished, sign-in started and done, login saved and deleted, automatic sign-in started and finished, each verification code outcome, each task run's and `read_page` call's outcome with whether the website was signed out, and each task saved from ChatGPT go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
-| Sentry Session Replay | gap | Every dashboard session is recorded with text and inputs masked; replays need Nathan's use |
+| Sentry Session Replay | gap | Every dashboard session is recorded with text, inputs, and link and image addresses masked; replays need Nathan's use |
 | Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
 | Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
 | Second website support | aspirational | Teach and run a task on a second website with the same product flow |
@@ -111,7 +111,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Browser Use sign-in, task execution, and a live ChatGPT connector need Nathan's production demonstration.
 - Automatic sign-in with a saved login and the text-message code step need Nathan's live Canvas test; the agent prompt, Duo option choice, and secret-binding hosts are untested against the real website.
 - Browser Use keeps a waiting sign-in browser for 15 minutes only on paid projects; free projects stop it after 2 minutes, so a slow code entry fails and the task must start sign-in again.
-- A sign-in agent run that takes longer than 220 seconds ends the tool call with an error, because Vercel stops the call at 300 seconds.
+- A sign-in agent run that takes longer than 150 seconds ends the tool call with an error, because Vercel stops the call at 300 seconds.
 - ChatGPT first sends MCP protocol version 2026-07-28, which no MCP SDK supports; the route relies on ChatGPT falling back to version 2025-11-25, which Nathan's live connector test must confirm.
 - Saved tasks become tools without a test, run GET requests only, and fail when a website needs header tokens instead of cookies.
 - Running a task and reading a page with `read_page` work only through ChatGPT; the dashboard has no matching control.
@@ -119,7 +119,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Pages that build their content only after later user actions can return incomplete text from page-reading tasks and `read_page`.
 - ChatGPT saves tasks with `save_task` without asking Nathan, which he accepted, so unwanted tasks stay until he deletes them on the app page.
 - Anyone with an app's connection link can use the whole site until the bypass secret is regenerated: read the workspace and the secret, change apps, tasks, and logins, run discovery, and start a live browser on an app's signed-in profile.
-- The extension shortens response samples and page text but does not filter them, so a token that a website returns in a response body or shows on a page can reach extension storage and Composer.
+- The extension and `/api/discover` redact secrets in samples and addresses only by matching patterns, such as secret-looking key names, JWTs, and long random strings, so a secret in another form can reach extension storage and Composer.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
 - Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
