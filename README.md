@@ -19,15 +19,15 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [What the product does](#what-the-product-does) | The product goal, its two phases, and what MCP means |
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | The management connection and one connection per website app |
-| [Teaching website tasks](#teaching-website-tasks) | How a user creates an app and teaches it a task |
+| [Teaching website tasks](#teaching-website-tasks) | How a user explores a website, finds what it can do, and chooses tasks |
+| [Discovery data sent to Gemini](#discovery-data-sent-to-gemini) | The agreed exception that sends short response samples to Gemini |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
 | [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, and the target service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, secrets, recordings, and diagnostics data |
-| [Local sign-in test](#local-sign-in-test) | How to run the local Browser Use sign-in diagnostic and how it handles secrets |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
-| [Running the task runner](#running-the-task-runner) | How to start the separate Browser Use Cloud task runner |
+| [Running the task runner](#running-the-task-runner) | How to start the dormant Browser Use Cloud task runner |
 
 ## What the product does
 
@@ -57,17 +57,17 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Browse website apps | `list_apps` |
 | Open a website app | `get_app` |
 | Create a website app | `create_app` |
-| Browse or open draft tasks | `list_tasks`, `get_task` |
-| Open a website exploration | `create_teaching_session` |
-| Save optional desired-action notes | `save_exploration_notes` |
-| Review observed reading actions | `get_teaching_status` |
-| Continue exploration without clearing captures | `resume_recording` |
-| Save a task draft | `save_draft` |
-| Delete an app and its drafts | `delete_app` |
+| List an app's chosen tasks | `list_tasks` |
+| Open the website and start recording | `start_exploration` |
+| Stop recording | `stop_exploration` |
+| List or delete recorded requests | `list_recorded_requests`, `delete_recorded_requests` |
+| Find what the website can do | `discover_capabilities` |
+| Save chosen capabilities as tasks | `save_tasks` |
+| Delete an app and its tasks | `delete_app` |
 
 These operation names are examples.
-Teaching, testing, publishing, connection, and recovery controls are aspirational and must follow the same rule.
-Editing remains aspirational. Deletion is available in the UI, but its matching management operation remains a parity gap.
+Testing, publishing, connection, and recovery controls are aspirational and must follow the same rule.
+Every operation in the table is available in the UI, but none has its matching management operation yet, which is a parity gap.
 Keep an operation inventory that maps each user capability to its MCP equivalent.
 For each new capability, check matching inputs, results, status, owner access, and required user actions through both interfaces.
 A capability is shipped only after these parity checks pass; do not accept capabilities that only one interface offers.
@@ -101,60 +101,65 @@ Keep passwords and verification codes in the secure browser or verification flow
 
 ## Teaching website tasks
 
-The workspace starts with website exploration, without a task-name form; the [status page](STATUS.md) records the evidence and gaps.
-One recording session can suggest several tasks, rather than requiring a separate demonstration for each task.
+Teaching has three steps for each website app: explore, discover, and choose.
+One exploration can suggest several tasks, so the user does not name or record each task separately.
+Canvas is a useful example, but the same flow works on any website.
 
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Select **Explore website**, install MCParrot Explorer once, then select **Open Canvas and explore**.
-4. Optionally list desired actions in plain words; these notes do not create working tasks.
-5. Use your normal browser sign-in and complete any required verification, such as Duo.
-6. Browse the pages you want the app to understand in the newly opened Canvas tab.
-7. Select **Review suggested actions** to see all observed reading requests together.
-8. Select **Continue exploring Canvas** to add observations without removing earlier captures.
-9. Confirm each task's name, description, variable inputs, and expected result.
-10. Test each task with changed inputs and compare its result with the website.
-11. Publish only the tasks whose tests pass, then connect the supplied authenticated MCP address to a compatible assistant.
+3. Select **Explore website**, install MCParrot Explorer once, then select **Open website and explore**.
+4. Sign in normally in the new tab and complete any required verification, such as Duo.
+5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
+6. Select **Find what this site can do** to send the recorded requests to Gemini and receive a list of capabilities.
+7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
 
-The Canvas pilot displays observed course-reading requests and syllabus navigation as candidate actions.
-It labels requests by their route; it does not infer complete task meanings or prove unvisited features.
-Desired-action notes stay in this browser and remain unavailable until separately discovered and tested.
-The broader task review, grouping, and publication experience remains aspirational.
-For example, browsing Canvas assignments and course materials can expose several reading requests in one session.
-A task that lists assignments could accept a course and a date range as inputs.
-The user should not need to record the same navigation again for each proposed task.
-Changing a supported input must not require another recording after the changed-input test passes.
-Canvas is an example; the same discovery flow applies to other websites.
+Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
+Saving replaces the app's current tasks, and the app page lists them.
+Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
+Chosen tasks stay in this browser's local storage and are not assistant tools yet.
+Testing tasks with changed inputs, publishing them, and serving them through MCP remain aspirational, as the [status page](STATUS.md) records.
 
-A browser extension observes supported reading routes in one explicitly opened normal-browser tab.
-The first pilot supports Berkeley Canvas on Chrome and Edge; it requires an unpacked extension installation, not a local server.
-Download the ZIP from the hosted exploration screen, extract it, enable Developer mode on the browser extensions page, and load the extracted folder.
+### Recording in the explore tab
+
+MCParrot Explorer is an unpacked Chrome and Edge extension that records only in the tab it opens for exploration.
+It attaches the browser's debugging interface to that tab, so the browser shows a bar saying that the extension is debugging the browser.
+It records data requests, such as fetch and XHR requests and other JSON or XML responses, with their method, full URL, status, response content type, and a short response sample.
+It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts and sign-in, session, and token paths.
+It never records request or response headers, cookies, request bodies, or authorization values, and it replaces query values whose names suggest a secret, such as a token or key.
+
+Each sample keeps at most 80 characters per text value and 2 items per list, up to about 3 KB per response.
+Requests that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
+Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
+Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension.
+The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
+
+Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
+To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
 Reload MCParrot after installation.
-The extension records allowlisted GET paths and numeric course identifiers only; it discards all query values, headers, bodies, cookies, and response content.
-It does not read typed passwords or intercept authentication traffic.
-Observations stay in extension storage until deleted or the extension is removed; the active recording ends when its tab closes, the browser restarts, or the user stops it.
-Deleting an app asks the extension to delete its observations and stop its recording.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
-Browser Use is reserved for later browser-dependent execution and authentication; it does not convert observations into reusable API requests.
-Normal exploration must not open a streamed cloud browser.
-Earlier cloud sessions remain accessible separately without starting a new session automatically.
-Candidate transfer into authenticated cloud testing remains a gap: the extension captures no reusable authentication or private response data.
-The application must group observed requests into candidate tasks and separate useful requests from unrelated traffic and authentication data.
-Each candidate must show the user what it reads, which inputs may change, and what result to expect.
-The application must verify a reusable request sequence before it enables the task as a tool.
-MCP management access must support starting discovery, reviewing candidates, testing, and publishing through the same operations as the UI.
 
-A recorded visit does not establish support for every feature on a website.
-Unvisited pages and actions remain unavailable unless separately discovered and tested.
-Public website documentation may inform suggestions, but a documented or inferred request is not proof that it works for this user.
-Some pages return HTML or use browser state rather than a separate JSON response; those tasks still need a tested execution path.
+### Limits of discovery
+
+Gemini's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
+Unvisited pages and actions remain unavailable unless separately explored and tested.
+Some pages return HTML or use browser state rather than a separate data response; those tasks still need a tested execution path.
+The application must verify a reusable request sequence with valid authentication before it enables a task as a tool.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
-We must prove capture and reuse on a real authenticated website before we promise broad support.
+
+## Discovery data sent to Gemini
+
+Discovery sends the recorded requests, including their truncated response samples, to Google Gemini `gemini-flash-latest` through the server route `/api/discover`.
+Nathan explicitly chose short real-value samples because they make Gemini's suggestions more accurate.
+This is the one agreed exception to the rule that keeps private website content out of prompts.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
+The server reads `GEMINI_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
+Vercel Authentication protects the production site, so only Nathan can start discovery.
+If the key is missing or the Gemini call fails, the exploration screen shows a clear error.
 
 ## Browser visibility by phase
 
 During teaching, also called parroting, the user browses a normal Chrome or Edge tab with the MCParrot Explorer extension.
-The extension observes only the selected tab and supported reading paths after explicit consent through **Open Canvas and explore**.
+The extension records only in the tab that the user opens through **Open website and explore**.
 The user signs in normally and completes personal verification; no cloud browser stream is used for normal exploration.
 
 During MCP use, the product must never open a visible website browser window.
@@ -172,7 +177,7 @@ Unsupported recovery must return a clear failure instead of opening a visible br
 
 The server checks the inputs and runs the saved API request sequence where this works.
 It supplies valid session data for the correct user and website.
-Browser Use handles steps that need a browser and supported recovery paths.
+Browser Use is reserved for this later MCP use: it signs in and passes authentication when tasks run, after the MCP server exists.
 Direct requests are the intended normal way to run a task, rather than an agent navigating the website each time.
 Measure speed against browser execution before you claim an improvement.
 
@@ -195,7 +200,7 @@ Never reuse one app's password on another website or assume the website origin m
 For example, Berkeley Canvas uses its approved CalNet login origin.
 The product must not capture typed passwords while exploring or import passwords from the user's normal browser.
 A normal-browser sign-in does not automatically sign in the separate Browser Use session.
-User-managed saved logins remain aspirational; the current private Canvas pilot uses fixed owner credentials, as the [status page](STATUS.md) records.
+User-managed saved logins remain aspirational, as the [status page](STATUS.md) records.
 When a session expires, the product follows these steps:
 
 1. Detect the expired session and keep the pending operation.
@@ -230,18 +235,17 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, and the HTML guides at `/docs`.
-The local sign-in diagnostic is not a public route or hosted sign-in service.
+The Next.js app deploys the workspace, the discovery route at `/api/discover`, and the HTML guides at `/docs`.
+Vercel Authentication protects every deployment, including the production domain.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets or private website content.
 
-The dashboard saves app names, website addresses, and draft task metadata in this browser’s local storage.
-This supports refresh and direct app links without a database or paid model.
-It does not save credentials, request captures, website content, or teaching results there.
-The authenticated hosted teaching pilot uses short server requests and a private Vercel Sandbox recorder, as described below. Durable task storage and remote MCP access remain aspirational.
+The dashboard saves app names, website addresses, and chosen tasks in this browser’s local storage.
+This supports refresh and direct app links without a database.
+It does not save credentials or recorded requests there; recorded requests stay in the extension.
+Durable task storage and remote MCP access remain aspirational.
 Short server operations can share the Next.js deployment.
 Store durable tasks and operation status in managed PostgreSQL; Supabase or Neon are available options.
-Browser Use Cloud hosts website browsers, while a private Vercel Sandbox keeps request recording active between server requests.
 Vercel requests must not own a browser session that waits for user verification.
 
 The following table describes the complete product; the [status page](STATUS.md) records which parts exist:
@@ -249,15 +253,16 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Part | Choice | Purpose |
 | --- | --- | --- |
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, teaching, verification, and task status |
-| Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Observe supported reading routes without a streamed browser or local server |
-| Browser sessions | Browser Use Cloud | Support later browser-dependent execution and authentication |
+| Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
+| Capability discovery | Google Gemini through a Next.js server route | Suggest capabilities from recorded requests |
+| Browser sessions | Browser Use Cloud | Sign in and pass authentication when tasks run through MCP later |
 | Recording and task execution | Application-owned request capture and HTTP execution | Turn demonstrated tasks into verified API request sequences |
 | Assistant connection | Official MCP TypeScript SDK, authenticated Streamable HTTP | Provide a remote MCP address for compatible assistants |
 | Persistent storage | Hosted PostgreSQL | Store user-owned connections, task definitions, and operation status |
 | Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
-Browser Use hosts later browser-dependent work, and our app shows progress and verification controls.
+Browser Use later hosts sign-in and authentication during MCP use, and our app shows progress and verification controls.
 A Vercel request must not wait for a whole browser session to finish.
 For work that takes longer than one request, store durable operation status and let clients check progress.
 The exact recording interface, secure session transfer, and long-task coordination still need technical proof.
@@ -272,6 +277,7 @@ Vercel deployment access alone does not establish product ownership for each cre
 Only the authentication worker may decrypt the selected app's password for its approved login origin; neither the UI nor MCP can read it back.
 Deleting saved login details removes the credential record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
+The only private website content allowed in a prompt is the truncated discovery samples described in [discovery data sent to Gemini](#discovery-data-sent-to-gemini).
 Recordings can contain passwords and private website content, so record only the network data that the task needs.
 Define how long recordings are kept and how they are deleted before you store captures in production.
 
@@ -282,62 +288,17 @@ Do not assume that a Browser Use profile alone gives a secure way to transfer to
 
 ## Workspace navigation behavior
 
-App, exploration, and older task pages have stable addresses under `/apps/<app-id>`, `/apps/<app-id>/explore`, and `/apps/<app-id>/tasks/<task-id>`.
-Each app exploration uses a stable `explore` session key; older task sessions remain separate and accessible.
-The older `/tasks/new` address opens exploration without requiring a task form.
-Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores local draft metadata.
+App and exploration pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/explore`.
+Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the apps and tasks saved in this browser.
 These addresses do not transfer a browser’s saved apps to another user or device.
-Select **Delete app** inside an app, then confirm inline to remove that app and its drafts from this browser.
-Deletion does not remove the website account or a browser profile.
+Select **Delete app** inside an app, then confirm inline to remove that app and its tasks from this browser and delete its recorded requests in the extension.
+Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
-
-## Hosted teaching requirement
-
-Exploration starts from the production app and uses MCParrot Explorer in a normal browser tab.
-No local server, recording worker, loopback pairing page, or streamed cloud browser is used by default.
-The extension keeps sanitized observed route metadata locally; it never transfers browser cookies or website credentials to the cloud.
-The separate Browser Use session needs its own authentication before a captured action can become a tested tool.
-Earlier cloud exploration sessions remain available under **Earlier cloud exploration session** until they expire.
-That legacy interface retains status, sign-in, reading tests, and session cleanup, but cannot start or resume recording or import extension observations.
-The local teaching worker is dormant and is not linked from the product UI.
-Its earlier request captures were memory-only and are unavailable after that worker stopped.
-See the [status page](STATUS.md) for the remaining production proof and cloud handoff gaps.
-
-## Local sign-in test
-
-This diagnostic is dormant; do not start local services for the current production-only workflow.
-The Berkeley-specific diagnostic uses open-source Browser Use with a separate headless local Chrome profile.
-It does not use Browser Use Cloud credits or an AI model.
-The main frontend remains separate from this diagnostic, which does not expose MCP operations.
-This diagnostic does not satisfy the UI and MCP parity rule or change the target hosted architecture.
-
-Run the local test after installing Browser Use with Python 3.12 and pipx:
-
-```sh
-pipx install --python /opt/homebrew/bin/python3.12 browser-use
-npm run browser:signin
-```
-
-Open [http://127.0.0.1:4321](http://127.0.0.1:4321).
-Enter credentials and verification codes only in that local page, never in chat.
-The test targets `https://bcourses.berkeley.edu/login/cas`; it is not a general sign-in implementation.
-The server binds to loopback, checks request origin, and transfers secrets through a private process pipe.
-Passwords and codes are not placed in command arguments, AI prompts, logs, or application storage.
-Browser Use recordings and telemetry are disabled.
-The browser keeps its session in the ignored `.local/headless-profile/` directory; do not export cookies or inspect course content.
-
-The launcher activates the hidden tab and sets a desktop viewport and focus, because Duo otherwise leaves the headless page hidden with no verification controls.
-The diagnostic checks actual Duo choices, selects the SMS option for the approved phone ending in 2199 once, and displays the code form.
-It skips optional persistent device trust through Duo's observed shared-device option.
-Rejected entries require user correction and another explicit submission; there is no automatic credential or code retry.
-The [status page](STATUS.md) records the test results.
-Keep the existing signed-in browser available; do not reset it merely to repeat this test.
-See the [official Browser Use local CLI guide](https://docs.browser-use.com/open-source/browser-use-cli) for details.
 
 ## Running the frontend
 
 Use Node.js 24 or later.
-The frontend does not need a Browser Use API key.
+The frontend does not need a Browser Use API key, but discovery needs `GEMINI_API_KEY` in `.env.local`.
 
 ```sh
 npm install
@@ -346,11 +307,12 @@ npm run dev -- --port 4317
 
 Open [http://localhost:4317](http://localhost:4317) when the development server starts.
 Open [http://localhost:4317/docs](http://localhost:4317/docs) to read Nathan's HTML guides.
-Use this frontend to review navigation and connect to the Berkeley local teaching pilot.
+MCParrot Explorer connects to this local dashboard as well as to the production site.
 
 ## Running the task runner
 
 The task runner sends one task to Browser Use Cloud.
+It is dormant and reserved for signing in and passing authentication when tasks run through MCP later.
 Use Node.js 24 or later, and have a Browser Use account.
 
 1. Install packages with `npm install`.
@@ -367,63 +329,3 @@ Each task uses your Browser Use account credits.
 Keep your API key private.
 Run `npm run check` to check syntax without starting a task.
 See the [Browser Use quick start](https://docs.browser-use.com/cloud/quickstart) for setup instructions.
-
-## Hosted teaching pilot
-
-The earlier cloud exploration path is dormant for new sessions.
-Existing-session controls remain for sign-in, review, reading tests, and cleanup only.
-The following describes that earlier architecture, not normal extension exploration.
-
-The production-only pilot connects a draft task to a Browser Use Cloud browser through `/api/teaching`.
-Vercel Authentication protects all deployments, including the production domain, before the app can spend browser credits.
-Nathan must sign in with his Vercel account to enter the private pilot.
-The server reads `BROWSER_USE_API_KEY` and `MCPARROT_SESSION_SECRET` from Sensitive production environment variables.
-Neither value is sent to the browser, stored in the repository, or included in request diagnostics.
-
-A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
-New exploration uses the extension and cannot create a hosted teaching browser.
-An earlier session can reopen its popup, attempt private sign-in, review captured requests, run reading tests, or end the session.
-The UI sends the app website address with each teaching request; the recorder stores its origin in the hosted session.
-Select **Open teaching browser** to focus or reopen the same hosted session without restarting it or deleting its captures.
-If the browser blocks the popup, allow popups for MCParrot and select the button again.
-The recorder observes only supported same-origin GET requests and syllabus navigation for that website origin; it excludes authentication traffic and request bodies.
-The pilot returns request labels and numeric course inputs, not raw headers, cookies, or course content.
-Each task has one named hosted recorder; repeated connection attempts reuse the task session instead of creating another paid browser.
-
-Secure signed HTTP-only cookies identify that draft's session after navigation or refresh in the same browser.
-Captures and test summaries remain in hosted memory until the 30-minute limit, explicit session deletion, or worker failure.
-They are not published tools or durable database records.
-Ending a session stops the Browser Use browser and deletes its recorder; merely stopping recording keeps review and testing available.
-A test obtains matching cookies privately and sends the observed GET request without navigating the teaching browser.
-It reports a result count or a syllabus-page check without storing the returned course data.
-The user can change the numeric course input for a second reading test.
-
-The shared teaching operation inventory is `create_teaching_session`, `get_teaching_status`, `start_recording`, `stop_recording`, `test_saved_request`, `end_teaching_session`, `continue_signin`, and `submit_signin_code`.
-The UI calls those operations; authenticated remote MCP exposure remains a parity gap and must use the same operations.
-This pilot does not infer unvisited actions, publish suggested tasks, provide a multi-user credential vault, or support another school automatically.
-Cloud school sign-in, live capture, and direct replay require Nathan's production demonstration before their gaps can close; see the [status page](STATUS.md).
-
-
-## Private hosted sign-in
-
-The private pilot reads `CANVAS_USERNAME` and `CANVAS_PASSWORD` from Sensitive Vercel production environment variables.
-These values belong to the single protected pilot owner; they are not a general credential-storage service.
-An earlier cloud session exposes **Sign in automatically** or **Check sign-in** without creating another browser.
-Normal extension exploration uses the normal browser's sign-in and does not start this helper.
-The authentication helper attaches to the existing Browser Use Cloud session and pauses request recording before sign-in.
-It only fills credentials on `https://auth.berkeley.edu/cas/login`, after checking that the form submits to that origin.
-It submits the password at most once per hosted session, and never automatically retries rejected credentials.
-
-The helper checks actual Duo controls and selects text verification for the approved phone ending in 2199 only when offered.
-It requests that text option once, opens the supported method selector when needed, and skips optional device trust.
-The user enters the code into MCParrot's code form; the helper submits it once for that explicit user action.
-A rejected code requires the user to enter a current code and submit again.
-Unsupported school policies or verification methods require manual action in the existing teaching browser window; no phone approval is automated.
-**Check sign-in** observes the current page and continues supported steps without another password attempt or text request.
-After website sign-in is detected, existing captured requests remain available for reading tests.
-
-Credentials and codes travel to the private Sandbox as AES-GCM encrypted envelopes, never as plaintext command arguments or files.
-The helper decrypts them only in memory and clears its payload after the action.
-It never sends these inputs to an AI model or includes them in captured requests, application responses, diagnostics, or documentation.
-The helper's control key stays inside the nonpersistent hosted session and is deleted with that session.
-Existing-session sign-in, SMS selection, code acceptance, and recording handoff remain a production proof gap until Nathan's live test passes.
