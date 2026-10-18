@@ -297,7 +297,7 @@ Inputs that ChatGPT leaves out use the example value that discovery found.
 When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
 Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
-An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`.
+An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`, ignoring a leading `www.` on the website's host, so `https://www.doordash.com` also accepts `doordash.com` and `api.doordash.com`.
 A request to a subdomain runs from the website's page as a cross-origin `fetch` with cookies included, so it works only when that subdomain allows it.
 Tools do not send headers that carry sign-in tokens, so a website whose data requests need such a header, such as Ed's `x-token`, returns 401 and the tool reports the website as signed out; this is a [known gap](STATUS.md).
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
