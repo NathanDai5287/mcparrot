@@ -184,9 +184,16 @@ export default function Workspace() {
           <svg width="29" height="29" viewBox="0 0 29 29" fill="none" aria-hidden="true"><rect x="1" y="1" width="27" height="27" rx="8" /><path d="M8 18V10l6.5 6 6.5-6v8" /></svg>
           <span>MCParrot</span>
         </button>
-        <p className="workspace-label">Personal workspace</p>
-        <nav aria-label="Workspace"><button className="nav-item" onClick={() => navigate({ view: "apps" })}><Icon name="apps" />Apps</button></nav>
-        <div className="sidebar-footer"><span className="avatar">N</span><div>Nathan’s workspace</div></div>
+        <button className="sidebar-apps-link" onClick={() => navigate({ view: "apps" })}>Apps</button>
+        <div className="sidebar-apps">
+          <div className="sidebar-apps-heading"><h2>Apps {loaded && <span>{apps.length}</span>}</h2><button className="sidebar-icon-button" aria-label="Create app" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" /></button></div>
+          {loaded && apps.length === 0 && <p className="sidebar-empty">No apps yet</p>}
+          <nav aria-label="Apps" className="sidebar-app-list">{apps.map((app) => <button className="sidebar-app" key={app.id} aria-current={currentApp?.id === app.id ? "page" : undefined} onClick={() => navigate({ view: "app", app })}>
+            <span className="sidebar-app-mark" aria-hidden="true">{app.name.charAt(0).toUpperCase()}</span>
+            <span className="sidebar-app-name">{app.name}</span>
+            <span className={app.signedInAt ? "status-dot signed-in" : "status-dot"}><span className="visually-hidden">{app.signedInAt ? "Signed in" : "Not signed in"}</span></span>
+          </button>)}</nav>
+        </div>
       </aside>
       <div className="page">
         <div className="topbar"><span>Workspace <span className="slash">/</span> {currentApp?.name ?? "Apps"}</span></div>
