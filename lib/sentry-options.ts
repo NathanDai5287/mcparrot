@@ -1,6 +1,7 @@
 export const sentryOptions = {
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 1,
+  ignoreErrors: [/Unsupported protocol version: 2026-07-28/],
   dataCollection: {
     userInfo: false,
     cookies: false,
