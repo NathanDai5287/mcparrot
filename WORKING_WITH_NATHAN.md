@@ -37,7 +37,7 @@ For each capability, explain both the UI path and the agent path, including the 
 
 Read the code, tests, history, and documentation to answer technical questions that the workspace can settle.
 Do not ask Nathan for facts that you can find yourself.
-Use the decision-queue workflow for a real product choice when an instruction requires it.
+For a real product choice, ask Nathan one focused question that lists the options and what each one changes for the user.
 Do not ask again for approval of settled details or routine implementation choices.
 Existing permission stays valid until Nathan changes the scope.
 
@@ -54,7 +54,7 @@ Do not stop for another confirmation when the conversation already shows that ag
 ## Implement small agreed steps
 
 Choose the simplest complete solution for the agreed behavior, and keep changes inside the requested scope.
-Use background agents for large edits, as Nathan's global instructions require.
+Use background agents for large edits.
 If a technical experiment is necessary, state the assumption it tests and report the result.
 Report the result, the remaining limits, and the related PRs or MRs.
 
@@ -63,7 +63,7 @@ Report the result, the remaining limits, and the related PRs or MRs.
 We move fast, so Nathan tests changes on the deployed site instead of agents testing them locally.
 Do not test changes on a local server.
 Do not click through the app in an agent browser or review screenshots to verify a change.
-Merge, deploy, and then ask Nathan to test the live site.
+Merge, and when Nathan asks for a deployment, deploy from `main` and ask him to test the live site.
 Tell Nathan the link and the exact steps to test.
 Run only the fast automatic checks before you push.
 
@@ -89,7 +89,7 @@ GitHub deletes a pull request's branch automatically when it merges, because the
 When an experiment fails or you abandon it, delete its branch immediately instead of leaving it open.
 Do not end your task with an open branch that you created.
 The one exception is work held during the Devpost submission and judging freeze, which you merge as soon as the freeze ends.
-After each change, report the commit or pull request link in the table of related PRs that Nathan's instructions require.
+After each change, report to Nathan a table of the related commits or pull requests, each with its link and what it changed.
 
 Pushes do not deploy, because `vercel.json` turns off Git deployments, so branches and pull requests get no automatic preview links.
 The [production deployment setup](README.md#production-deployment-setup) explains how to publish to [the production website](https://mcparrot.vercel.app).

@@ -50,7 +50,7 @@
           <li><h3>We question the details</h3><p>Both sides challenge unclear steps, hidden assumptions, and failure cases. We use concrete examples to find where our expectations differ.</p></li>
           <li><h3>We close the differences</h3><p>We revise the explanation until we share the same picture. An unknown technical limit stays marked as unknown until a test gives evidence.</p></li>
           <li><h3>We record the agreement</h3><p>Before it builds the agreed change, the agent updates the product guide, the hackathon guide when it applies, and its own working instructions.</p></li>
-          <li><h3>We build and you test the result</h3><p>The agent publishes the change, and you test it on the live website against the agreed example. If new evidence changes the expected experience, it starts another focused discussion.</p></li>
+          <li><h3>We build and you test the result</h3><p>When you ask for it, the agent publishes the change, and you test it on the live website against the agreed example. If new evidence changes the expected experience, it starts another focused discussion.</p></li>
         </ol>
       </section>
 
@@ -81,7 +81,7 @@
 
       <section id="testing">
         <h2>Testing on the live website</h2>
-        <p>We move fast, so you test changes on the live website. Agents do not test changes on their own computer. They also do not click through the app in a test browser or study screenshots, because that is too slow. Instead, the agent publishes the change and sends you the link and the exact steps to try.</p>
+        <p>We move fast, so you test changes on the live website. Agents do not test changes on their own computer. They also do not click through the app in a test browser or study screenshots, because that is too slow. Instead, when you ask for a publication, the agent publishes the change and sends you the link and the exact steps to try.</p>
       </section>
 
       <section id="changes">
@@ -93,7 +93,7 @@
           <li>The work is an experiment that we may throw away, such as a first test of recording and repeating website requests.</li>
           <li>The work happens in the final hours before the Devpost submission or during in-person judging, when the main copy must not change unexpectedly. The <a href="hackathon.html">LA Hacks 2026 guide</a> has the deadline and event details.</li>
         </ul>
-        <p>Agents merge their own pull requests into the main copy as soon as the automatic checks pass, so you do not need to approve. They never collect finished work or leave it waiting on a branch, because a forgotten branch slowly falls out of step with the main copy. Right after a merge, the agent deletes the branch, both on its computer and on GitHub, and GitHub also deletes it automatically. If an experiment fails or we drop it, the agent deletes its branch immediately. An agent never finishes a task with a branch it made still open. The one exception is work held back while the main copy stays frozen for the Devpost submission and judging, and the agent merges that work as soon as the freeze ends. After each change, the agent gives you a link to the saved change or its pull request.</p>
+        <p>Agents merge their own pull requests into the main copy as soon as the automatic checks pass, so you do not need to approve. They never collect finished work or leave it waiting on a branch, because a forgotten branch slowly falls out of step with the main copy. Right after a merge, the agent deletes the branch, both on its computer and on GitHub, and GitHub also deletes it automatically. If an experiment fails or we drop it, the agent deletes its branch immediately. An agent never finishes a task with a branch it made still open. The one exception is work held back while the main copy stays frozen for the Devpost submission and judging, and the agent merges that work as soon as the freeze ends. After each change, the agent gives you a table of the related saved changes or pull requests, each with its link and what it changed.</p>
         <aside class="note">
           <strong class="note-label">Publishing happens on request</strong>
           <p>Updates to the main copy do not publish by themselves. <a href="https://mcparrot.vercel.app">The production website</a> changes only when a change is published on request, as you chose. Branches do not get a preview link by themselves. During the submission and judging freeze, the agent publishes a preview link for the branch, which is a separate web address that shows that version of the app, and you test it instead of the live website. After each publication, the agent confirms that publishing succeeded, sends you the link, and fixes or undoes a failed update immediately. These guides are also part of the website, at <a href="https://mcparrot.vercel.app/docs">mcparrot.vercel.app/docs</a>.</p>
