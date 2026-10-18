@@ -9,7 +9,7 @@ import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSch
 import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
-import { isGetRequest } from "../../../../lib/task-request";
+import { isReadOnlyRequest } from "../../../../lib/task-request";
 import { viewImage } from "../../../../lib/view-image";
 import { findApp } from "../../../../lib/workspace";
 
@@ -23,6 +23,8 @@ function inputSchema(task: Task) {
 }
 
 const serverInstructions = (app: Website) => `Tools read ${app.name} as the signed-in user. Call the saved tool that matches the request directly; one call returns the whole answer. Use read_page only when no saved tool fits. Answers are already shortened; set fullAnswer only if a needed field is missing. If a result says the site is signed out, tell the user and stop. Run independent tools at once.`;
+
+const readOnlyAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
@@ -106,7 +108,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
-      annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      annotations: task.requests.every(isReadOnlyRequest) ? readOnlyAnnotations : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer))));
   }
   const website = new URL(app.url).origin;
@@ -114,13 +116,13 @@ function appServer(app: Website, orderLimitUsd?: number) {
     title: `Read a page on ${app.name}`,
     description: `Open any page on ${website} that the signed-in user can see and return its text. Use only when no other tool covers the page, such as a link that the user shares.`,
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
-    annotations: { readOnlyHint: true },
+    annotations: readOnlyAnnotations,
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
     description: "Read the text, numbers, and charts in one image address from an earlier answer. Use only when that image holds the answer.",
     inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
-    annotations: { readOnlyHint: true },
+    annotations: { ...readOnlyAnnotations, openWorldHint: true },
   }, async ({ url }) => textResult((await viewImage(app, url)).text));
   server.registerTool("save_task", {
     title: `Save a tool for ${app.name}`,
