@@ -20,6 +20,7 @@ Read the product specification and the collaboration process before material wor
 | [Status guide](public/docs/status.html) | Nathan | Plain-language mirror of the status page |
 | [Hackathon guide](public/docs/hackathon.html) | Nathan | Plain-language mirror of the hackathon facts |
 | [Working together guide](public/docs/working-together.html) | Nathan | Plain-language mirror of the collaboration process |
+| [Pitch slideshow](public/docs/pitch.html) | Judges and Nathan | The LA Hacks pitch slides, which follow the [organizer pitch guidelines](HACKATHON.md#organizer-pitch-guidelines) |
 | [Devpost submission page](public/docs/devpost.html) | Nathan and Devpost judges | The project description submitted on Devpost |
 
 ## Repository-Wide Rules
