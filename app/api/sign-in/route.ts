@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { browserUse, startBrowser, stopBrowser, withPage } from "../../../lib/browser-use";
-import { updateStoredApp } from "../../../lib/workspace";
+import { readWorkspace, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -9,19 +9,43 @@ const signInMinutes = 15;
 
 export async function POST(request: Request) {
   if (!process.env.BROWSER_USE_API_KEY) return Response.json({ error: "Sign-in is not set up. Add BROWSER_USE_API_KEY to the server environment." }, { status: 500 });
-  const { appId, name, websiteUrl, browserProfileId } = await request.json() as { appId: string; name: string; websiteUrl: string; browserProfileId?: string };
-  Sentry.logger.info("Sign-in started", { app: name, newProfile: !browserProfileId });
-  const profileId = browserProfileId ?? (await browserUse().profiles.create({ name: `MCParrot ${name}` })).id;
-  await updateStoredApp(appId, { browserProfileId: profileId });
-  const browser = await startBrowser(profileId, signInMinutes);
-  await withPage(browser.cdpUrl!, (page) => page.goto(websiteUrl, { waitUntil: "domcontentloaded" }));
+  const { appId } = await request.json().catch(() => ({})) as { appId?: string };
+  if (!appId) return Response.json({ error: "Missing appId." }, { status: 400 });
+  let browser: Awaited<ReturnType<typeof startBrowser>>;
+  let profileId: string;
+  try {
+    const app = (await readWorkspace() ?? []).find((storedApp) => storedApp.id === appId);
+    if (!app) return Response.json({ error: "App not found." }, { status: 404 });
+    Sentry.logger.info("Sign-in started", { app: app.name, newProfile: !app.browserProfileId });
+    profileId = app.browserProfileId ?? (await browserUse().profiles.create({ name: `MCParrot ${app.name}` })).id;
+    if (!app.browserProfileId) await updateStoredApp(appId, { browserProfileId: profileId });
+    browser = await startBrowser(profileId, signInMinutes);
+    try {
+      await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded" }));
+    } catch (error) {
+      Sentry.logger.warn("Sign-in browser could not open the website", { app: app.name });
+      Sentry.captureException(error);
+    }
+  } catch (error) {
+    Sentry.captureException(error);
+    return Response.json({ error: "Browser Use could not open a sign-in browser. Try again." }, { status: 502 });
+  }
   return Response.json({ browserProfileId: profileId, browserId: browser.id, liveUrl: browser.liveUrl });
 }
 
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
-  await stopBrowser(searchParams.get("browserId")!);
-  await updateStoredApp(searchParams.get("appId")!, { signedInAt: new Date().toISOString() });
-  Sentry.logger.info("Sign-in done");
+  const browserId = searchParams.get("browserId");
+  const appId = searchParams.get("appId");
+  const finished = searchParams.get("finished") !== "false";
+  if (!browserId || !appId) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
+  try {
+    await stopBrowser(browserId);
+    if (finished) await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
+  } catch (error) {
+    Sentry.captureException(error);
+    return Response.json({ error: finished ? "MCParrot could not save the sign-in. Select Done signing in again." : "MCParrot could not stop the sign-in browser. It stops by itself within 15 minutes." }, { status: 502 });
+  }
+  Sentry.logger.info(finished ? "Sign-in done" : "Sign-in cancelled");
   return Response.json({ stopped: true });
 }
