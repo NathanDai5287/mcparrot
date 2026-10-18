@@ -23,17 +23,17 @@ function describeImage(app: Website, dataUrl: string, apiKey: string) {
     op: "gen_ai.invoke_agent",
     attributes: { "gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "MCParrot image reader", "gen_ai.request.model": claudeModelName, "image.data.size": dataUrl.length },
   }, async (span) => {
-    const result = await runClaudeAgent({ text: descriptionPrompt(new URL(app.url).origin), images: [{ data, mimeType }] }, apiKey, descriptionDeadlineMs, () => new Error("Reading the image took too long. Try again."));
+    const result = await runClaudeAgent({ text: descriptionPrompt(new URL(app.url).origin), images: [{ data, mimeType }] }, apiKey, descriptionDeadlineMs, () => new Error("Retry once now. Reading the image took too long."));
     span.setAttributes({ "image.describe.status": result.status, "gen_ai.response.size": result.result?.length ?? 0 });
     Sentry.logger.info("Image described", { appId: app.id, status: result.status, resultSize: result.result?.length ?? 0 });
-    if (result.status !== "finished" || !result.result) throw new Error("MCParrot could not read this image. Try again.");
+    if (result.status !== "finished" || !result.result) throw new Error("Retry once now. MCParrot could not read this image.");
     return result.result;
   });
 }
 
 export async function viewImage(app: Website, url: string): Promise<ImageView> {
   const apiKey = process.env.CURSOR_API_KEY;
-  if (!apiKey) throw new Error("Reading images is not set up. Add CURSOR_API_KEY to the server environment.");
+  if (!apiKey) throw new Error("Do not retry; tell the user: Reading images is not set up. Add CURSOR_API_KEY to the server environment.");
   const read = await readSigningIn(app, async (signedInApp) => ({ image: await readImageDataUrl(signedInApp, url) }));
   if (typeof read === "string") return { text: read };
   return { image: read.image, text: `MCParrot's image reader copied this image:\n\n${await describeImage(app, read.image, apiKey)}` };

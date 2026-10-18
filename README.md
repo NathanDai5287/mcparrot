@@ -531,11 +531,11 @@ When a payment run fails for another reason, the order may still have gone throu
 Nathan decided that MCParrot has real accounts, so other people can use it with their own apps.
 Users sign in with Google through Clerk, which Nathan installed from the Vercel Marketplace; the `/sign-in` page shows Clerk's sign-in box, and the sidebar has an account button to sign out.
 The dashboard and every `/api` route need a signed-in user, except the marketplace page and its read route, and `/docs`, `/monitoring`, `/sign-in`, and the app connections at `/mcp/apps/<app-id>` are public; each connection checks its own token.
-Each page and route checks the session itself, because Clerk deprecates path matching in middleware, and `proxy.ts` runs Clerk's middleware and still rejects cross-site `/api` writes.
+Each page and route checks the session itself, because Clerk deprecates path matching in middleware, and `proxy.ts` runs Clerk's middleware on every path except the `/mcp/` connections, which need no Clerk session, and still rejects cross-site `/api` writes.
 A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards.
 
 Each user has one workspace under the Redis key `workspace:<user-id>`, and the key `app-owner:<app-id>` records which user owns each app.
-Every route and connection finds the app's owner from that key, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
+Every route and connection finds the app's owner from that key, a connection reads the owner key and the workspace in one Redis script, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
 Creating an app sets its owner key in the same atomic step as the workspace change and fails when the key already exists, and deleting an app removes the key in the same way.
 
 The owner is the account whose verified primary email matches `MCPARROT_OWNER_EMAIL`.
