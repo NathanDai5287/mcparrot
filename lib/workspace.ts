@@ -75,7 +75,7 @@ export async function readWorkspace() {
   return apps && wellFormed(apps);
 }
 
-export async function changeApps(change: (apps: Website[]) => Website[], deleteKeys: string[] = []) {
+async function changeStoredApps(change: (apps: Website[]) => Website[], deleteKeys: string[], keepMalformed: (app: unknown) => boolean) {
   for (let attempt = 0; attempt < changeAttempts; attempt++) {
     if (attempt) await retryPause();
     const raw = await readStoredWorkspace();
@@ -84,11 +84,16 @@ export async function changeApps(change: (apps: Website[]) => Website[], deleteK
     const apps = change(valid);
     checkLimits(valid, apps);
     const unchanged = raw === null && !apps.length;
-    const next = unchanged ? "" : JSON.stringify([...apps, ...current.filter((app) => !isWellFormed(app))]);
+    const next = unchanged ? "" : JSON.stringify([...apps, ...current.filter((app) => !isWellFormed(app) && keepMalformed(app))]);
     if (await stored((redis) => redis.eval(compareAndSet, [workspaceKey, ...deleteKeys], [raw ?? "", next])) === 1) return wellFormed(apps);
   }
   throw new StorageUnavailable("Storage is busy with other changes. Try again in a moment.");
 }
+
+export const changeApps = (change: (apps: Website[]) => Website[], deleteKeys: string[] = []) => changeStoredApps(change, deleteKeys, () => true);
+
+export const deleteStoredApp = (appId: string, deleteKeys: string[]) =>
+  changeStoredApps((apps) => apps.filter((app) => app.id !== appId), deleteKeys, (app) => (app as { id?: unknown } | null)?.id !== appId);
 
 export const changeApp = (appId: string, change: (app: Website) => Website) =>
   changeApps((apps) => {

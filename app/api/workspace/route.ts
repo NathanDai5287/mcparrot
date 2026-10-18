@@ -1,6 +1,6 @@
 import { stopBrowser } from "../../../lib/browser-use";
 import { addTasks } from "../../../lib/save-task";
-import { AppNotFound, changeApp, changeApps, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
+import { AppNotFound, changeApp, changeApps, deleteStoredApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -21,12 +21,14 @@ export async function GET() {
   }
 }
 
+const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`];
+
 async function deleteApp(appId: string) {
   const pendingKey = `pending-sign-in:${appId}`;
   const pending = await storage().get<{ browserId?: string }>(pendingKey).catch((error) => {
     throw new StorageUnavailable("Storage could not be reached, so the app was kept. Try again in a moment.", { cause: error });
   });
-  const apps = await changeApps((apps) => apps.filter((app) => app.id !== appId), [`login:${appId}`, pendingKey]);
+  const apps = await deleteStoredApp(appId, appKeys(appId));
   if (pending?.browserId) {
     try {
       await stopBrowser(pending.browserId);
@@ -39,7 +41,7 @@ function apply(change: WorkspaceOperation) {
   if (change.operation === "createApp") return changeApps((apps) => {
     if (apps.some((app) => app.id === change.app.id)) throw new WorkspaceLimit("An app with this id already exists.");
     return [...apps, change.app];
-  });
+  }, appKeys(change.app.id));
   if (change.operation === "deleteApp") return deleteApp(change.appId);
   if (change.operation === "addTasks") return addTasks(change.appId, change.capabilities);
   return changeApp(change.appId, (app) => ({ ...app, tasks: app.tasks.filter((task) => task.id !== change.taskId) }));
