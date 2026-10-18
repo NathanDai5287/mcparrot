@@ -7,6 +7,7 @@ type Exploration = { recording: boolean; requests: CapturedRequest[]; activeAppI
 type Choice = DiscoveredCapability & { selected: boolean };
 export type SaveResult = { error?: string; skipped?: string[]; saved?: string[] };
 const emptyExploration: Exploration = { recording: false, requests: [] };
+const maximumDiscoveryBytes = 3_900_000;
 const connectionToolNames = ["read_page", "view_image", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
 const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 const isText = (value: unknown) => typeof value === "string";
@@ -17,6 +18,14 @@ function isCapability(value: unknown): value is DiscoveredCapability {
     && (value.updatesTaskId === undefined || isText(value.updatesTaskId))
     && Array.isArray(value.inputs) && value.inputs.every((input) => isObject(input) && isText(input.name) && isText(input.description) && isText(input.example))
     && Array.isArray(value.requests) && value.requests.length > 0 && value.requests.every((request) => isObject(request) && isText(request.method) && isText(request.urlPattern));
+}
+
+function newestThatFit(requests: CapturedRequest[]) {
+  const sizes = requests.map((request) => new TextEncoder().encode(JSON.stringify(request)).length + 1);
+  let total = sizes.reduce((sum, size) => sum + size, 0);
+  let oldest = 0;
+  while (total > maximumDiscoveryBytes) total -= sizes[oldest++];
+  return requests.slice(oldest);
 }
 
 function nameProblem(name: string, otherNames: string[]) {
@@ -109,7 +118,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   }
 
   const discover = () => run("discovery", async () => {
-    const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId, requests: state.requests }) });
+    const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId, requests: newestThatFit(state.requests) }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "Discovery failed. Try again.");
     showDiscovery(result);
@@ -200,7 +209,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
           {state.requests.map((request) => <div className="candidate-button" key={`${request.method} ${request.pattern}`}><span>{request.method} {request.pattern}<small>{request.status} · {request.contentType}</small></span></div>)}
         </div>
       </details>
-      <p className="field-help">Cookies, sign-in traffic, sign-in codes, and headers other than a few safe ones, such as accept, are not recorded; for a sign-in code, only its header name and where the page stores it are kept. Selecting Find what this site can do sends these requests and their short samples to an AI that finds what the site can do.</p>
+      <p className="field-help">Cookies, sign-in pages, sign-in codes, and secret header values are not recorded; for a sign-in code, only its header name and where the page stores it are kept. Selecting Find what this site can do sends these requests and their samples to an AI that finds what the site can do.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
         <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>
