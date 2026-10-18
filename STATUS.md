@@ -33,7 +33,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | --- | --- | --- |
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, opens exploration, and lists chosen tools beside a setup column, with a filter above 8 tools; automatic type and production build checks pass |
 | App and exploration addresses | shipped | `/apps/<app-id>` and `/apps/<app-id>/explore` use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
-| App deletion | shipped | Inline confirmation removes an app and its tools from storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
+| App deletion | shipped | **Delete app** in the app page header opens a confirmation dialog that removes an app, its tools, saved login, ChatGPT link, and marketplace listing from storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
 | Persistent storage in Upstash Redis | shipped | `/api/workspace` stores the workspace under one Redis key; on October 17, 2026, the production MCP route listed all 23 Canvas tools from the production Upstash Redis |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app; Nathan decided to turn it off for production after accounts ship |

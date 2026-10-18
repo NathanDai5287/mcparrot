@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
 import { OrderingPanel } from "./ordering-panel";
@@ -24,8 +24,6 @@ function screenPath(screen: Screen) {
   return appPath;
 }
 
-const focusOnMount = (node: HTMLElement | null) => node?.focus();
-
 function screenAtPath(apps: Website[]): Screen {
   const path = window.location.pathname.replace(/\/$/, "");
   if (!path) return { view: "apps" };
@@ -38,13 +36,14 @@ function screenAtPath(apps: Website[]): Screen {
   return { view: "missing" };
 }
 
-function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }) {
+function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" | "trash" }) {
   const paths = {
     apps: "M3 3h5v5H3zM12 3h5v5h-5zM3 12h5v5H3zM12 12h5v5h-5z",
     arrow: "m7 4 6 6-6 6",
     plus: "M10 4v12M4 10h12",
     back: "m10 4-6 6 6 6M4 10h12",
     browser: "M3 7h14M6 5h.01M9 5h.01M4 3h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z",
+    trash: "M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5 5.5l.8 10.6a1 1 0 0 0 1 .9h6.4a1 1 0 0 0 1-.9L15 5.5M8.5 9v4.5M11.5 9v4.5",
   };
   return <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
@@ -90,6 +89,29 @@ function ToolList({ app, onDelete }: { app: Website; onDelete: (toolId: string) 
   </>;
 }
 
+function DeleteAppButton({ app, busy, error, onDelete, onClose }: { app: Website; busy: boolean; error: string; onDelete: () => void; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const toolCount = `${app.tasks.length} ${app.tasks.length === 1 ? "tool" : "tools"}`;
+  return <>
+    <button className="button delete-app" onClick={() => { dialog.current?.showModal(); keepButton.current?.focus(); }}><Icon name="trash" />Delete app</button>
+    <dialog ref={dialog} className="confirm-dialog" aria-labelledby="delete-app-title" onCancel={(event) => { if (busy) event.preventDefault(); }} onClose={onClose}>
+      <h2 id="delete-app-title">Delete {app.name}?</h2>
+      <p>This removes from MCParrot:</p>
+      <ul>
+        <li>The app and its {toolCount}</li>
+        {app.loginSavedAt && <li>Its saved login</li>}
+        {app.connectionTokenHash && <li>Its ChatGPT link, so ChatGPT can no longer use this app</li>}
+        {app.listing && <li>Its marketplace listing</li>}
+        <li>Its recorded requests in MCParrot Explorer</li>
+      </ul>
+      <p>Your account on the website is not affected.</p>
+      <div className="form-actions"><button className="button danger" disabled={busy} onClick={onDelete}>{busy ? "Deleting…" : "Delete app"}</button><button className="button" ref={keepButton} disabled={busy} onClick={() => dialog.current?.close()}>Keep app</button></div>
+      {error && <p className="pilot-error" role="alert">{error}</p>}
+    </dialog>
+  </>;
+}
+
 function BackButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return <button className="back-button" onClick={onClick}><Icon name="back" />{children}</button>;
 }
@@ -118,16 +140,9 @@ export default function Workspace() {
   const [screen, setScreen] = useState<Screen>({ view: "apps" });
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState(false);
-  const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const focusHeading = useRef(false);
-  const restoreDeleteFocus = useRef(false);
-  const deleteAppButton = useCallback((node: HTMLButtonElement | null) => {
-    if (!node || !restoreDeleteFocus.current) return;
-    restoreDeleteFocus.current = false;
-    node.focus();
-  }, []);
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
@@ -145,7 +160,6 @@ export default function Workspace() {
   useEffect(() => {
     const restoreScreen = () => {
       setScreen(screenAtPath(apps));
-      setDeletingAppId(null);
       setDeleteError("");
     };
     window.addEventListener("popstate", restoreScreen);
@@ -167,7 +181,6 @@ export default function Workspace() {
     }
     focusHeading.current = true;
     setScreen(nextScreen);
-    setDeletingAppId(null);
     setDeleteError("");
   }
 
@@ -273,7 +286,7 @@ export default function Workspace() {
           </>}
           {screen.view === "app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
-            <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>}><AppStatus app={screen.app} /></PageHeader>
+            <PageHeader title={screen.app.name} description={screen.app.url} action={<div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button></div>}><AppStatus app={screen.app} /></PageHeader>
             <div className="app-layout">
               <section className="app-tools" aria-labelledby="app-tools-heading">
                 <div className="section-heading"><h2 id="app-tools-heading">What ChatGPT can do on {screen.app.name} <span>{screen.app.tasks.length} {screen.app.tasks.length === 1 ? "tool" : "tools"}</span></h2><span>Explore, find what the site can do, then choose</span></div>
@@ -282,16 +295,7 @@ export default function Workspace() {
               <aside className="setup-rail" aria-label="Setup">
                 <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
-                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
-                <section className="app-settings">
-                  {deletingAppId !== screen.app.id ? <button className="delete-link" ref={deleteAppButton} onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
-                    <h2 tabIndex={-1} ref={focusOnMount}>Delete {screen.app.name}?</h2>
-                    <p>This removes this app and its tools from MCParrot and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
-                    <div className="form-actions"><button className="button danger" disabled={deleteBusy} onClick={() => deleteApp(screen.app)}>{deleteBusy ? "Deleting…" : "Delete app and tools"}</button><button className="button" disabled={deleteBusy} onClick={() => { restoreDeleteFocus.current = true; setDeletingAppId(null); setDeleteError(""); }}>Keep app</button></div>
-                    {deleteError && <p className="pilot-error" role="alert">{deleteError}</p>}
-                  </div>}
-                </section>
-              </aside>
+                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}              </aside>
             </div>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>

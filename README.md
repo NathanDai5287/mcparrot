@@ -544,12 +544,13 @@ Sentry ignores that expected error, and also the expected tool outcomes for a si
 App and exploration pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/explore`.
 Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tools.
 The same apps appear on any device where the user signs in.
-Each app page shows the app name, its website address, **Explore website**, and status labels for sign-in, a saved login, and ordering.
+Each app page shows the app name, its website address, **Delete app** beside **Explore website**, and status labels for sign-in, a saved login, and ordering.
 On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, and **Delete tool**.
 A filter box appears above the list when the app has more than 8 tools.
-A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, and, for the owner, Ordering in that order, with **Delete app** at the bottom, and it stays in view while the list scrolls.
+A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
 On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.
-Select **Delete app** inside an app, then confirm inline to remove that app and its tools from MCParrot and delete its recorded requests in the extension.
+Select **Delete app** at the top of an app page, then confirm in the dialog to remove that app, its tools, its saved login, its ChatGPT link, and its marketplace listing from MCParrot and delete its recorded requests in the extension.
+**Keep app** or Escape closes the dialog and returns focus to **Delete app**.
 Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
 
