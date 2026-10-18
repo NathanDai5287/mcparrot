@@ -298,7 +298,7 @@ No local server, recording worker, loopback pairing page, or streamed cloud brow
 The extension keeps sanitized observed route metadata locally; it never transfers browser cookies or website credentials to the cloud.
 The separate Browser Use session needs its own authentication before a captured action can become a tested tool.
 Earlier cloud exploration sessions remain available under **Earlier cloud exploration session** until they expire.
-That legacy interface retains its own capture and testing controls, but does not automatically import extension observations.
+That legacy interface retains status, sign-in, reading tests, and session cleanup, but cannot start or resume recording or import extension observations.
 The local teaching worker is dormant and is not linked from the product UI.
 Its earlier request captures were memory-only and are unavailable after that worker stopped.
 See the [status page](STATUS.md) for the remaining production proof and cloud handoff gaps.
@@ -370,6 +370,10 @@ See the [Browser Use quick start](https://docs.browser-use.com/cloud/quickstart)
 
 ## Hosted teaching pilot
 
+The earlier cloud exploration path is dormant for new sessions.
+Existing-session controls remain for sign-in, review, reading tests, and cleanup only.
+The following describes that earlier architecture, not normal extension exploration.
+
 The production-only pilot connects a draft task to a Browser Use Cloud browser through `/api/teaching`.
 Vercel Authentication protects all deployments, including the production domain, before the app can spend browser credits.
 Nathan must sign in with his Vercel account to enter the private pilot.
@@ -377,10 +381,8 @@ The server reads `BROWSER_USE_API_KEY` and `MCPARROT_SESSION_SECRET` from Sensit
 Neither value is sent to the browser, stored in the repository, or included in request diagnostics.
 
 A short server request starts a 30-minute Browser Use browser and a private, nonpersistent Vercel Sandbox recorder.
-Select **Connect Canvas** to open the hosted browser in a separate popup window; no local service or installation is involved.
-The popup opens on the user's click before the connection request, so the browser can allow it.
-Connect attempts Berkeley sign-in with the private pilot credentials, then asks for the text code inside MCParrot when that option is offered. The user can also sign in manually in the Canvas window.
-Browse course reading pages in the Canvas window and return to MCParrot to stop recording and review requests.
+New exploration uses the extension and cannot create a hosted teaching browser.
+An earlier session can reopen its popup, attempt private Canvas sign-in, review captured requests, run reading tests, or end the session.
 Select **Open Canvas window** to focus or reopen the same hosted session without restarting it or deleting its captures.
 If the browser blocks the popup, allow popups for MCParrot and select the button again.
 The recorder observes only supported same-origin Canvas GET requests and syllabus navigation; it excludes authentication traffic and request bodies.
@@ -405,7 +407,8 @@ Cloud school sign-in, live capture, and direct replay require Nathan's productio
 
 The private pilot reads `CANVAS_USERNAME` and `CANVAS_PASSWORD` from Sensitive Vercel production environment variables.
 These values belong to the single protected pilot owner; they are not a general credential-storage service.
-Connecting a browser starts a sign-in attempt; an existing session exposes **Sign in automatically** or **Check sign-in** without creating another browser.
+An earlier cloud session exposes **Sign in automatically** or **Check sign-in** without creating another browser.
+Normal extension exploration uses the normal browser's sign-in and does not start this helper.
 The authentication helper attaches to the existing Browser Use Cloud session and pauses request recording before sign-in.
 It only fills credentials on `https://auth.berkeley.edu/cas/login`, after checking that the form submits to that origin.
 It submits the password at most once per hosted session, and never automatically retries rejected credentials.
@@ -416,7 +419,7 @@ The user enters the code into MCParrot's code form; the helper submits it once f
 A rejected code requires the user to enter a current code and submit again.
 Unsupported school policies or verification methods require manual action in the existing Canvas window; no phone approval is automated.
 **Check sign-in** observes the current page and continues supported steps without another password attempt or text request.
-After Canvas authentication is detected, the primary action becomes **Start recording**.
+After Canvas authentication is detected, existing captured requests remain available for reading tests.
 
 Credentials and codes travel to the private Sandbox as AES-GCM encrypted envelopes, never as plaintext command arguments or files.
 The helper decrypts them only in memory and clears its payload after the action.
