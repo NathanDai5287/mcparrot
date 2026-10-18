@@ -5,10 +5,15 @@ import { changeApp } from "./workspace";
 
 export type PageTask = Omit<Capability, "requests"> & { urlPattern: string };
 
-const connectionToolNames = ["read_page", "save_task", "submit_verification_code"];
+export const connectionToolNames = ["read_page", "save_task", "submit_verification_code"];
 
 export function toolName(taskName: string) {
   return taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+}
+
+export function taskNameProblem(taskName: string) {
+  const name = toolName(taskName);
+  if (!name || connectionToolNames.includes(name)) return "Give the task a short plain name, such as Read course syllabus.";
 }
 
 const placeholders = (urlPattern: string) => [...new Set([...urlPattern.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]))];
@@ -25,7 +30,7 @@ function duplicateOf(website: string, tasks: Task[], capability: Capability) {
 
 const withNewTasks = (app: Website, capabilities: Capability[]) => ({
   ...app,
-  tasks: capabilities.reduce((tasks, capability) => duplicateOf(app.url, tasks, capability) ? tasks : [...tasks, { ...capability, id: crypto.randomUUID() }], app.tasks),
+  tasks: capabilities.reduce((tasks, capability) => taskNameProblem(capability.name) || duplicateOf(app.url, tasks, capability) ? tasks : [...tasks, { ...capability, id: crypto.randomUUID() }], app.tasks),
 });
 
 export const addTasks = (appId: string, capabilities: Capability[]) => changeApp(appId, (app) => withNewTasks(app, capabilities));
@@ -33,7 +38,8 @@ export const addTasks = (appId: string, capabilities: Capability[]) => changeApp
 function rejectionReason(app: Website, capability: Capability) {
   const { urlPattern } = capability.requests[0];
   addressOnWebsite(app, urlPattern.replace(/\{[^}]+\}/g, "{}"));
-  if (!toolName(capability.name) || connectionToolNames.includes(toolName(capability.name))) return "Give the task a short plain name, such as Read course syllabus.";
+  const nameProblem = taskNameProblem(capability.name);
+  if (nameProblem) return nameProblem;
   if (!sameNames(placeholders(urlPattern), capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern needs exactly one input with the same name, and every input needs a placeholder.";
   const duplicate = duplicateOf(app.url, app.tasks, capability);
   if (duplicate) return `${app.name} already has a task with this name or page, ${duplicate.name}. Use that tool in a new chat, or choose another name and page.`;
@@ -42,9 +48,14 @@ function rejectionReason(app: Website, capability: Capability) {
 export function saveTask(app: Website, { urlPattern, ...pageTask }: PageTask) {
   return Sentry.startSpan({ name: "task.save", attributes: { "task.name": pageTask.name } }, async () => {
     const capability = { ...pageTask, requests: [{ method: "GET", urlPattern }] };
-    const reason = rejectionReason(app, capability);
-    if (reason) throw new Error(reason);
-    await addTasks(app.id, [capability]);
+    let found = false;
+    await changeApp(app.id, (storedApp) => {
+      found = true;
+      const reason = rejectionReason(storedApp, capability);
+      if (reason) throw new Error(reason);
+      return withNewTasks(storedApp, [capability]);
+    });
+    if (!found) throw new Error("This app no longer exists in MCParrot.");
     Sentry.logger.info("Task saved", { appId: app.id, task: pageTask.name });
     return `Saved ${pageTask.name} as a task for ${app.name}. It appears as its own tool, ${toolName(pageTask.name)}, in a new ChatGPT chat; in this chat, keep using read_page.`;
   });
