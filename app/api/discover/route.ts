@@ -39,6 +39,7 @@ const capturedRequestSchema = z.object({
   body: clipped(maximumBodyLength).optional(),
   requestContentType: clipped(200).optional(),
   requestHeaders: z.record(z.string().max(80), clipped(200)).optional(),
+  tokenHeaders: z.array(z.object({ header: z.string().max(80), fromLocalStorage: z.string().max(200) })).max(10).optional(),
 });
 const discoveryBodySchema = z.object({
   appId: appIdSchema,
@@ -202,9 +203,12 @@ const pathOf = (address: string, origin: string) => {
   return url.origin + url.pathname;
 };
 
+const originOf = (address: string, origin: string) => pathOf(address, origin) && new URL(pathOf(address, origin)).origin;
+
 function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
   const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
-  return match ? { ...request, headers: match.requestHeaders } : request;
+  const tokenSource = recorded.find((candidate) => candidate.tokenHeaders?.length && originOf(candidate.pattern, origin) === originOf(request.urlPattern, origin));
+  return { ...request, ...(match ? { headers: match.requestHeaders } : {}), ...(tokenSource ? { tokenHeaders: tokenSource.tokenHeaders } : {}) };
 }
 
 function capabilitiesFrom(reply: string, app: Website, recorded: CapturedRequest[]) {

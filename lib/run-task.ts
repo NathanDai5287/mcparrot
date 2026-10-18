@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
 import { startBrowser, stopBrowser, withPage } from "./browser-use";
-import type { Task, TaskRequest, Website } from "./capabilities";
+import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
 import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, urlPlaceholderPattern } from "./task-request";
 
 const taskBrowserMinutes = 3;
@@ -15,7 +15,7 @@ export type TaskInputs = Record<string, string | undefined>;
 
 type Reason = "signed_out" | "navigation_failed" | "fetch_failed" | "timeout" | "http_error" | "off_site" | "missing_input" | "refused" | "failed";
 
-type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string> };
+type FilledRequest = { method: string; url: string; body?: string; contentType?: string; headers?: Record<string, string>; tokenHeaders?: TokenHeader[] };
 
 class TaskError extends Error {
   constructor(readonly reason: Reason, message: string) {
@@ -48,7 +48,7 @@ function filledRequest(app: Website, request: TaskRequest, values: TaskInputs): 
   const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
   const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, bodyEncoding);
   if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
-  return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers) };
+  return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers), tokenHeaders: request.tokenHeaders };
 }
 
 function looksSignedOut(address: string) {
@@ -78,12 +78,17 @@ function requireOnWebsite(page: Page, website: string) {
 
 function fetchInPage(page: Page, request: FilledRequest) {
   return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": request.method } }, async (span) => {
-    const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType, headers: savedHeaders }, csrfCookieNames, limit, timeout }) => {
+    const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType, headers: savedHeaders, tokenHeaders = [] }, csrfCookieNames, limit, timeout }) => {
       try {
         const csrfCookie = method === "GET" ? undefined : document.cookie.split("; ").find((cookie) => csrfCookieNames.includes(cookie.split("=")[0].toLowerCase()));
         const csrfToken = csrfCookie && decodeURIComponent(csrfCookie.slice(csrfCookie.indexOf("=") + 1));
-        const headers = { ...savedHeaders, ...(requestContentType ? { "content-type": requestContentType } : {}), ...(csrfToken ? { "x-csrftoken": csrfToken, "x-csrf-token": csrfToken, "x-xsrf-token": csrfToken } : {}) };
-        const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" ? "follow" : "manual", credentials: "include", signal: AbortSignal.timeout(timeout) });
+        const tokens = Object.fromEntries(tokenHeaders.flatMap(({ header, fromLocalStorage }) => {
+          const value = localStorage.getItem(fromLocalStorage);
+          return value ? [[header, value]] : [];
+        }));
+        const credentials = Object.keys(tokens).length && new URL(address).origin !== location.origin ? "omit" : "include";
+        const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...(csrfToken ? { "x-csrftoken": csrfToken, "x-csrf-token": csrfToken, "x-xsrf-token": csrfToken } : {}) };
+        const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" ? "follow" : "manual", credentials, signal: AbortSignal.timeout(timeout) });
         if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, contentType: "", body: "" };
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
