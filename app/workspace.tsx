@@ -177,7 +177,7 @@ export default function Workspace() {
       setApps(savedApps);
       setScreen(screenAtPath(savedApps));
       setLoaded(true);
-      whenIdle(() => savedApps.forEach((app) => void cachedJson(discoveryUrl(app.id)).catch(() => undefined)));
+      whenIdle(() => savedApps.slice(0, 5).forEach((app) => void cachedJson(discoveryUrl(app.id)).catch(() => undefined)));
     }).catch(() => setStorageError(true));
   }, []);
 
