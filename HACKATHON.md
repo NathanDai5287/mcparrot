@@ -88,7 +88,7 @@ Devpost lists the LA Hacks grand prize amounts as TBD, so confirm them at [ai.la
 ## Demo planning implications
 
 Prove one complete path before building a wide interface.
-The strongest path explores a website once, lets Cursor Composer find what it can do, and chooses a tool.
+The strongest path explores a website once, lets Claude Opus 5.5 through Cursor find what it can do, and chooses a tool.
 It then signs in once through Browser Use, adds the app's private connection link to ChatGPT, and asks ChatGPT for a result that the saved tool returns.
 This path addresses technical depth and execution better than a polished interface without working features.
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.

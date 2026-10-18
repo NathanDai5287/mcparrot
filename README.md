@@ -20,7 +20,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | One private connection link per website app, and the later management connection |
 | [Teaching website tools](#teaching-website-tools) | How a user explores a website, finds what it can do, and chooses tools |
-| [Discovery data sent to Composer](#discovery-data-sent-to-composer) | What discovery sends to Cursor Composer and what it never includes |
+| [Discovery data sent to Claude](#discovery-data-sent-to-claude) | What discovery sends to Claude Opus 5.5 and what it never includes |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Signing in to websites](#signing-in-to-websites) | How the user signs in once in a Browser Use cloud browser |
 | [Using saved tools](#using-saved-tools) | How ChatGPT runs saved tools and where this can fail |
@@ -163,7 +163,7 @@ Canvas is a useful example, but the same flow works on any website.
 3. Select **Explore website**, install MCParrot Explorer once, then select **Open website and explore**.
 4. Sign in normally in the new tab and complete any required verification, such as Duo.
 5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
-6. Select **Find what this site can do** to send the recorded requests and the app's saved tools to Cursor Composer 2.5 Fast and receive a list of capabilities that are new or that improve a saved tool.
+6. Select **Find what this site can do** to send the recorded requests and the app's saved tools to Claude Opus 5.5 and receive a list of capabilities that are new or that improve a saved tool.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select the save button, which shows the number of ticked tools, such as **Save 3 tools**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
@@ -171,7 +171,7 @@ Each capability is marked **New** or **Updates <tool name>**, where an update is
 Saving adds the ticked new capabilities to the app's current tools, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing tool, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
 Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or URL pattern breaks those rules, is skipped.
 
-The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another Composer run.
+The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another discovery run.
 The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
 An update that the user renamed before saving no longer equals its tool, so it appears again until the next discovery run.
 Select **Find what this site can do** again to replace the saved result with a new run.
@@ -209,30 +209,31 @@ The extension is not published in an extension store, and website policies can d
 
 ### Limits of discovery
 
-Composer's capabilities are suggestions inferred from one visit, not proof that a tool works for this user.
+Claude's capabilities are suggestions inferred from one visit, not proof that a tool works for this user.
 Unvisited pages and actions remain unavailable unless separately explored and tested.
 Discovery can suggest page-reading tools, such as "Read course syllabus" with a `{courseId}` input, from recorded pages.
 Pages that build their content only after later user actions, rather than when they load, can still return incomplete text.
 Saved tools appear in ChatGPT without a separate test, so a tool can fail when its request cannot be reused; checking each tool before it appears in ChatGPT is aspirational.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
 
-## Discovery data sent to Composer
+## Discovery data sent to Claude
 
-Discovery sends the recorded requests and pages, including their truncated samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
+Discovery sends the recorded requests and pages, including their truncated samples, to Claude Opus 5.5 at low effort in fast mode, with a 300k context, through the Cursor SDK in the server route `/api/discover`.
+Nathan chose this model for discovery on October 17, 2026.
 The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tools from storage and adds each tool's ID, name, description, requests, inputs, and returns to the recorded data.
 The agent runs with its tools disabled by configuration, in an empty temporary folder, and inside the SDK's sandbox; when the server does not support the sandbox, it runs again without it.
 The server deletes the temporary folders after each run and stops waiting after 50 seconds with a timeout error.
 The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tools where a page's text is useful, in the same capability shape as data tools.
-It asks Composer to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
-It marks the recorded data, including the saved tools, as untrusted website content that Composer must never follow as instructions.
+It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
+It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys, JWTs, long random-looking strings, and values after labels such as `password:` again.
 It keeps at most 50 replied capabilities, and only those whose requests all use GET on the app's own origin and whose placeholders match their inputs one to one.
 It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
-Nathan chose short real-value samples because they make Composer's suggestions more accurate.
+Nathan chose short real-value samples because they make Claude's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
-The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Composer in a sample.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Claude in a sample.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
@@ -467,7 +468,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | --- | --- | --- |
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, sign-in, and the MCP route |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record pages, data requests, and short samples in one opened tab |
-| Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
+| Capability discovery | Claude Opus 5.5 at low effort in fast mode through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login |
 | Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
@@ -505,8 +506,8 @@ The password never returns to the dashboard, never appears in MCP results, and n
 `/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public tool definitions, logs, traces, documentation, and source control.
-Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Composer](#discovery-data-sent-to-composer) describe.
-That redaction matches patterns, so a secret in another form can still reach the recording and Composer, which the [status page](STATUS.md) lists as a gap.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Claude](#discovery-data-sent-to-claude) describe.
+That redaction matches patterns, so a secret in another form can still reach the recording and Claude, which the [status page](STATUS.md) lists as a gap.
 Recordings stay only in the extension, which deletes them after 30 days.
 
 ## Diagnostics with Sentry
@@ -519,11 +520,11 @@ MCParrot keeps every trace and every session because it has few users, and it se
 
 | Sentry product | What MCParrot sends |
 | --- | --- |
-| Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the tool name for each `save_task` call |
+| Error monitoring | Unhandled server route errors, React render errors, and Claude failures that discovery reports to the user |
+| Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the tool name for each `save_task` call |
 | Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each tool run's and `read_page` call's outcome, including whether the website was signed out, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
-| AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
+| AI agent monitoring | The `discover.agent` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
 Spans carry only non-secret attributes, such as the app ID, tool name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
