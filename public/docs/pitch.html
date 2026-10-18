@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="MCParrot's LA Hacks 2026 pitch: teach ChatGPT any website you sign in to, powered by Browser Use.">
+  <meta name="theme-color" content="#f6f4ec">
+  <title>Pitch · MCParrot</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f4ec;
+      --surface: #fffdf8;
+      --ink: #1f232b;
+      --muted: #515b68;
+      --line: #ddd8ca;
+      --teal: #12675d;
+      --teal-deep: #0b4a43;
+      --teal-soft: #edf3ef;
+      --teal-line: #c9dcd3;
+      --gap-ink: #8a3b1f;
+      --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+      --body: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --ease-out: cubic-bezier(.16, 1, .3, 1);
+      --bar: 4.75rem;
+      --pad-x: clamp(1.25rem, 5.5vw, 6rem);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: clamp(1rem, .55rem + .75vw, 1.3rem); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    ::selection { background: #d5e9df; color: #133e35; }
+    a { color: var(--teal); text-underline-offset: .2em; }
+    a:hover { text-decoration-thickness: 2px; }
+    :focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; border-radius: 4px; }
+    h1, h2, h3, p { margin: 0; }
+    h1, h2 { font-family: var(--display); font-weight: 600; letter-spacing: -.03em; line-height: 1.04; text-wrap: balance; }
+    h3 { font-family: var(--display); font-weight: 600; font-size: 1.25em; line-height: 1.2; letter-spacing: -.01em; }
+    svg.icon { width: 1.4em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .num { font-variant-numeric: tabular-nums; }
+    .skip { position: absolute; left: -100vw; }
+    .skip:focus { left: 1rem; top: 1rem; z-index: 10; padding: .5rem 1rem; background: var(--surface); }
+
+    .topbar { position: fixed; inset: 0 0 auto 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: clamp(.9rem, 2vw, 1.5rem) var(--pad-x) 1rem; background: linear-gradient(to bottom, var(--paper) 65%, rgba(246, 244, 236, 0)); pointer-events: none; }
+    .wordmark { display: inline-flex; align-items: center; gap: .6rem; color: var(--ink); font-weight: 650; letter-spacing: -.03em; text-decoration: none; pointer-events: auto; font-size: 1rem; }
+    .wordmark img { width: 1.9rem; height: 1.9rem; }
+    .section-label { color: var(--muted); font-size: .8rem; font-weight: 600; letter-spacing: .02em; }
+    .section-label[data-backup] { color: var(--teal); }
+
+    .deck { position: fixed; inset: 0; }
+    .slide { position: absolute; inset: 0; display: flex; padding: calc(clamp(.9rem, 2vw, 1.5rem) + 3.25rem) var(--pad-x) calc(var(--bar) + 1rem); overflow: hidden; visibility: hidden; opacity: 0; transform: translateX(var(--from, 3%)); transition: opacity .45s var(--ease-out), transform .7s var(--ease-out), visibility 0s .7s; }
+    .slide.is-active { visibility: visible; opacity: 1; transform: none; transition: opacity .45s var(--ease-out), transform .7s var(--ease-out), visibility 0s; }
+    .slide.is-before { --from: -3%; }
+    .slide-inner { width: 100%; max-width: 78rem; margin: auto; }
+    .slide h2 { font-size: clamp(2rem, 1rem + 3.4vw, 3.9rem); }
+    .lede { margin-top: 1.1rem; max-width: 46ch; color: var(--muted); font-size: 1.12em; text-wrap: pretty; }
+    .fine { color: var(--muted); font-size: .78em; }
+
+    .badge { display: inline-block; padding: .05rem .55rem; border: 1px solid; border-radius: 2rem; font-family: var(--body); font-size: .68rem; font-weight: 700; letter-spacing: .01em; line-height: 1.6; white-space: nowrap; vertical-align: .15em; }
+    .badge--shipped { border-color: #b9d6c1; background: #e3efe6; color: #24603a; }
+    .badge--gap { border-color: #e6c3b3; background: #f8e9e2; color: var(--gap-ink); }
+    .badge--aspirational { border-color: #c9d3e6; background: #eaeef5; color: #2f4b7c; }
+
+    /* Title */
+    .title { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); align-items: center; gap: clamp(2rem, 5vw, 5rem); }
+    .title h1 { font-size: clamp(2.7rem, 1rem + 5.4vw, 6rem); }
+    .title h1 em { font-style: italic; font-weight: 500; color: var(--teal); }
+    .title .lede { max-width: 40ch; }
+    .title-meta { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: 2rem; color: var(--muted); font-size: .85em; }
+    .title-meta strong { color: var(--ink); font-weight: 600; }
+    .title-mark { justify-self: center; width: min(100%, 22rem); aspect-ratio: 1; filter: drop-shadow(0 1.5rem 2.5rem rgba(18, 103, 93, .18)) drop-shadow(0 .25rem .5rem rgba(18, 103, 93, .12)); }
+
+    /* Problem */
+    .problem { display: grid; gap: clamp(1.5rem, 3.5vw, 3rem); }
+    .trail { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem .35rem; margin: 0; padding: 0; list-style: none; }
+    .trail li { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .8rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--surface); color: var(--muted); font-size: .9em; white-space: nowrap; }
+    .trail li + li::before { content: ""; width: .45rem; height: .45rem; margin-right: .55rem; margin-left: -.15rem; border-top: 1.6px solid #9aa3ad; border-right: 1.6px solid #9aa3ad; transform: rotate(45deg); }
+    .trail-label { display: block; margin-bottom: .8rem; color: var(--muted); font-size: .85em; font-weight: 600; }
+    .ask { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .ask-bubble { padding: .85rem 1.3rem; border-radius: 1.4rem 1.4rem .35rem 1.4rem; background: var(--teal); color: #fff; font-size: 1.15em; box-shadow: 0 .6rem 1.4rem -.6rem rgba(11, 74, 67, .55); }
+    .problem-why { max-width: 60ch; color: var(--muted); text-wrap: pretty; }
+    .problem-why strong { color: var(--ink); }
+
+    /* Flow */
+    .flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.25rem, 3vw, 3rem); margin-top: clamp(1.5rem, 3.5vw, 2.75rem); position: relative; }
+    .flow-step { position: relative; }
+    .flow-step:not(:last-child)::after { content: ""; position: absolute; top: 1.6rem; left: calc(3.2rem + .9rem); right: calc(-1 * clamp(1.25rem, 3vw, 3rem) + .9rem); height: 1.5px; background: repeating-linear-gradient(90deg, var(--teal-line) 0 .5rem, transparent .5rem .85rem); }
+    .flow-icon { display: grid; place-items: center; width: 3.2rem; height: 3.2rem; border: 1px solid var(--teal-line); border-radius: 50%; background: var(--surface); color: var(--teal); }
+    .flow-step h3 { margin: 1.1rem 0 .45rem; }
+    .flow-step p { color: var(--muted); font-size: .92em; text-wrap: pretty; }
+    .flow-step .badge { margin-top: .75rem; justify-self: start; }
+    .engine { display: flex; align-items: center; gap: 1.1rem; margin-top: clamp(1.5rem, 3.5vw, 2.75rem); padding: 1.1rem 1.4rem; border-radius: .9rem; background: var(--teal); color: #fff; box-shadow: 0 1rem 2rem -1.2rem rgba(11, 74, 67, .6); }
+    .engine p { font-size: .95em; color: #e3f0ea; }
+    .engine strong { color: #fff; }
+
+    /* Screenshot slides */
+    .shot-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(16rem, .65fr); gap: clamp(1.5rem, 4vw, 4rem); align-items: center; }
+    .shot-layout.square { grid-template-columns: minmax(0, 1fr) minmax(17rem, .8fr); }
+    .shot { position: relative; margin: 0; justify-self: center; width: fit-content; max-width: 100%; }
+    .shot-frame { position: relative; }
+    .shot img { display: block; max-width: 100%; max-height: calc(100vh - var(--bar) - 9.5rem); max-height: calc(100dvh - var(--bar) - 9.5rem); width: auto; height: auto; border-radius: .85rem; border: 1px solid #2c2f35; box-shadow: 0 1.75rem 3rem -1.5rem rgba(20, 24, 30, .55), 0 .3rem .8rem rgba(20, 24, 30, .15); }
+    .pin { position: absolute; left: var(--x); top: var(--y); width: 1.7rem; height: 1.7rem; margin: -.85rem 0 0 -.85rem; display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--teal-deep); font-size: .78rem; font-weight: 700; box-shadow: 0 0 0 3px var(--teal), 0 .3rem .7rem rgba(0, 0, 0, .35); }
+    .shot figcaption { margin-top: .8rem; color: var(--muted); font-size: .72em; text-align: center; }
+    .notes { margin: 1.4rem 0 0; padding: 0; list-style: none; counter-reset: pin; display: grid; gap: 1rem; }
+    .notes li { counter-increment: pin; display: grid; grid-template-columns: 1.7rem 1fr; gap: .8rem; align-items: start; font-size: .92em; text-wrap: pretty; }
+    .notes li::before { content: counter(pin); display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; border: 1.5px solid var(--teal); color: var(--teal); font-size: .78rem; font-weight: 700; margin-top: .1rem; }
+    .notes strong { font-weight: 650; }
+    .shot-side h2 { font-size: clamp(1.8rem, 1rem + 2.4vw, 3rem); }
+
+    /* Browser Use */
+    .split { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; }
+    .jobs { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+    .jobs li { display: grid; grid-template-columns: 2.6rem 1fr; gap: 1rem; padding: 1.05rem 0; border-bottom: 1px solid var(--line); }
+    .jobs .flow-icon { width: 2.6rem; height: 2.6rem; }
+    .jobs .flow-icon svg { width: 1.2em; height: 1.2em; }
+    .jobs h3 { font-size: 1.05em; display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .6rem; }
+    .jobs p { margin-top: .2rem; color: var(--muted); font-size: .86em; text-wrap: pretty; }
+
+    /* Hard parts */
+    .hard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.5rem, 3.5vw, 3.5rem); margin-top: clamp(1.75rem, 4vw, 3rem); }
+    .hard > div { border-top: 2px solid var(--teal); padding-top: 1.1rem; }
+    .hard p { margin-top: .6rem; color: var(--muted); font-size: .9em; text-wrap: pretty; }
+    .hard .proof { margin-top: 1rem; color: var(--ink); font-size: .85em; }
+    .hard .proof strong { display: block; font-family: var(--display); font-size: 1.9em; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; color: var(--teal); }
+
+    /* Next */
+    .next-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+    .next-list li { padding: 1rem 0; border-bottom: 1px solid var(--line); font-size: .95em; }
+    .next-list .badge { margin-left: .4rem; }
+    .learned { font-family: var(--display); font-size: clamp(1.5rem, .9rem + 1.6vw, 2.3rem); font-weight: 500; line-height: 1.22; letter-spacing: -.015em; text-wrap: balance; }
+    .learned em { color: var(--teal); font-style: italic; }
+
+    /* Close */
+    .close { text-align: center; display: grid; justify-items: center; gap: 1.2rem; }
+    .close img { width: clamp(5rem, 11vw, 8rem); }
+    .close h2 { font-size: clamp(2.4rem, 1rem + 4.6vw, 5rem); }
+    .links { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem 1.75rem; margin-top: .6rem; font-size: .95em; }
+    .links a { font-weight: 600; }
+
+    /* Backup slides */
+    .arch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: clamp(1.5rem, 3.5vw, 2.5rem); align-items: stretch; }
+    .node { position: relative; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); }
+    .node h3 { font-size: 1em; }
+    .node p { margin-top: .3rem; color: var(--muted); font-size: .8em; }
+    .node--core { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+    .wire { display: flex; align-items: center; padding: 0 .5rem; }
+    .wire span { flex: 1; position: relative; display: block; padding-bottom: .4rem; color: var(--teal); font-size: .68em; font-weight: 600; text-align: center; border-bottom: 1.5px solid var(--teal); }
+    .wire span::after { content: ""; position: absolute; right: -1px; bottom: -4.5px; width: 7px; height: 7px; border-top: 1.5px solid var(--teal); border-right: 1.5px solid var(--teal); transform: rotate(45deg); }
+    .arch-row { display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem minmax(0, 1.2fr) 6.5rem minmax(0, 1fr) 4rem minmax(0, .8fr); align-items: stretch; }
+    .arch-under { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin-top: 1.4rem; }
+    .arch-under .node { background: transparent; border-style: dashed; }
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1.5rem, 4vw, 4rem); margin-top: clamp(1.5rem, 3.5vw, 2.5rem); }
+    .two-col h3 { font-size: 1.05em; margin-bottom: .6rem; }
+    .plain-list { margin: 0; padding: 0; list-style: none; }
+    .plain-list li { position: relative; padding: .5rem 0 .5rem 1.2rem; border-bottom: 1px solid var(--line); font-size: .88em; text-wrap: pretty; }
+    .plain-list li::before { content: ""; position: absolute; left: 0; top: 1.05rem; width: .45rem; height: .45rem; border-radius: 50%; background: var(--teal); }
+    .plain-list.drop li::before { background: none; border: 1.5px solid var(--gap-ink); }
+    .plain-list code, .notes code, .jobs code { font-size: .88em; padding: .05rem .3rem; border-radius: .25rem; background: var(--teal-soft); color: var(--teal-deep); }
+    .footnote { margin-top: 1.4rem; color: var(--muted); font-size: .75em; }
+
+    .bars { display: grid; gap: 1.6rem; margin-top: clamp(1.5rem, 3.5vw, 2.5rem); }
+    .bar-group h3 { font-size: 1em; margin-bottom: .6rem; }
+    .bar-row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; align-items: center; margin-top: .45rem; font-size: .82em; }
+    .bar-row span:first-child { color: var(--muted); }
+    .bar-track { position: relative; height: 1.7rem; }
+    .bar-fill { height: 100%; width: var(--w); border-radius: .35rem; background: #d9e6df; display: flex; align-items: center; justify-content: flex-end; padding-right: .6rem; font-weight: 700; color: var(--teal-deep); white-space: nowrap; transition: width 1s var(--ease-out) .2s; }
+    .bar-fill.final { background: var(--teal); color: #fff; }
+    .slide:not(.is-active) .bar-fill { width: 0; }
+
+    /* Controls */
+    .controls { position: fixed; inset: auto 0 0 0; z-index: 3; height: var(--bar); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1.25rem; padding: 0 var(--pad-x) env(safe-area-inset-bottom); background: linear-gradient(to top, var(--paper) 60%, rgba(246, 244, 236, 0)); }
+    .progress { position: relative; height: 3px; border-radius: 3px; background: var(--line); }
+    .progress-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--teal); transition: width .6s var(--ease-out); }
+    .progress-mark { position: absolute; top: -5px; width: 1.5px; height: 13px; background: var(--muted); }
+    .progress-mark span { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: .66rem; font-weight: 600; white-space: nowrap; }
+    .nav { display: flex; align-items: center; gap: .6rem; }
+    .counter { min-width: 4.5rem; text-align: center; color: var(--muted); font-size: .85rem; font-weight: 600; }
+    .counter b { color: var(--ink); }
+    .nav button { display: grid; place-items: center; width: 2.9rem; height: 2.9rem; padding: 0; border: 1px solid #7f8f89; border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: background .2s, border-color .2s, transform .2s var(--ease-out); }
+    .nav button:hover:enabled { background: var(--teal-soft); border-color: var(--teal); color: var(--teal); }
+    .nav button:active:enabled { transform: scale(.94); }
+    .nav button:disabled { opacity: .35; cursor: default; }
+    .nav button.next { background: var(--teal); border-color: var(--teal); color: #fff; }
+    .nav button.next:hover:enabled { background: var(--teal-deep); border-color: var(--teal-deep); color: #fff; }
+    .nav svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .hint { color: var(--muted); font-size: .7rem; margin-right: .5rem; }
+
+    @media (max-width: 1100px) {
+      .arch-row { grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1.2fr) 5rem minmax(0, 1fr) 3rem minmax(0, .8fr); }
+      .arch-under { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 860px), (max-height: 520px) and (max-width: 1000px) {
+      :root { --bar: 4.25rem; }
+      .slide { overflow-y: auto; overscroll-behavior: contain; }
+      .slide-inner { padding-bottom: 1.5rem; }
+      .pin { width: 1.15rem; height: 1.15rem; margin: -.575rem 0 0 -.575rem; font-size: .6rem; box-shadow: 0 0 0 2px var(--teal), 0 .2rem .4rem rgba(0, 0, 0, .35); }
+      .title, .shot-layout, .shot-layout.square, .split, .two-col, .hard, .flow { grid-template-columns: 1fr; }
+      .title-mark { order: -1; justify-self: start; width: 6.5rem; }
+      .flow-step:not(:last-child)::after { display: none; }
+      .flow-step { display: grid; grid-template-columns: 3.2rem 1fr; column-gap: 1rem; }
+      .flow-step .flow-icon { grid-row: span 3; }
+      .flow-step h3 { margin-top: .2rem; }
+      .shot img { max-height: none; }
+      .arch-row { grid-template-columns: 1fr; gap: 0; }
+      .wire { height: 2.6rem; padding: 0 0 0 1.5rem; }
+      .wire span { flex: none; height: 100%; padding: 0 0 0 .8rem; border-bottom: 0; border-left: 1.5px solid var(--teal); display: flex; align-items: center; text-align: left; }
+      .wire span::after { right: auto; left: -4.5px; bottom: -1px; transform: rotate(135deg); }
+      .arch-under { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: .25rem; }
+      .hint, .progress-mark span { display: none; }
+      .section-label { font-size: .72rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .slide, .slide.is-active { transform: none; transition: opacity .2s, visibility 0s; }
+      .bar-fill, .progress-fill { transition: none; }
+    }
+
+    @media print {
+      body { overflow: visible; }
+      .controls, .topbar { display: none; }
+      .deck, .slide { position: relative; }
+      .slide { visibility: visible; opacity: 1; transform: none; min-height: 100vh; break-after: page; }
+      .slide:not(.is-active) .bar-fill { width: var(--w); }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#deck">Skip to slides</a>
+  <header class="topbar">
+    <a class="wordmark" href="index.html"><img src="/logo.svg" alt="">MCParrot</a>
+    <span class="section-label" id="section-label" aria-live="polite">Pitch · 2 minutes</span>
+  </header>
+
+  <main class="deck" id="deck" aria-roledescription="slideshow" aria-label="MCParrot pitch">
+
+    <section class="slide" aria-roledescription="slide" aria-label="Title" data-section="Pitch · 2 minutes">
+      <div class="slide-inner title">
+        <div>
+          <h1>Teach ChatGPT any website <em>you sign in to</em>.</h1>
+          <p class="lede">Browse a website once. MCParrot learns what it can do, and ChatGPT uses it for you in a signed-in Browser Use cloud browser.</p>
+          <div class="title-meta">
+            <span><strong>LA Hacks 2026</strong></span>
+            <span>Applied Intelligence track</span>
+            <span>Best Use of Browser Use</span>
+          </div>
+        </div>
+        <img class="title-mark" src="/logo.svg" alt="MCParrot logo: a teal letter P with a parrot in it">
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="The problem" data-section="Pitch · 2 minutes">
+      <div class="slide-inner problem">
+        <h2>Your assistant is locked out of the websites you use most.</h2>
+        <div>
+          <span class="trail-label">To find one due date today</span>
+          <ol class="trail">
+            <li>bcourses.berkeley.edu</li>
+            <li>Sign in</li>
+            <li>Duo code</li>
+            <li>Dashboard</li>
+            <li>ENGIN 125</li>
+            <li>Assignments</li>
+            <li>Scroll…</li>
+          </ol>
+        </div>
+        <div class="ask">
+          <span class="trail-label" style="margin:0">What you want instead</span>
+          <span class="ask-bubble">Which ENGIN 125 assignments are due?</span>
+        </div>
+        <p class="problem-why">ChatGPT cannot sign in as you, and Canvas, Gradescope, and Ed give it no doorway into your account. <strong>These websites already have the data. They just need an agent with a real browser and your sign-in.</strong></p>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="How it works" data-section="Pitch · 2 minutes">
+      <div class="slide-inner">
+        <h2>Browse once. Ask forever.</h2>
+        <div class="flow">
+          <div class="flow-step">
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><circle cx="12" cy="14.25" r="2.4"/></svg></span>
+            <h3>Record a website</h3>
+            <p>Use the site normally with MCParrot Explorer, our Chrome extension. It records the site’s own data requests and leaves out passwords, cookies, and sign-in pages.</p>
+            <span class="badge badge--gap">gap: live recording demo</span>
+          </div>
+          <div class="flow-step">
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
+            <h3>Claude finds tools</h3>
+            <p>Claude Opus 5.5, through the Cursor SDK, reads the recording and suggests tools such as “List assignments in a course.” You keep the ones you want.</p>
+            <span class="badge badge--shipped">shipped</span>
+          </div>
+          <div class="flow-step">
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg></span>
+            <h3>ChatGPT uses them</h3>
+            <p>Add the app’s private MCP link to ChatGPT. Each tool call runs in a cloud browser that is already signed in as you.</p>
+            <span class="badge badge--shipped">shipped</span>
+          </div>
+        </div>
+        <div class="engine">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M2.5 8.5h19"/><path d="M5.5 6.25h.01M8 6.25h.01"/><path d="M8 14.5l2.5 2 5.5-5"/></svg>
+          <p><strong>Underneath: Browser Use.</strong> Each app keeps its own persistent Browser Use profile, so it stays signed in between calls without MCParrot storing a single cookie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Live result: Gradescope and Ed together" data-section="Pitch · 2 minutes">
+      <div class="slide-inner shot-layout">
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-midterm-multi-mcp.jpg" width="2048" height="1529" alt="ChatGPT conversation: asked for an EECS 126 midterm score and class statistics, it answers 74 out of 101 from Gradescope, a class mean of 52.14, standard deviation 27.1, and median 52.5 from an Ed announcement, and a z-score of 0.81." loading="eager">
+            <span class="pin" style="--x: 15.5%; --y: 32.8%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 15.5%; --y: 47%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 38%; --y: 74.8%" aria-hidden="true">3</span>
+          </div>
+          <figcaption>A real ChatGPT conversation with two MCParrot connections.</figcaption>
+        </figure>
+        <div class="shot-side">
+          <h2>Two websites, one question.</h2>
+          <ol class="notes">
+            <li><span>The <strong>Gradescope</strong> connection reads the score: <span class="num">74/101</span>.</span></li>
+            <li><span>The <strong>Ed</strong> connection finds the staff announcement. The statistics were only in a picture, so <code>view_image</code> had Claude read it: mean <span class="num">52.14</span>, deviation <span class="num">27.1</span>.</span></li>
+            <li><span>ChatGPT combines both: <span class="num">0.81</span> standard deviations above the mean.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Live result: signing in again with a text-message code" data-section="Pitch · 2 minutes">
+      <div class="slide-inner shot-layout square">
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-canvas-verification.jpg" width="1940" height="1884" alt="ChatGPT conversation: asked which ENGIN 125 assignments are due, ChatGPT says Canvas sent a verification code to the phone and asks for it; after the user types the code, which is blurred, it lists the assignments with due dates and status." loading="lazy">
+            <span class="pin" style="--x: 35%; --y: 28.4%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 77%; --y: 38.6%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 74%; --y: 59.6%" aria-hidden="true">3</span>
+          </div>
+          <figcaption>A real ChatGPT conversation. The one-time code is blurred.</figcaption>
+        </figure>
+        <div class="shot-side">
+          <h2>Signed out? It signs back in.</h2>
+          <ol class="notes">
+            <li><span>Canvas had signed out. A <strong>Browser Use agent</strong> signed in with the saved login, and Canvas texted a code.</span></li>
+            <li><span>ChatGPT asked for the code, and Nathan typed it in the chat. The agent finished signing in.</span></li>
+            <li><span>The tool ran and returned the ENGIN 125 assignments, with no setup in between.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Browser Use does the work" data-section="Pitch · 2 minutes">
+      <div class="slide-inner split">
+        <div>
+          <h2>Browser Use is the part that touches the web.</h2>
+          <p class="lede">MCParrot decides what should happen. Browser Use cloud browsers and agents do it on the real website, as you.</p>
+        </div>
+        <ul class="jobs">
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
+            <div><h3>Sign in once, in a live view <span class="badge badge--gap">gap: live demo</span></h3><p>You sign in yourself, Duo included, and the app’s profile remembers it.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+            <div><h3>Run every tool call <span class="badge badge--shipped">shipped</span></h3><p>A hidden browser on your profile replays the tool’s requests from inside the signed-in page.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M20 4.5v4h-4"/></svg></span>
+            <div><h3>Sign back in by itself <span class="badge badge--shipped">shipped</span></h3><p>An agent types the saved login through secret bindings, so the model never sees the password, and relays codes through ChatGPT.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M3 10.5h18"/><path d="M7 15h3"/></svg></span>
+            <div><h3>Check out with Pay with Link <span class="badge badge--gap">gap: test mode only</span></h3><p>After you approve the total, an agent pays with a one-time Link card. It stays off until Link test mode is available.</p></div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Hard problems we solved" data-section="Pitch · 2 minutes">
+      <div class="slide-inner">
+        <h2>Three hard parts.</h2>
+        <div class="hard">
+          <div>
+            <h3>Replay the website, not the screen</h3>
+            <p>Tools call the website’s own data requests inside your signed-in page. Sign-in tokens are read from local storage by name at run time, and CSRF codes come fresh from the page, so no secret is saved in a tool.</p>
+            <p class="proof"><strong>Ed, Gradescope, Canvas</strong>working from ChatGPT</p>
+          </div>
+          <div>
+            <h3>Fit the answer in ChatGPT</h3>
+            <p>Raw website answers are huge. MCParrot strips empty values, keeps only the fields Claude chose, and writes long lists as tables. ChatGPT cannot see pictures, so Claude reads them.</p>
+            <p class="proof"><strong class="num">73–80%</strong>fewer tokens on sample Ed and DoorDash data</p>
+          </div>
+          <div>
+            <h3>Stay signed in, and stay fast</h3>
+            <p>One persistent Browser Use profile per app, an agent that signs back in, and a warm browser that stays open between calls instead of starting a new one each time.</p>
+            <p class="proof"><strong class="num">3.2–3.6 s → 2.5 s</strong>for a simple page, in a timed test</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="What we learned and what comes next" data-section="Pitch · 2 minutes">
+      <div class="slide-inner split">
+        <div>
+          <p class="learned">What we learned: most websites are <em>already APIs</em>. The hard part is signing in as the person and keeping the answer small.</p>
+        </div>
+        <div>
+          <h3 style="margin-bottom:.8rem">What comes next</h3>
+          <ul class="next-list">
+            <li>Test each tool with new values before ChatGPT can use it <span class="badge badge--aspirational">aspirational</span></li>
+            <li>Let ChatGPT set up apps and tools by itself through a management connection <span class="badge badge--aspirational">aspirational</span></li>
+            <li>Real payments, once Pay with Link has a test mode we can prove <span class="badge badge--gap">gap</span></li>
+          </ul>
+          <p class="footnote">Every claim here matches our public <a href="status.html">status page</a>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Thank you" data-section="Pitch · 2 minutes">
+      <div class="slide-inner close">
+        <img src="/logo.svg" alt="">
+        <h2>Questions?</h2>
+        <p class="lede" style="margin-top:0">Add a website from the marketplace, or teach MCParrot a new one.</p>
+        <div class="links">
+          <a href="https://mcparrot.vercel.app">mcparrot.vercel.app</a>
+          <a href="https://mcparrot.vercel.app/marketplace">Marketplace</a>
+          <a href="https://github.com/NathanDai5287/mcparrot">GitHub</a>
+          <a href="devpost.html">Devpost write-up</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: architecture" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>How the pieces connect.</h2>
+        <div class="arch-row" style="margin-top:clamp(1.5rem,3.5vw,2.5rem)">
+          <div class="node"><h3>ChatGPT</h3><p>One connector per app</p></div>
+          <div class="wire"><span>MCP, private link</span></div>
+          <div class="node node--core"><h3>MCParrot on Vercel</h3><p>Next.js, one MCP route per app at <code>/mcp/apps/&lt;id&gt;</code></p></div>
+          <div class="wire"><span>Playwright over CDP</span></div>
+          <div class="node"><h3>Browser Use</h3><p>Cloud browser on the app’s persistent profile</p></div>
+          <div class="wire"><span></span></div>
+          <div class="node"><h3>The website</h3><p>Its own data requests</p></div>
+        </div>
+        <div class="arch-under">
+          <div class="node"><h3>MCParrot Explorer</h3><p>Chrome extension that records a browsing session</p></div>
+          <div class="node"><h3>Claude Opus 5.5</h3><p>Through the Cursor SDK: finds tools, reads pictures</p></div>
+          <div class="node"><h3>Upstash Redis</h3><p>Apps, tools, encrypted logins, warm browser IDs</p></div>
+          <div class="node"><h3>Clerk and Sentry</h3><p>Google sign-in per person; errors, traces, and logs</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: recording safely" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>Recording without leaking secrets.</h2>
+        <p class="lede">Explorer uses Chrome’s debugger permission to see the requests a page makes, with no host permissions. Claude only ever sees redacted samples.</p>
+        <div class="two-col">
+          <div>
+            <h3>Kept</h3>
+            <ul class="plain-list">
+              <li>Data requests, with samples cut to 400 characters per value and 5 items per list</li>
+              <li>Request bodies up to 30,000 characters, so GraphQL queries stay whole</li>
+              <li>Request headers that are not secret, and the visible text of whole pages</li>
+              <li>The <em>name</em> of a sign-in header and its local storage key, never the value</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Dropped</h3>
+            <ul class="plain-list drop">
+              <li>Cookies and the <code>authorization</code> header</li>
+              <li>Values under secret names such as <code>token</code> and <code>password</code></li>
+              <li>JWTs and <code>Bearer</code> values, wherever they appear</li>
+              <li>Real sign-in pages, such as <code>login</code>, <code>oauth</code>, and <code>2fa</code></li>
+            </ul>
+          </div>
+        </div>
+        <p class="footnote">Explorer 0.8.0 passed these rules in a local test browser. A live recording with 0.8.0 is a gap on the status page.</p>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: running a tool" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>What a tool does when ChatGPT calls it.</h2>
+        <div class="two-col">
+          <ul class="plain-list">
+            <li><strong>Stays on the website.</strong> A tool may call any host under the site’s registrable domain, so <code>us.edstem.org</code> works for <code>edstem.org</code>, and nothing else.</li>
+            <li><strong>Reads sign-in tokens at run time.</strong> Ed sends <code>X-Token</code> from local storage, so the tool reads it inside the page by name. It never reaches a tool, a log, or Claude.</li>
+            <li><strong>Gets a fresh CSRF code.</strong> Before a POST, it reads the code from the page’s meta tag, hidden input, or CSRF cookie.</li>
+          </ul>
+          <ul class="plain-list">
+            <li><strong>Chains steps.</strong> A placeholder such as <code>{step1.cartId}</code> fills a later request from an earlier answer.</li>
+            <li><strong>Refuses to pay.</strong> One guard blocks any request that looks like checkout or payment, in tools and in tools ChatGPT saves.</li>
+            <li><strong>Reports honestly.</strong> Signed out, bot checks, and refused CSRF codes each get their own message.</li>
+          </ul>
+        </div>
+        <p class="footnote">Running tools from ChatGPT is shipped. Token headers, CSRF codes, and step placeholders pass local tests, and their first live runs on real websites are gaps on the status page.</p>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: smaller answers" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>Smaller answers, better answers.</h2>
+        <p class="lede">ChatGPT reads every token a tool returns. Claude picks the fields worth keeping when it finds the tool, and long lists become tables.</p>
+        <div class="bars">
+          <div class="bar-group">
+            <h3>30 Ed discussion threads</h3>
+            <div class="bar-row"><span>Compacted</span><div class="bar-track"><div class="bar-fill num" style="--w: 100%">9,301</div></div></div>
+            <div class="bar-row"><span>As a table</span><div class="bar-track"><div class="bar-fill num" style="--w: 61.7%">5,735</div></div></div>
+            <div class="bar-row"><span>Claude’s fields only</span><div class="bar-track"><div class="bar-fill final num" style="--w: 20.4%">1,896</div></div></div>
+          </div>
+          <div class="bar-group">
+            <h3>DoorDash home feed</h3>
+            <div class="bar-row"><span>Compacted</span><div class="bar-track"><div class="bar-fill num" style="--w: 89.9%">8,362</div></div></div>
+            <div class="bar-row"><span>As a table</span><div class="bar-track"><div class="bar-fill num" style="--w: 59.3%">5,515</div></div></div>
+            <div class="bar-row"><span>Claude’s fields only</span><div class="bar-track"><div class="bar-fill final num" style="--w: 23.9%">2,227</div></div></div>
+          </div>
+        </div>
+        <p class="footnote">GPT tokens, measured by a test script on made-up sample data. Claude-chosen fields are a gap until a live discovery returns them.</p>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: pictures and speed" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>Pictures and speed.</h2>
+        <div class="two-col">
+          <div>
+            <h3>ChatGPT cannot see pictures from a connector</h3>
+            <ul class="plain-list">
+              <li>ChatGPT drops MCP image results; OpenAI support confirmed it in April 2026.</li>
+              <li><code>view_image</code> opens the picture in the signed-in browser, shrinks it to 1,600 pixels, and has Claude Opus 5.5 copy its words and numbers.</li>
+              <li>That is how ChatGPT read the Ed exam statistics on slide 4.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>A warm browser between calls</h3>
+            <ul class="plain-list">
+              <li>The app’s browser stays open for up to 7 minutes and serves each call in a new tab.</li>
+              <li>A simple page: <span class="num">3.2–3.6 s</span> cold, <span class="num">2.5 s</span> warm. A larger page: <span class="num">4.8–5.6 s</span> cold, about <span class="num">4 s</span> warm.</li>
+              <li>Sign-in, codes, and deleting the app close it first, so an old sign-in never overwrites a new one.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="footnote">Timings come from a test script with a throwaway profile. The warm browser and reading pictures from the app page are gaps on the status page.</p>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: signing in and paying safely" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>Signing in and paying, safely.</h2>
+        <div class="two-col">
+          <div>
+            <h3>Signing back in <span class="badge badge--shipped">shipped</span></h3>
+            <ul class="plain-list">
+              <li>The saved login is encrypted with AES-256-GCM and reaches the agent only as secret bindings.</li>
+              <li>One sign-in at a time per app, never the same rejected password twice, and a ten-minute pause after a failure.</li>
+              <li>A text-message code goes from you, through ChatGPT, to the waiting browser.</li>
+              <li>“Continue with Google” reuses the profile’s Google session, with no Google password <span class="badge badge--gap">gap</span></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Ordering <span class="badge badge--gap">gap</span></h3>
+            <ul class="plain-list">
+              <li>An agent fills the cart and stops; ChatGPT shows items, fees, and the total.</li>
+              <li>Only after you approve does an agent pay with a one-time Pay with Link card.</li>
+              <li>The server refuses above your limit, if the total changed by a cent, or whenever Link is not in test mode.</li>
+              <li>Browser Use said Link test mode is not realistically available, so live payment stays blocked.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: accounts, sharing, and Sentry" data-section="Backup for questions">
+      <div class="slide-inner">
+        <h2>Many people, shared recipes.</h2>
+        <div class="two-col">
+          <div>
+            <h3>Accounts and the marketplace</h3>
+            <ul class="plain-list">
+              <li>Each person signs in with Google through Clerk and gets their own apps <span class="badge badge--gap">gap: live checks</span></li>
+              <li>Each app’s ChatGPT link holds a secret, and MCParrot stores only its SHA&#8209;256 hash.</li>
+              <li>The marketplace shares an app’s tools, not its logins, profile, or link: a recipe, not a key <span class="badge badge--shipped">shipped</span></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Sentry changed what we built <span class="badge badge--shipped">shipped</span></h3>
+            <ul class="plain-list">
+              <li>A missing Playwright file on Vercel led to a build tracing fix.</li>
+              <li>The Cursor SDK writing to a read-only folder led to a writable home folder.</li>
+              <li>ChatGPT’s newer MCP protocol version led to a documented fallback.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="controls" aria-label="Slide controls">
+    <div class="progress" aria-hidden="true">
+      <div class="progress-fill" id="progress-fill"></div>
+      <div class="progress-mark" id="progress-mark"><span>Backup</span></div>
+    </div>
+    <div class="nav">
+      <span class="hint">← → or space</span>
+      <button type="button" class="prev" id="prev" aria-label="Previous slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <span class="counter num" id="counter" aria-live="polite"></span>
+      <button type="button" class="next" id="next" aria-label="Next slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+  </nav>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    const pitchSlideCount = slides.filter((slide) => slide.dataset.section.startsWith("Pitch")).length;
+    const counter = document.getElementById("counter");
+    const sectionLabel = document.getElementById("section-label");
+    const progressFill = document.getElementById("progress-fill");
+    const prevButton = document.getElementById("prev");
+    const nextButton = document.getElementById("next");
+    const pad = (n) => String(n).padStart(2, "0");
+    let current = -1;
+
+    document.getElementById("progress-mark").style.left = `${(pitchSlideCount - 1) / (slides.length - 1) * 100}%`;
+
+    function slideFromHash() {
+      const n = Number(location.hash.replace("#", ""));
+      return Number.isInteger(n) && n >= 1 && n <= slides.length ? n - 1 : 0;
+    }
+
+    function show(index) {
+      const target = Math.max(0, Math.min(slides.length - 1, index));
+      if (target === current) return;
+      current = target;
+      slides.forEach((slide, i) => {
+        const isActive = i === current;
+        slide.classList.toggle("is-active", isActive);
+        slide.classList.toggle("is-before", i < current);
+        slide.inert = !isActive;
+        slide.setAttribute("aria-hidden", String(!isActive));
+        if (isActive) slide.scrollTop = 0;
+      });
+      const section = slides[current].dataset.section;
+      sectionLabel.textContent = section;
+      sectionLabel.toggleAttribute("data-backup", section.startsWith("Backup"));
+      counter.innerHTML = `<b>${pad(current + 1)}</b> / ${pad(slides.length)}`;
+      progressFill.style.width = `${current / (slides.length - 1) * 100}%`;
+      prevButton.disabled = current === 0;
+      nextButton.disabled = current === slides.length - 1;
+      history.replaceState(null, "", `#${current + 1}`);
+    }
+
+    const keyActions = {
+      ArrowRight: 1, ArrowDown: 1, PageDown: 1, " ": 1,
+      ArrowLeft: -1, ArrowUp: -1, PageUp: -1,
+    };
+
+    document.addEventListener("keydown", (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "Home") return show(0);
+      if (event.key === "End") return show(slides.length - 1);
+      const step = keyActions[event.key];
+      if (!step) return;
+      const isButtonPress = event.target.closest("button, a") && (event.key === " " || event.key === "Enter");
+      if (isButtonPress) return;
+      event.preventDefault();
+      show(current + (event.key === " " && event.shiftKey ? -1 : step));
+    });
+
+    prevButton.addEventListener("click", () => show(current - 1));
+    nextButton.addEventListener("click", () => show(current + 1));
+    window.addEventListener("hashchange", () => show(slideFromHash()));
+
+    let touchStart = null;
+    document.addEventListener("touchstart", (event) => {
+      touchStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }, { passive: true });
+    document.addEventListener("touchend", (event) => {
+      if (!touchStart) return;
+      const dx = event.changedTouches[0].clientX - touchStart.x;
+      const dy = event.changedTouches[0].clientY - touchStart.y;
+      touchStart = null;
+      const isHorizontalSwipe = Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5;
+      if (isHorizontalSwipe) show(current + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+
+    show(slideFromHash());
+  </script>
+</body>
+</html>
