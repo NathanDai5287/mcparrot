@@ -36,12 +36,11 @@ function screenAtPath(apps: Website[]): Screen {
   return { view: "missing" };
 }
 
-function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" | "trash" }) {
+function Icon({ name }: { name: "apps" | "arrow" | "plus" | "browser" | "trash" }) {
   const paths = {
     apps: "M3 3h5v5H3zM12 3h5v5h-5zM3 12h5v5H3zM12 12h5v5h-5z",
     arrow: "m7 4 6 6-6 6",
     plus: "M10 4v12M4 10h12",
-    back: "m10 4-6 6 6 6M4 10h12",
     browser: "M3 7h14M6 5h.01M9 5h.01M4 3h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z",
     trash: "M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5 5.5l.8 10.6a1 1 0 0 0 1 .9h6.4a1 1 0 0 0 1-.9L15 5.5M8.5 9v4.5M11.5 9v4.5",
   };
@@ -112,8 +111,11 @@ function DeleteAppButton({ app, busy, error, onDelete, onClose }: { app: Website
   </>;
 }
 
-function BackButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button className="back-button" onClick={onClick}><Icon name="back" />{children}</button>;
+function Breadcrumb({ trail, current, onNavigate }: { trail: { label: string; screen: Screen }[]; current: string; onNavigate: (screen: Screen) => void }) {
+  return <nav className="breadcrumb" aria-label="Breadcrumb"><ol>
+    {trail.map(({ label, screen }) => <li key={screenPath(screen)}><a href={screenPath(screen)} onClick={(event) => { event.preventDefault(); onNavigate(screen); }}>{label}</a></li>)}
+    <li aria-current="page">{current}</li>
+  </ol></nav>;
 }
 
 function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => void; onCancel: () => void }) {
@@ -264,7 +266,6 @@ export default function Workspace() {
         </div>
       </aside>
       <div className="page">
-        <div className="topbar"><span>Workspace <span className="slash">/</span> {currentApp?.name ?? "Apps"}</span></div>
         <main id="main-content">
           {storageError && <p className="workspace-warning" role="status">MCParrot cannot reach its storage, so your apps may not load or save. Reload the page to try again.</p>}
           {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
@@ -280,12 +281,12 @@ export default function Workspace() {
             <p className="preview-note">MCParrot stores apps and chosen tools so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
           </>}
           {screen.view === "create-app" && <>
-            <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
+            <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }]} current="Create an app" onNavigate={navigate} />
             <PageHeader title="Create an app" description="Start with the website you want your assistant to use." />
             <AppForm onSave={createApp} onCancel={() => navigate({ view: "apps" })} />
           </>}
           {screen.view === "app" && <>
-            <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
+            <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }]} current={screen.app.name} onNavigate={navigate} />
             <PageHeader title={screen.app.name} description={screen.app.url} action={<div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button></div>}><AppStatus app={screen.app} /></PageHeader>
             <div className="app-layout">
               <section className="app-tools" aria-labelledby="app-tools-heading">
@@ -295,11 +296,12 @@ export default function Workspace() {
               <aside className="setup-rail" aria-label="Setup">
                 <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
-                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}              </aside>
+                {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />}
+              </aside>
             </div>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
-            <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
+            <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }, { label: app.name, screen: { view: "app", app } }]} current="Explore" onNavigate={navigate} />
             <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tools to keep." />
             <ExplorationPanel appId={app.id} websiteUrl={app.url} tasks={app.tasks} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
             <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tools appear in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
