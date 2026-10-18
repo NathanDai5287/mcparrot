@@ -83,6 +83,21 @@
     .problem-why { max-width: 60ch; color: var(--muted); text-wrap: pretty; }
     .problem-why strong { color: var(--ink); }
 
+    /* Insight */
+    .insight { display: grid; grid-template-columns: minmax(0, 1.1fr) auto minmax(0, .9fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: center; margin-top: clamp(1.75rem, 4vw, 3rem); }
+    .layers { display: grid; gap: .9rem; }
+    .layer { padding: 1rem 1.2rem; border-radius: .8rem; }
+    .layer h3 { font-size: .95em; }
+    .layer p { margin-top: .15rem; font-size: .8em; color: var(--muted); }
+    .layer--ui { border: 1.5px dashed #c4beb0; }
+    .layer--ui h3 { color: #8a8f96; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+    .layer--data { background: var(--ink); color: #e9ecef; box-shadow: 0 1rem 2rem -1.2rem rgba(20, 24, 30, .6); }
+    .layer--data h3 { color: #fff; }
+    .layer--data pre { margin: .6rem 0 0; font: .74em/1.55 ui-monospace, "SF Mono", Menlo, monospace; color: #b9e3d4; white-space: pre-wrap; }
+    .insight-arrow { display: grid; justify-items: center; gap: .4rem; color: var(--teal); font-size: .8em; font-weight: 700; }
+    .insight-arrow img { width: 3rem; height: 3rem; }
+    .insight-arrow svg { width: 2.6rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
     /* Flow */
     .flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.25rem, 3vw, 3rem); margin-top: clamp(1.5rem, 3.5vw, 2.75rem); position: relative; }
     .flow-step { position: relative; }
@@ -197,7 +212,8 @@
       .slide { overflow-y: auto; overscroll-behavior: contain; }
       .slide-inner { padding-bottom: 1.5rem; }
       .pin { width: 1.15rem; height: 1.15rem; margin: -.575rem 0 0 -.575rem; font-size: .6rem; box-shadow: 0 0 0 2px var(--teal), 0 .2rem .4rem rgba(0, 0, 0, .35); }
-      .title, .shot-layout, .shot-layout.square, .split, .two-col, .hard, .flow { grid-template-columns: 1fr; }
+      .title, .shot-layout, .shot-layout.square, .split, .two-col, .hard, .flow, .insight { grid-template-columns: 1fr; }
+      .insight-arrow svg { transform: rotate(90deg); }
       .title-mark { order: -1; justify-self: start; width: 6.5rem; }
       .flow-step:not(:last-child)::after { display: none; }
       .flow-step { display: grid; grid-template-columns: 3.2rem 1fr; column-gap: 1rem; }
@@ -237,26 +253,11 @@
 
   <main class="deck" id="deck" aria-roledescription="slideshow" aria-label="MCParrot pitch">
 
-    <section class="slide" aria-roledescription="slide" aria-label="Title" data-section="Pitch · 2 minutes">
-      <div class="slide-inner title">
-        <div>
-          <h1>Teach ChatGPT any website <em>you sign in to</em>.</h1>
-          <p class="lede">Browse a website once. ChatGPT can use it for you from then on.</p>
-          <div class="title-meta">
-            <span><strong>LA Hacks 2026</strong></span>
-            <span>Applied Intelligence</span>
-            <span>Best Use of Browser Use</span>
-          </div>
-        </div>
-        <img class="title-mark" src="/logo.svg" alt="MCParrot logo: a teal letter P with a parrot in it">
-      </div>
-    </section>
-
-    <section class="slide" aria-roledescription="slide" aria-label="The problem" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="Hook" data-section="Pitch · 2 minutes">
       <div class="slide-inner problem">
-        <h2>ChatGPT can’t get into your accounts.</h2>
+        <h2>You should never click through a slow website to get one answer.</h2>
         <div>
-          <span class="trail-label">One due date today</span>
+          <span class="trail-label">One due date on Canvas today</span>
           <ol class="trail">
             <li>Sign in</li>
             <li>Duo code</li>
@@ -272,6 +273,29 @@
       </div>
     </section>
 
+    <section class="slide" aria-roledescription="slide" aria-label="The insight" data-section="Pitch · 2 minutes">
+      <div class="slide-inner">
+        <h2>The interface is cheap. The data is what matters.</h2>
+        <div class="insight">
+          <div class="layers">
+            <div class="layer layer--ui"><h3>The interface</h3><p>Anyone can vibe-code one now.</p></div>
+            <div class="layer layer--data">
+              <h3>The data behind it</h3>
+<pre>{ "assignment": "E3: Final Analysis",
+  "due": "Oct 29, 11:59 PM",
+  "status": "unsubmitted" }</pre>
+            </div>
+          </div>
+          <div class="insight-arrow">
+            <img src="/logo.svg" alt="">
+            <span>MCParrot</span>
+            <svg viewBox="0 0 40 16" aria-hidden="true"><path d="M2 8h34"/><path d="M30 2l6 6-6 6"/></svg>
+          </div>
+          <span class="ask-bubble">Straight to your assistant, signed in as you.</span>
+        </div>
+      </div>
+    </section>
+
     <section class="slide" aria-roledescription="slide" aria-label="How it works" data-section="Pitch · 2 minutes">
       <div class="slide-inner">
         <h2>Browse once. Ask forever.</h2>
@@ -279,7 +303,7 @@
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><circle cx="12" cy="14.25" r="2.4"/></svg></span>
             <h3>1. Browse the site</h3>
-            <p>Our Chrome extension records what the site asks its server for.</p>
+            <p>Our Chrome extension watches what the site asks its server for.</p>
           </div>
           <div class="flow-step">
             <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></span>
@@ -294,7 +318,29 @@
         </div>
         <div class="engine">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M2.5 8.5h19"/><path d="M5.5 6.25h.01M8 6.25h.01"/><path d="M8 14.5l2.5 2 5.5-5"/></svg>
-          <p><strong>Every step on the real website runs in a Browser Use cloud browser</strong> that remembers your sign-in.</p>
+          <p><strong>Every call runs in a Browser Use cloud browser</strong> that stays signed in as you.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Live: Chess.com in 19 seconds" data-section="Pitch · 2 minutes">
+      <div class="slide-inner shot-layout square">
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-chess-winrate.jpg" width="1830" height="1940" alt="ChatGPT conversation: asked for the win rate of the last 10 Chess.com games and the opponents' ratings, ChatGPT worked for 19 seconds and answers 7 wins, 2 losses, 1 draw, a 70% win rate, all 1+1 bullet, with a table of 10 opponents and ratings and an average opponent rating of 1,079." loading="eager">
+            <span class="pin" style="--x: 22%; --y: 17.2%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 78.5%; --y: 32.2%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 36%; --y: 91.3%" aria-hidden="true">3</span>
+          </div>
+          <figcaption>Real ChatGPT conversation.</figcaption>
+        </figure>
+        <div class="shot-side">
+          <h2>Any website. 19 seconds.</h2>
+          <ol class="notes">
+            <li><span>Answered in <span class="num">19</span> seconds</span></li>
+            <li><span>All ten games: 7 wins, 2 losses, 1 draw</span></li>
+            <li><span>Average opponent: <span class="num">1,079</span></span></li>
+          </ol>
         </div>
       </div>
     </section>
@@ -303,7 +349,7 @@
       <div class="slide-inner shot-layout">
         <figure class="shot">
           <div class="shot-frame">
-            <img src="images/pitch-midterm-multi-mcp.jpg" width="2048" height="1529" alt="ChatGPT conversation: asked for an EECS 126 midterm score and class statistics, it answers 74 out of 101 from Gradescope, a class mean of 52.14, standard deviation 27.1, and median 52.5 from an Ed announcement, and a z-score of 0.81." loading="eager">
+            <img src="images/pitch-midterm-multi-mcp.jpg" width="2048" height="1529" alt="ChatGPT conversation: asked for an EECS 126 midterm score and class statistics, it answers 74 out of 101 from Gradescope, a class mean of 52.14, standard deviation 27.1, and median 52.5 from an Ed announcement, and a z-score of 0.81." loading="lazy">
             <span class="pin" style="--x: 15.5%; --y: 32.8%" aria-hidden="true">1</span>
             <span class="pin" style="--x: 15.5%; --y: 47%" aria-hidden="true">2</span>
             <span class="pin" style="--x: 38%; --y: 74.8%" aria-hidden="true">3</span>
@@ -311,11 +357,11 @@
           <figcaption>Real ChatGPT conversation.</figcaption>
         </figure>
         <div class="shot-side">
-          <h2>Two websites, one question.</h2>
+          <h2>Two websites, one answer.</h2>
           <ol class="notes">
-            <li><span>Score from <strong>Gradescope</strong>: <span class="num">74/101</span></span></li>
-            <li><span>Class stats from a picture on <strong>Ed</strong>, read by Claude</span></li>
-            <li><span>ChatGPT puts them together</span></li>
+            <li><span>Score from <strong>Gradescope</strong></span></li>
+            <li><span>Class stats from a chart on <strong>Ed</strong>, read by Claude</span></li>
+            <li><span>Combined: 0.81 above the mean</span></li>
           </ol>
         </div>
       </div>
@@ -335,8 +381,8 @@
         <div class="shot-side">
           <h2>Signed out? It signs back in.</h2>
           <ol class="notes">
-            <li><span>A <strong>Browser Use agent</strong> signs in with your saved login</span></li>
-            <li><span>You type the texted code right in ChatGPT</span></li>
+            <li><span>A <strong>Browser Use agent</strong> signs in for you</span></li>
+            <li><span>You type the texted code in ChatGPT</span></li>
             <li><span>Then it lists the assignments</span></li>
           </ol>
         </div>
@@ -358,8 +404,8 @@
           <h2>It shops. It pays only when you say so.</h2>
           <ol class="notes">
             <li><span>“Add it to my cart. Don’t order yet.”</span></li>
-            <li><span>A <strong>Browser Use agent</strong> builds the cart: <span class="num">$19.00</span></span></li>
-            <li><span>Nothing is paid until you confirm. Then checkout uses <strong>Stripe Pay with Link</strong>, within your spending limit.</span></li>
+            <li><span>A <strong>Browser Use agent</strong> builds the cart</span></li>
+            <li><span>On your OK, it checks out with <strong>Stripe Pay with Link</strong>, within your limit</span></li>
           </ol>
         </div>
       </div>
@@ -367,46 +413,42 @@
 
     <section class="slide" aria-roledescription="slide" aria-label="What makes it hard" data-section="Pitch · 2 minutes">
       <div class="slide-inner">
-        <h2>Three hard parts.</h2>
+        <h2>The hard part is being you, safely.</h2>
         <div class="hard">
           <div>
-            <h3>Act like the website</h3>
-            <p class="proof"><strong>Its own requests</strong>sent from inside your signed-in browser, with no password saved</p>
+            <h3>Signed in everywhere</h3>
+            <p class="proof"><strong>Browser Use</strong>keeps one signed-in cloud browser per website, and its agents sign back in</p>
           </div>
           <div>
-            <h3>Keep answers small</h3>
-            <p class="proof"><strong class="num">73–80%</strong>fewer tokens for ChatGPT to read</p>
+            <h3>No secrets in tools</h3>
+            <p class="proof"><strong>Zero</strong>passwords or sign-in tokens saved in a tool</p>
           </div>
           <div>
-            <h3>Stay signed in, and fast</h3>
-            <p class="proof"><strong class="num">2.5 s</strong>for a simple page with a warm browser</p>
+            <h3>Answers that fit</h3>
+            <p class="proof"><strong class="num">73–80%</strong>less for ChatGPT to read</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="What we learned and what comes next" data-section="Pitch · 2 minutes">
+    <section class="slide" aria-roledescription="slide" aria-label="Close and what comes next" data-section="Pitch · 2 minutes">
       <div class="slide-inner split">
-        <p class="learned">Most websites are <em>already APIs</em>. The hard part is signing in as you.</p>
+        <div class="close" style="justify-items:start;text-align:left">
+          <img src="/logo.svg" alt="">
+          <h2>Every website, as data for your assistant.</h2>
+          <div class="links" style="justify-content:flex-start">
+            <a href="https://mcparrot.vercel.app">mcparrot.vercel.app</a>
+            <a href="https://github.com/NathanDai5287/mcparrot">GitHub</a>
+            <a href="devpost.html">Devpost</a>
+          </div>
+        </div>
         <div>
           <h3 style="margin-bottom:.8rem">What comes next</h3>
           <ul class="next-list">
             <li>Test each tool before ChatGPT can use it <span class="badge badge--aspirational">aspirational</span></li>
             <li>Let ChatGPT set up new websites by itself <span class="badge badge--aspirational">aspirational</span></li>
           </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="slide" aria-roledescription="slide" aria-label="Thank you" data-section="Pitch · 2 minutes">
-      <div class="slide-inner close">
-        <img src="/logo.svg" alt="">
-        <h2>Questions?</h2>
-        <div class="links">
-          <a href="https://mcparrot.vercel.app">mcparrot.vercel.app</a>
-          <a href="https://mcparrot.vercel.app/marketplace">Marketplace</a>
-          <a href="https://github.com/NathanDai5287/mcparrot">GitHub</a>
-          <a href="devpost.html">Devpost write-up</a>
+          <p class="learned" style="margin-top:1.6rem">Questions?</p>
         </div>
       </div>
     </section>
