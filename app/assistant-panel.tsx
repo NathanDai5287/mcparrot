@@ -68,11 +68,10 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
     const response = await fetch(`/api/sign-in?browserId=${encodeURIComponent(signInBrowser.browserId)}&appId=${encodeURIComponent(app.id)}${finished ? "" : "&finished=false"}`, { method: "DELETE" }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
     setBusy(false);
-    if (!response?.ok && finished) {
-      setError(result.error ?? "MCParrot could not save the sign-in. Select Done signing in again.");
+    if (!response?.ok) {
+      setError(result.error ?? (finished ? "MCParrot could not save the sign-in. Select Done signing in again." : "MCParrot could not stop the sign-in browser. Select Cancel again."));
       return;
     }
-    if (!response?.ok) setError(result.error ?? "MCParrot could not stop the sign-in browser. It stops by itself within 15 minutes.");
     popupRef.current?.close();
     popupRef.current = null;
     if (finished) onChange({ signedInAt: new Date().toISOString() });

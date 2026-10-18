@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { browserUse, startBrowser, stopBrowser, withPage } from "../../../lib/browser-use";
-import { readWorkspace, updateStoredApp } from "../../../lib/workspace";
+import { changeApp, readWorkspace, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,7 +18,11 @@ export async function POST(request: Request) {
     if (!app) return Response.json({ error: "App not found." }, { status: 404 });
     Sentry.logger.info("Sign-in started", { app: app.name, newProfile: !app.browserProfileId });
     profileId = app.browserProfileId ?? (await browserUse().profiles.create({ name: `MCParrot ${app.name}` })).id;
-    if (!app.browserProfileId) await updateStoredApp(appId, { browserProfileId: profileId });
+    if (!app.browserProfileId) {
+      const createdProfileId = profileId;
+      const apps = await changeApp(appId, (storedApp) => storedApp.browserProfileId ? storedApp : { ...storedApp, browserProfileId: createdProfileId });
+      profileId = apps.find((storedApp) => storedApp.id === appId)?.browserProfileId ?? profileId;
+    }
     browser = await startBrowser(profileId, signInMinutes);
     try {
       await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded" }));
@@ -40,11 +44,13 @@ export async function DELETE(request: Request) {
   const finished = searchParams.get("finished") !== "false";
   if (!browserId || !appId) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
   try {
-    await stopBrowser(browserId);
+    await stopBrowser(browserId).catch(async (error) => {
+      if ((await browserUse().browsers.get(browserId)).status !== "stopped") throw error;
+    });
     if (finished) await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
   } catch (error) {
     Sentry.captureException(error);
-    return Response.json({ error: finished ? "MCParrot could not save the sign-in. Select Done signing in again." : "MCParrot could not stop the sign-in browser. It stops by itself within 15 minutes." }, { status: 502 });
+    return Response.json({ error: finished ? "MCParrot could not save the sign-in. Select Done signing in again." : "MCParrot could not stop the sign-in browser. Select Cancel again." }, { status: 502 });
   }
   Sentry.logger.info(finished ? "Sign-in done" : "Sign-in cancelled");
   return Response.json({ stopped: true });
