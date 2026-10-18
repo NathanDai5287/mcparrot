@@ -16,7 +16,7 @@ export const replayedHeaders = (headers: Record<string, string> = {}) => Object.
 
 const isGraphqlDocument = (text: string) => graphqlDocument.test(text);
 
-const isPlaceholderOnly = (text: string) => new RegExp(`^${bodyPlaceholderPattern.source}$`).test(text);
+const isGraphqlText = (text: string) => isGraphqlDocument(text) && (!/^\s*\{/.test(text) || text.replace(bodyPlaceholderPattern, "").includes("{"));
 
 export type BodyPlace = { inString: boolean; inGraphql: boolean };
 
@@ -27,7 +27,7 @@ function replacedInString(literal: string, replace: PlaceholderReplacer) {
   try {
     text = JSON.parse(literal);
   } catch {}
-  if (!isGraphqlDocument(text) || isPlaceholderOnly(text)) return literal.replace(bodyPlaceholderPattern, (match, name: string) => replace(name, match, { inString: true, inGraphql: false }));
+  if (!isGraphqlText(text)) return literal.replace(bodyPlaceholderPattern, (match, name: string) => replace(name, match, { inString: true, inGraphql: false }));
   return literal.replace(graphqlPlaceholderPattern, (match, name: string) => `\\"${replace(name, match.slice(2, -2), { inString: true, inGraphql: true })}\\"`);
 }
 

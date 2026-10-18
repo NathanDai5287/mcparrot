@@ -164,13 +164,7 @@ function fetchInPage(page: Page, request: FilledRequest) {
         const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...csrfHeaders };
         const carriesSecrets = Object.keys(tokens).length > 0 || Object.keys(csrfHeaders).length > 0;
         const signal = AbortSignal.timeout(timeout);
-        let reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" && !carriesSecrets ? "follow" : "manual", credentials, signal });
-        if (reply.type === "opaqueredirect" && method === "GET") {
-          const probe = await fetch(address, { headers: savedHeaders, redirect: "follow", credentials, signal }).catch(() => undefined);
-          await probe?.body?.cancel();
-          const target = probe?.redirected ? new URL(probe.url) : undefined;
-          if (target && (target.origin === location.origin || target.origin === new URL(address).origin)) reply = await fetch(target.href, { headers, redirect: "manual", credentials, signal });
-        }
+        const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" && !carriesSecrets ? "follow" : "manual", credentials, signal });
         if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, mitigated: false, contentType: "", body: "", truncated: false };
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
