@@ -328,11 +328,12 @@ Measure speed against an agent navigating the website before you claim an improv
 
 Nathan decided on October 17, 2026, that tools may use GET and POST requests, not only GET, because many websites, such as DoorDash, read and act through POST GraphQL requests to addresses such as `/graphql/<operation>` with JSON bodies.
 He accepted the risk that a POST tool can change data in his website account.
-MCParrot keeps exactly one guard on tool requests: it refuses any request whose URL path, body, or GraphQL operation name looks like checkout or payment.
+MCParrot keeps exactly one guard on tool requests: it refuses any request whose URL path or body looks like checkout or payment.
+For a GraphQL body, it checks only the operation name of a query, so a query that selects fields such as `paymentMethod` or `purchases` passes, and it checks the operation name and the whole document of a mutation.
 The guard decodes URL encoding until nothing changes, splits names such as `placeOrder` into words, and refuses the words checkout, check out, payment, pay, purchase, place order, create order, submit order, and order create, so `cart/checkout`, `order/create`, and `createOrderFromCart` are all refused.
 Discovery, `save_task`, the connection's tool list, and every tool run apply the guard, and a run checks the request again after it fills the inputs.
 The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
-The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address or body contains one of the words, such as a query for a payment history, is refused.
+The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address, non-GraphQL body, or GraphQL operation name contains one of the words, such as a query named `paymentHistory`, is refused.
 `read_page` only opens pages with GET, so the guard does not apply to it.
 A POST tool sends its saved `headers`, filtered again to the same short list of header names, and it adds a fresh anti-forgery (CSRF) token as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many websites refuse a request without that header.
 Before the requests, the run opens the website's home page in the signed-in browser and reads the token from the first of `meta[name=csrf-token]`, `meta[name=csrf_token]`, `meta[name=_csrf]`, `input[name=csrfmiddlewaretoken]`, and `input[name=authenticity_token]`, or else from a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`.
