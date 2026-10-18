@@ -13,7 +13,7 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 function isCapability(value: unknown): value is Capability {
   return isObject(value) && isText(value.name) && isText(value.description) && isText(value.returns)
-    && Array.isArray(value.inputs) && value.inputs.every((input) => isObject(input) && isText(input.name) && isText(input.example))
+    && Array.isArray(value.inputs) && value.inputs.every((input) => isObject(input) && isText(input.name) && isText(input.description) && isText(input.example))
     && Array.isArray(value.requests) && value.requests.length > 0 && value.requests.every((request) => isObject(request) && isText(request.method) && isText(request.urlPattern));
 }
 
@@ -110,7 +110,9 @@ export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave 
   const namesValid = problems.every((problem) => !problem);
 
   async function save() {
+    setError("");
     if (await onSave(chosen.map(({ selected, ...capability }) => capability))) setChoices([]);
+    else setError("MCParrot could not save these tasks. Try again.");
   }
 
   useEffect(() => {

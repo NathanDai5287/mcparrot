@@ -134,12 +134,13 @@ export default function Workspace() {
   async function deleteApp(app: Website) {
     setDeleteBusy(true);
     setDeleteError("");
-    await requestExtension("clear", app.id).catch(() => undefined);
     const login = await fetch(`/api/login?appId=${encodeURIComponent(app.id)}`, { method: "DELETE" }).catch(() => null);
+    if (login?.ok) updateApp(app.id, { loginSavedAt: undefined });
     const savedApps = login?.ok ? await changeWorkspace({ operation: "deleteApp", appId: app.id }) : null;
+    if (savedApps) await requestExtension("clear", app.id).catch(() => undefined);
     setDeleteBusy(false);
     if (!savedApps) {
-      setDeleteError(login?.ok ? "MCParrot could not delete this app. Try again." : "MCParrot could not delete this app’s saved login, so it kept the app. Try again.");
+      setDeleteError(login?.ok ? "MCParrot deleted this app’s saved login but could not delete the app. Try again." : "MCParrot could not delete this app’s saved login, so it kept the app. Try again.");
       return;
     }
     navigate({ view: "apps" }, true);
@@ -164,8 +165,9 @@ export default function Workspace() {
 
   async function saveTasks(app: Website, capabilities: Capability[]) {
     const savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities });
-    navigate({ view: "app", app: (savedApps ?? apps).find((savedApp) => savedApp.id === app.id) ?? app });
-    return savedApps !== null;
+    if (!savedApps) return false;
+    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
+    return true;
   }
 
   function updateApp(appId: string, changes: Partial<Website>) {
