@@ -103,10 +103,10 @@ async function testRequest({ requestId, courseId }) {
   const { cookies } = await command("Storage.getCookies");
   const cookie = cookies.filter((entry) => applicableCookie(entry, url)).map(({ name, value }) => `${name}=${value}`).join("; ");
   const response = await fetch(url, { headers: { Cookie: cookie, Accept: candidate.kind === "json" ? "application/json" : "text/html" }, redirect: "manual", signal: AbortSignal.timeout(20000) });
-  if (!response.ok) throw new Error("Canvas rejected this request. Check sign-in and the course ID.");
+  if (!response.ok) throw new Error("The website rejected this request. Check sign-in and the course ID.");
   const text = await boundedResponse(response);
-  if (candidate.kind === "syllabus" && !text.includes('id="course_syllabus"')) throw new Error("Canvas did not return a syllabus page.");
-  if (candidate.kind === "json" && !response.headers.get("content-type")?.includes("application/json")) throw new Error("Canvas did not return reading data. Check sign-in.");
+  if (candidate.kind === "syllabus" && !text.includes('id="course_syllabus"')) throw new Error("The website did not return a syllabus page.");
+  if (candidate.kind === "json" && !response.headers.get("content-type")?.includes("application/json")) throw new Error("The website did not return reading data. Check sign-in.");
   const entries = candidate.kind === "json" ? JSON.parse(text) : null;
   lastTest = { requestId, courseId, changedInput: courseId !== candidate.courseId, success: true, resultCount: Array.isArray(entries) ? entries.length : null, testedAt: new Date().toISOString() };
   return status();

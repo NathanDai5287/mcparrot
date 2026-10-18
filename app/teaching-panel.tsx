@@ -25,14 +25,13 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   const [testFailed, setTestFailed] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const browserWindow = useRef<Window | null>(null);
-  const supported = new URL(websiteUrl).origin === "https://bcourses.berkeley.edu";
 
   async function operate(name: string, input?: object) {
     setBusy(true);
     setError("");
     if (name === "test_saved_request") setTestFailed(true);
     try {
-      const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, arguments: input }) });
+      const response = await fetch("/api/teaching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, appId, taskId, websiteUrl, arguments: input }) });
       const next = await response.json();
       if (!response.ok) {
         if (next.hasSession) setState((previous) => ({ ...previous, expiresAt: next.expiresAt }));
@@ -78,22 +77,20 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
       return;
     }
     teachingWindow.location.href = interactiveBrowserUrl(next.liveUrl);
-    await operate("continue_canvas_signin");
+    await operate("continue_signin");
   }
 
   async function submitVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = verificationCode;
     setVerificationCode("");
-    await operate("submit_canvas_code", { code });
+    await operate("submit_signin_code", { code });
   }
 
   useEffect(() => {
-    if (!active || !supported) return;
+    if (!active) return;
     void operate("get_teaching_status");
   }, [active, appId, taskId]);
-
-  if (!supported) return <section className="teaching-pilot"><h2>Start with Berkeley Canvas</h2><p>This first hosted reading test supports Berkeley Canvas. Other websites still need recording support.</p></section>;
 
   const step = !state.ready ? "connect" : state.recording || state.candidates.length === 0 ? "teach" : "review";
   const selected = state.candidates.find(({ id }) => id === selectedId);
@@ -105,19 +102,19 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
     <ol className="teaching-progress"><li aria-current={step === "connect" ? "step" : undefined}>Connect</li><li aria-current={step === "teach" ? "step" : undefined}>Explore</li><li aria-current={step === "review" ? "step" : undefined}>Review</li></ol>
     {!state.ready && <div className="teaching-step">
       <h2>Open your teaching browser</h2>
-      <p>A separate Canvas window opens for sign-in and teaching. The browser runs in the cloud.</p>
-      <button className="button primary" disabled={busy} onClick={connectBrowser}>{busy ? "Opening hosted browser…" : "Connect Canvas"}</button>
+      <p>A separate teaching browser window opens for sign-in and browsing. The browser runs in the cloud.</p>
+      <button className="button primary" disabled={busy} onClick={connectBrowser}>{busy ? "Opening hosted browser…" : "Connect teaching browser"}</button>
       <p className="field-help">This private pilot uses your Browser Use credits. Each session ends after 30 minutes.</p>
     </div>}
     {state.ready && <>
       <div className="teaching-step">
-        <h2>{state.recording ? "Explore the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "Canvas is ready" : "Continue Canvas sign-in"}</h2>
-        <p>{state.recording ? "Visit the course pages you use in the Canvas window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without navigating Canvas again." : authentication?.stage === "signed_in" ? "Start exploring, then browse course pages such as assignments, materials, and the syllabus. Some pages have no supported reading request." : "We can enter your saved Berkeley sign-in details. You complete the text-code check here."}</p>
+        <h2>{state.recording ? "Explore the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "The website is ready" : "Continue sign-in"}</h2>
+        <p>{state.recording ? "Visit the pages you use in the teaching browser window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without opening the website again." : authentication?.stage === "signed_in" ? "Start exploring, then browse pages such as assignments, materials, and the syllabus. Some pages have no supported reading request." : "We can enter your saved sign-in details when automatic sign-in is configured. You complete any text-code check here."}</p>
         <div className="pilot-controls">
-          {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open Canvas window</button>}
+          {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open teaching browser</button>}
           {state.recording ? <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Review suggested actions</button> : state.candidates.length === 0 && authentication?.stage === "signed_in" && <button className="button primary" disabled={busy} onClick={() => operate("start_recording")}>Start exploring</button>}
           {!state.recording && state.candidates.length > 0 && <button className="button" disabled={busy} onClick={() => operate("resume_recording")}>Continue exploring</button>}
-          <span>{state.recording ? "Recording course reading requests" : `${state.candidates.length} observed requests`}</span>
+          <span>{state.recording ? "Recording reading requests" : `${state.candidates.length} observed requests`}</span>
         </div>
       </div>
       {!state.recording && state.candidates.length === 0 && authentication?.stage !== "signed_in" && <div className="pilot-review">
@@ -126,9 +123,9 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
           <label htmlFor={`verification-${appId}-${taskId}`}>Text verification code</label>
           <input id={`verification-${appId}-${taskId}`} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required />
           <button className="button primary" disabled={busy} type="submit">{busy ? "Checking code…" : "Submit code"}</button>
-        </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_canvas_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
-        {verificationRequired && <button className="button" disabled={busy} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button>}
-        <p className="field-help">You can also continue manually in the Canvas window. We never approve your phone verification for you.</p>
+        </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
+        {verificationRequired && <button className="button" disabled={busy} onClick={() => operate("continue_signin")}>Check sign-in</button>}
+        <p className="field-help">You can also continue manually in the teaching browser window. We never approve your phone verification for you.</p>
       </div>}
       {state.candidates.length > 0 && !state.recording && <div className="pilot-candidates">
         <h3>Observed reading actions · {state.candidates.length}</h3>
@@ -145,7 +142,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
         <p>This session and its observed requests remain available here until the session ends. Only reading requests are supported.</p>
         <p>Task publication and assistant connections are not available yet. Continue exploring keeps these captures; replacing removes them.</p>
         {selected && <label htmlFor={`course-${appId}-${taskId}`}>Test another course ID<input id={`course-${appId}-${taskId}`} inputMode="numeric" pattern="[0-9]+" value={courseId} onChange={(event) => setCourseId(event.target.value)} /></label>}
-        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace all captured actions</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
+        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace all captured actions</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
       </details>
     </>}
     {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The browser connection ended. Close this session before opening another.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}

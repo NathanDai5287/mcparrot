@@ -55,7 +55,6 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
 .app-row:hover, .task-row:hover { background: #f2f6f3; }
 .app-row > svg, .task-row > svg { width: 16px; color: var(--muted); }
 .app-mark { width: 42px; height: 42px; display: grid; place-items: center; flex-shrink: 0; border: 1px solid #dae4de; border-radius: 11px; font-weight: 600; font-size: 21px; color: var(--accent); background: #edf3ef; }
-.app-mark.canvas { color: #a34b3e; background: #faf0ec; border-color: #f0ded7; }
 .app-mark.youtube { color: #a9413b; background: #fff7f5; border-color: #f3e3e0; }
 .app-main { flex: 1; min-width: 0; }
 .app-name { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }

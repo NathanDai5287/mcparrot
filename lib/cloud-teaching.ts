@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 const browserApi = "https://api.browser-use.com/api/v4/browsers";
 const sessionDuration = 30 * 60 * 1000;
-export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "resume_recording", "stop_recording", "test_saved_request", "end_teaching_session", "continue_canvas_signin", "submit_canvas_code"] as const;
+export const teachingOperations = ["create_teaching_session", "get_teaching_status", "start_recording", "resume_recording", "stop_recording", "test_saved_request", "end_teaching_session", "continue_signin", "submit_signin_code"] as const;
 export type TeachingOperation = typeof teachingOperations[number];
 type Session = { sandboxName: string; browserId: string; appId: string; taskId: string; expiresAt: number };
 type TeachingResult = { session?: Session; state: Record<string, unknown> };
@@ -74,7 +74,7 @@ async function authenticationOperation(sandbox: Sandbox, name: string, payload: 
   }
   const envelope = encryptedAuthentication(sandbox, payload);
   const command = await sandbox.runCommand({ cmd: "curl", args: ["--silent", "--show-error", "--retry", "8", "--retry-connrefused", "--retry-delay", "1", "--max-time", "35", "-X", "POST", "-H", "Content-Type: application/json", "--data", JSON.stringify({ name, envelope }), "http://127.0.0.1:4324"] });
-  if (command.exitCode !== 0) throw new Error("The cloud sign-in helper is unavailable. Continue manually in the Canvas window.");
+  if (command.exitCode !== 0) throw new Error("The cloud sign-in helper is unavailable. Continue manually in the teaching browser window.");
   return JSON.parse(await command.stdout());
 }
 
@@ -82,7 +82,7 @@ async function authenticationStatus(sandbox: Sandbox) {
   const control = await sandbox.readFileToBuffer({ path: "auth-control.json" });
   if (!control) return undefined;
   const command = await sandbox.runCommand({ cmd: "curl", args: ["--silent", "--max-time", "5", "-X", "POST", "-H", "Content-Type: application/json", "--data", '{"name":"get_authentication_status"}', "http://127.0.0.1:4324"] });
-  if (command.exitCode !== 0) return { stage: "manual_required", message: "Automatic sign-in is unavailable. Continue in the Canvas window." };
+  if (command.exitCode !== 0) return { stage: "manual_required", message: "Automatic sign-in is unavailable. Continue in the teaching browser window." };
   return JSON.parse(await command.stdout());
 }
 
@@ -95,20 +95,20 @@ async function teachingSandbox(name: string) {
   }
 }
 
-async function createSession(appId: string, taskId: string): Promise<TeachingResult> {
+async function createSession(appId: string, taskId: string, websiteOrigin: string): Promise<TeachingResult> {
   const name = `teaching-${createHmac("sha256", signingSecret()).update(`${appId}:${taskId}`).digest("hex").slice(0, 24)}`;
   const { sandbox, created } = await teachingSandbox(name);
   if (!created) {
     if (sandbox.status !== "running") {
       await sandbox.delete();
-      throw new Error("The previous session ended. Select Connect Canvas again.");
+      throw new Error("The previous session ended. Connect the teaching browser again.");
     }
     const ownerFile = await sandbox.readFileToBuffer({ path: "owner.json" });
-    if (!ownerFile) throw new Error("The teaching browser is opening. Wait a moment, then select Connect Canvas again.");
+    if (!ownerFile) throw new Error("The teaching browser is opening. Wait a moment, then connect again.");
     const session: Session = JSON.parse(ownerFile.toString());
     if (session.expiresAt < Date.now()) {
       await sandbox.delete();
-      throw new Error("The previous session expired. Select Connect Canvas again.");
+      throw new Error("The previous session expired. Connect the teaching browser again.");
     }
     return operateTeaching("get_teaching_status", session, appId, taskId);
   }
@@ -117,7 +117,7 @@ async function createSession(appId: string, taskId: string): Promise<TeachingRes
     browser = await browserRequest("", "POST", { timeout: 30, enableRecording: false, browserScreenWidth: 1440, browserScreenHeight: 1000 }) as Browser;
     await sandbox.writeFiles([
       { path: "cloud-recorder.mjs", content: await readFile(join(process.cwd(), "cloud-recorder.mjs")) },
-      { path: "session.json", content: Buffer.from(JSON.stringify({ cdpUrl: browser.cdpUrl, websiteOrigin: "https://bcourses.berkeley.edu" })) },
+      { path: "session.json", content: Buffer.from(JSON.stringify({ cdpUrl: browser.cdpUrl, websiteOrigin })) },
     ]);
     await sandbox.runCommand({ cmd: "node", args: ["cloud-recorder.mjs"], detached: true });
     const ready = await sandbox.runCommand({ cmd: "curl", args: ["--silent", "--show-error", "--retry", "10", "--retry-connrefused", "--retry-delay", "1", "--max-time", "20", "-X", "POST", "-H", "Content-Type: application/json", "--data", '{"name":"get_teaching_status"}', "http://127.0.0.1:4323"] });
@@ -132,9 +132,23 @@ async function createSession(appId: string, taskId: string): Promise<TeachingRes
   }
 }
 
-export async function operateTeaching(name: TeachingOperation, session: Session | undefined, appId: string, taskId: string, input: object = {}): Promise<TeachingResult> {
+export function websiteOriginFromUrl(websiteUrl: unknown) {
+  if (typeof websiteUrl !== "string") return;
+  try {
+    const url = new URL(websiteUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return;
+    return url.origin;
+  } catch {
+    return;
+  }
+}
+
+export async function operateTeaching(name: TeachingOperation, session: Session | undefined, appId: string, taskId: string, input: object = {}, websiteOrigin?: string): Promise<TeachingResult> {
   if (!session && name === "get_teaching_status") return { session: undefined, state: { ready: false, recording: false, candidates: [] } };
-  if (!session && name === "create_teaching_session") return createSession(appId, taskId);
+  if (!session && name === "create_teaching_session") {
+    if (!websiteOrigin) throw new Error("Enter a valid website address for this app.");
+    return createSession(appId, taskId, websiteOrigin);
+  }
   if (!session) throw new Error("Connect the teaching browser first.");
   if (name === "end_teaching_session") {
     try {
@@ -145,13 +159,13 @@ export async function operateTeaching(name: TeachingOperation, session: Session 
     return { session: undefined, state: { ready: false, recording: false, candidates: [], ended: true } };
   }
   const sandbox = await Sandbox.get({ name: session.sandboxName });
-  const authenticationAction = name === "continue_canvas_signin" || name === "submit_canvas_code";
+  const authenticationAction = name === "continue_signin" || name === "submit_signin_code";
   let authentication;
   if (authenticationAction) {
     await recorderOperation(sandbox, "stop_recording");
     const code = (input as { code?: string }).code;
-    if (name === "submit_canvas_code" && (typeof code !== "string" || !/^\d{6,10}$/.test(code))) throw new Error("Enter the numeric text code from your phone.");
-    const payload = name === "continue_canvas_signin" ? { username: process.env.CANVAS_USERNAME, password: process.env.CANVAS_PASSWORD } : { code };
+    if (name === "submit_signin_code" && (typeof code !== "string" || !/^\d{6,10}$/.test(code))) throw new Error("Enter the numeric text code from your phone.");
+    const payload = name === "continue_signin" ? { username: process.env.CANVAS_USERNAME, password: process.env.CANVAS_PASSWORD } : { code };
     authentication = await authenticationOperation(sandbox, name, payload);
   }
   const operation = name === "create_teaching_session" || authenticationAction ? "get_teaching_status" : name;
