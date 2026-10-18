@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { ExplorationPanel as TeachingPanel, requestExtension } from "./exploration-panel";
+import { ExplorationPanel, requestExtension } from "./exploration-panel";
+import type { Capability } from "../lib/capabilities";
 
-type Task = { id: string; name: string; description: string };
-type Website = { id: string; name: string; url: string; sample?: boolean; explorationNotes?: string; tasks: Task[] };
+type Task = Capability & { id: string };
+type Website = { id: string; name: string; url: string; sample?: boolean; tasks: Task[] };
 type Screen =
   | { view: "apps" }
   | { view: "create-app" }
   | { view: "missing" }
   | { view: "app"; app: Website }
-  | { view: "explore"; app: Website }
-  | { view: "teach"; app: Website; task: Task };
+  | { view: "explore"; app: Website };
 
 const sampleApps: Website[] = [
   { id: "youtube", name: "YouTube", url: "https://www.youtube.com", sample: true, tasks: [] },
@@ -24,7 +24,6 @@ function screenPath(screen: Screen) {
   if (screen.view === "create-app") return "/apps/new";
   const appPath = `/apps/${screen.app.id}`;
   if (screen.view === "explore") return `${appPath}/explore`;
-  if (screen.view === "teach") return `${appPath}/tasks/${screen.task.id}`;
   return appPath;
 }
 
@@ -37,18 +36,18 @@ function screenAtPath(apps: Website[]): Screen {
   if (parts[1] !== "apps" || !app) return { view: "missing" };
   if (parts.length === 3) return { view: "app", app };
   if (parts[3] === "explore" && parts.length === 4) return { view: "explore", app };
-  if (parts[3] !== "tasks" || parts.length !== 5) return { view: "missing" };
-  if (parts[4] === "new") return { view: "explore", app };
-  const task = app.tasks.find((candidate) => candidate.id === parts[4]);
-  return task ? { view: "teach", app, task } : { view: "missing" };
+  return { view: "missing" };
 }
 
 function isWorkspace(value: unknown): value is Website[] {
   if (!Array.isArray(value)) return false;
   return value.every((app) => typeof app.id === "string" && typeof app.name === "string"
-    && typeof app.url === "string" && (app.explorationNotes === undefined || typeof app.explorationNotes === "string") && Array.isArray(app.tasks)
-    && app.tasks.every((task: Task) => typeof task.id === "string"
-      && typeof task.name === "string" && typeof task.description === "string"));
+    && typeof app.url === "string" && Array.isArray(app.tasks));
+}
+
+function isTask(task: Task) {
+  return typeof task.id === "string" && typeof task.name === "string" && typeof task.description === "string"
+    && typeof task.returns === "string" && Array.isArray(task.requests) && Array.isArray(task.inputs);
 }
 
 function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }) {
@@ -101,7 +100,7 @@ export default function Workspace() {
     try {
       const stored = localStorage.getItem(workspaceStorageKey);
       const saved: unknown = stored ? JSON.parse(stored) : sampleApps;
-      if (isWorkspace(saved)) savedApps = saved;
+      if (isWorkspace(saved)) savedApps = saved.map((app) => ({ ...app, tasks: app.tasks.filter(isTask) }));
     } catch {
       setStorageError(true);
     }
@@ -147,8 +146,10 @@ export default function Workspace() {
     navigate({ view: "app", app });
   }
 
-  function saveExplorationNotes(appId: string, explorationNotes: string) {
-    setApps((savedApps) => savedApps.map((app) => app.id === appId ? { ...app, explorationNotes } : app));
+  function saveTasks(app: Website, capabilities: Capability[]) {
+    const savedApp = { ...app, tasks: capabilities.map((capability) => ({ ...capability, id: crypto.randomUUID() })) };
+    setApps((savedApps) => savedApps.map((candidate) => candidate.id === app.id ? savedApp : candidate));
+    navigate({ view: "app", app: savedApp });
   }
 
   const currentApp = "app" in screen ? screen.app : null;
@@ -167,8 +168,8 @@ export default function Workspace() {
       <div className="page">
         <div className="topbar"><span>Workspace <span className="slash">/</span> {currentApp?.name ?? "Apps"}</span></div>
         <main id="main-content">
-          {storageError && <p className="workspace-warning" role="status">This browser cannot save your drafts. Keep this page open to retain your changes.</p>}
-          {loaded && screen.view === "missing" && <><PageHeader title="App or task not found" description="It may have been deleted, or saved in another browser." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
+          {storageError && <p className="workspace-warning" role="status">This browser cannot save your apps. Keep this page open to retain your changes.</p>}
+          {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted, or saved in another browser." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
 
           {screen.view === "apps" && <>
             <PageHeader title="Your apps" description="One website. Many tasks for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
@@ -176,9 +177,9 @@ export default function Workspace() {
             <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
               <span className="app-main"><span className="app-name">{app.name} {app.sample && <span className="badge">Sample</span>}</span><span className="website-address">{app.url}</span></span>
-              <span className="app-status">Not connected<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} draft ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
+              <span className="app-status">Not connected<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
             </button>)}</div>
-            <p className="preview-note">Apps and draft names stay in this browser. Website sign-in and recordings stay with your teaching browser.</p>
+            <p className="preview-note">Apps and chosen tasks stay in this browser. Recorded requests stay in MCParrot Explorer.</p>
           </>}
           {screen.view === "create-app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
@@ -188,38 +189,23 @@ export default function Workspace() {
           {screen.view === "app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
             <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
-            <div className="section-heading"><h2>Earlier drafts <span>{screen.app.tasks.length}</span></h2><span>Explore first, then review actions</span></div>
-            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then review suggested reading actions together. No task names needed.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <button className="task-row" key={task.id} onClick={() => navigate({ view: "teach", app: screen.app, task })}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span></span><span className="badge">Draft</span><Icon name="arrow" /></button>)}</div>}
+            <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
+            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span></div>)}</div>}
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
                 <h2>Delete {screen.app.name}?</h2>
-                <p>This removes this app and its drafts from this browser. Your website account and teaching browser stay intact.</p>
-                <div className="form-actions"><button className="button danger" onClick={() => deleteApp(screen.app)}>Delete app and drafts</button><button className="button" onClick={() => setDeletingAppId(null)}>Keep app</button></div>
+                <p>This removes this app and its tasks from this browser and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
+                <div className="form-actions"><button className="button danger" onClick={() => deleteApp(screen.app)}>Delete app and tasks</button><button className="button" onClick={() => setDeletingAppId(null)}>Keep app</button></div>
               </div>}
             </section>
-            <section className="assistant-section"><div><h2>Use tasks in your assistant</h2><p>Assistant connections will be available after teaching and testing are built.</p></div><button className="button" disabled>Connect assistant</button></section>
+            <section className="assistant-section"><div><h2>Use tasks in your assistant</h2><p>Assistant connections will be available after the MCP server is built.</p></div><button className="button" disabled>Connect assistant</button></section>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
-            <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use. Review the reading actions we observe, all in one place." />
-            <details className="exploration-notes">
-              <summary>What would you like your assistant to do? (optional)</summary>
-              <label htmlFor={`exploration-notes-${app.id}`}>List the actions you want, one per line</label>
-              <textarea id={`exploration-notes-${app.id}`} value={app.explorationNotes ?? ""} maxLength={2000} rows={4} placeholder="Find a syllabus
-List assignments
-Read course materials" onChange={(event) => saveExplorationNotes(app.id, event.target.value)} aria-describedby={`notes-help-${app.id}`} />
-              <p id={`notes-help-${app.id}`}>These notes stay in this browser. They do not create working tools. Keep private information out.</p>
-              {app.explorationNotes?.trim() && <p className="field-help">Needs discovery: these actions still need observed requests and separate tests.</p>}
-            </details>
-            <TeachingPanel appId={app.id} taskId="explore" websiteUrl={app.url} active={screen.view === "explore" && screen.app.id === app.id} />
-            <div className="teaching-actions"><p>One session can suggest several actions. Captures expire after 30 minutes. Nothing publishes automatically.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
+            <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tasks to keep." />
+            <ExplorationPanel appId={app.id} websiteUrl={app.url} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
+            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Nothing becomes an assistant tool yet.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
-          {apps.flatMap((app) => app.tasks.map((task) => <div key={task.id} hidden={screen.view !== "teach" || screen.task.id !== task.id}>
-            <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
-            <PageHeader title={task.name} description={task.description} />
-            <TeachingPanel appId={app.id} taskId={task.id} websiteUrl={app.url} active={screen.view === "teach" && screen.task.id === task.id} />
-            <div className="teaching-actions"><p>Draft names stay in this browser. Hosted sessions last 30 minutes. This draft is not an assistant tool.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
-          </div>))}
 
         </main>
       </div>

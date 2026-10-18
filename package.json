@@ -8,13 +8,9 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "browser": "node --env-file-if-exists=.env browser.mjs",
-    "browser:local": "node browser-local.mjs",
-    "check": "node --check browser.mjs && node --check browser-local.mjs && node --check local-auth-server.mjs && node --check teaching-worker.mjs && node --check cloud-recorder.mjs && node --check cloud-auth.mjs && node --check public/extension/background.js && node --check public/extension/bridge.js && next typegen && tsc --noEmit",
-    "browser:signin": "node local-auth-server.mjs",
-    "browser:teach": "node teaching-worker.mjs"
+    "check": "node --check browser.mjs && node --check public/extension/background.js && node --check public/extension/bridge.js && next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@vercel/sandbox": "^3.8.0",
     "browser-use-sdk": "^3.12.1",
     "next": "^16.4.2",
     "react": "^19.3.1",

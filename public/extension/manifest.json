@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "MCParrot Explorer",
-  "version": "0.1.0",
-  "description": "Observe supported reading routes in the tab you choose, without copying passwords or website content.",
-  "permissions": ["storage", "webRequest"],
-  "host_permissions": ["https://bcourses.berkeley.edu/*"],
+  "version": "0.2.0",
+  "description": "Record the data requests a website makes in the tab you open from MCParrot, with short response samples and no headers or cookies.",
+  "permissions": ["storage", "debugger"],
+  "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
-  "content_scripts": [{ "matches": ["https://mcparrot.vercel.app/*"], "js": ["bridge.js"] }]
+  "content_scripts": [{ "matches": ["https://mcparrot.vercel.app/*", "http://localhost:4317/*", "http://127.0.0.1:4317/*"], "js": ["bridge.js"] }]
 }
