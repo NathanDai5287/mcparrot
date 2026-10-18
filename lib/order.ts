@@ -7,7 +7,6 @@ import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, sto
 import type { Ordering, Website } from "./capabilities";
 import { signedOutMessage } from "./run-task";
 import { withLock } from "./sign-in";
-import { appOwner } from "./workspace";
 
 const browserKeepAliveSeconds = 1800;
 const orderRecordSeconds = 3600;
@@ -104,6 +103,10 @@ const dollars = (amount: number) => `$${amount.toFixed(2)}`;
 
 export const pendingOrderKey = (appId: string) => `pending-order:${appId}`;
 const lockKey = (appId: string) => `order-lock:${appId}`;
+const appOwnerKey = (appId: string) => `app-owner:${appId}`;
+const saveIfAppExists = `if redis.call("EXISTS", KEYS[1]) == 0 then return 0 end
+redis.call("SET", KEYS[2], ARGV[1], "EX", ARGV[2])
+return 1`;
 const readOrder = async (appId: string) => PendingOrder.safeParse(await Redis.fromEnv().get(pendingOrderKey(appId))).data ?? null;
 const isActive = (order: PendingOrder) => ["preparing", "ready", "placing"].includes(order.status);
 const isFinished = (run: Pick<RunSummary, "status">) => ["completed", "failed", "cancelled"].includes(run.status);
@@ -177,11 +180,10 @@ export async function stopOrder(order: Pick<PendingOrder, "runId" | "sessionId">
 }
 
 async function saveOrder(appId: string, order: PendingOrder) {
-  if (!await appOwner(appId)) {
-    await stopOrder(order);
-    throw new OrderRefused("no_app", deletedAppMessage);
-  }
-  await Redis.fromEnv().set(pendingOrderKey(appId), order, { ex: orderRecordSeconds });
+  const saved = await Redis.fromEnv().eval(saveIfAppExists, [appOwnerKey(appId), pendingOrderKey(appId)], [JSON.stringify(order), String(orderRecordSeconds)]);
+  if (saved === 1) return;
+  await stopOrder(order);
+  throw new OrderRefused("no_app", deletedAppMessage);
 }
 
 export function prepareOrder(app: Website, request: string) {
@@ -200,7 +202,10 @@ export function prepareOrder(app: Website, request: string) {
       outputSchema: z.toJSONSchema(CheckoutResult),
     });
     const order: PendingOrder = { orderId: randomUUID(), sessionId: run.sessionId, runId: run.id, status: "preparing" };
-    await saveOrder(app.id, order);
+    await saveOrder(app.id, order).catch(async (error: unknown) => {
+      if (!(error instanceof OrderRefused)) await stopOrder(order);
+      throw error;
+    });
     Sentry.logger.info("Order preparing", { appId: app.id });
     return view(order);
   })));
