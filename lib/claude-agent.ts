@@ -1,16 +1,16 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Agent, JsonlLocalAgentStore, type Run, type RunResult, type SDKAgent, type SDKUserMessage } from "@cursor/sdk";
+import type { JsonlLocalAgentStore, Run, RunResult, SDKAgent, SDKUserMessage } from "@cursor/sdk";
 
 export const claudeModelName = "claude-opus-5-5-low-fast";
 
-function agentOptions(apiKey: string, cwd: string, storeDir: string, sandbox: boolean) {
+function agentOptions(apiKey: string, cwd: string, store: JsonlLocalAgentStore, sandbox: boolean) {
   return {
     apiKey,
     model: { id: "claude-opus-5-5", params: [{ id: "context", value: "300k" }, { id: "effort", value: "low" }, { id: "fast", value: "true" }] },
     tools: [],
-    local: { cwd, settingSources: [], sandboxOptions: { enabled: sandbox }, store: new JsonlLocalAgentStore(storeDir) },
+    local: { cwd, settingSources: [], sandboxOptions: { enabled: sandbox }, store },
   };
 }
 
@@ -27,7 +27,8 @@ export async function runClaudeAgent(message: string | SDKUserMessage, apiKey: s
   const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
   const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
   const start = async (sandbox: boolean) => {
-    agent = await Agent.create(agentOptions(apiKey, dirs[0], dirs[1], sandbox));
+    const { Agent, JsonlLocalAgentStore } = await import("@cursor/sdk");
+    agent = await Agent.create(agentOptions(apiKey, dirs[0], new JsonlLocalAgentStore(dirs[1]), sandbox));
     if (timedOut) throw timeout();
     return agent.send(message);
   };
