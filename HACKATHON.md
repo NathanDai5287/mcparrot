@@ -64,7 +64,7 @@ For example, the Commit Fellowship requires a supplemental form.
 | --- | --- | --- |
 | Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved task in a hidden Browser Use browser with that profile; when the website signs out, a Browser Use agent signs in again with the saved login through secret bindings, chooses the text-message check, and finishes after the user types the code in ChatGPT; this use is a gap until Nathan's live demonstration passes |
 | Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; MCParrot sends error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring, and the demo must show how that evidence changed what we built, which is a gap |
-| Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents |
+| Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents; Devpost lists $3,000, so confirm the amount on Devpost |
 
 ### Secondary sponsor challenges
 
@@ -72,9 +72,9 @@ Pursue these only if the demo supports them.
 
 | Sponsor | Challenge | Notes |
 | --- | --- | --- |
-| Paper | Best Designed Hack | Judges design fundamentals and craft; the Calm workspace design is the entry |
-| Creao AI | AI-first disruptor, one-person company, or team empowerment | Fits the story that an agent does the work; choose categories when you submit, as the event site describes |
-| Base44 | Build Something People Want | Needs a real user, a problem-first approach, and a usable product rather than a demo shell |
+| Paper | Best Designed Hack | Judges design fundamentals and craft; the Calm workspace design is the entry; Devpost lists $3,000, so confirm the amount and rules on Devpost and the event site |
+| Creao AI | AI-first disruptor, one-person company, or team empowerment | Fits the story that an agent does the work; choose categories when you submit, as the event site describes; Devpost lists a $3,500 category, and the event site may list smaller split tracks, so confirm on Devpost |
+| Base44 | Build Something People Want | Needs a real user, a problem-first approach, and a usable product rather than a demo shell; Devpost lists $2,000, so confirm the amount on Devpost |
 | Cognition | Best Use of Devin | Applies only if Devin built a meaningful part of the project |
 
 ## Other listed prizes
