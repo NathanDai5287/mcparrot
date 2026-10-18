@@ -16,7 +16,7 @@
   "dependencies": {
     "@clerk/nextjs": "^7.9.17",
     "@cursor/sdk": "^1.0.38",
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/server": "^2.3.1",
     "@sentry/nextjs": "^11.8.0",
     "@upstash/redis": "^1.39.0",
     "browser-use-sdk": "^3.12.1",
