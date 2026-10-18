@@ -6,7 +6,7 @@ export const stepPlaceholderPattern = /^step(\d+)\.(.+)$/;
 const paymentWords = /\b(check ?out|payments?|pay|purchases?|place order|create order|submit order|order create)\b/;
 export const paymentRefusal = "MCParrot refuses tool requests that look like checkout or payment, so a tool can never place an order. Orders go only through the Pay with Link ordering tools.";
 
-const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "x-apollo-operation-name", "x-channel-id", "x-experience-id", "x-requested-with"];
+const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "client-identifier", "github-verified-fetch", "notion-client-version", "x-apollo-operation-name", "x-channel-id", "x-client-identifier", "x-experience-id", "x-notion-active-user-header", "x-requested-with", "x-restli-protocol-version"];
 
 export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name]) => replayedHeaderNames.includes(name.toLowerCase())));
 
