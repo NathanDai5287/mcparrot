@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { sentryOptions } from "./lib/sentry-options";
+import { scrubDynamicSamplingContext, sentryOptions } from "./lib/sentry-options";
 
 Sentry.init(sentryOptions);
+Sentry.getClient()?.on("createDsc", scrubDynamicSamplingContext);
