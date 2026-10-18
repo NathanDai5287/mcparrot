@@ -1,5 +1,5 @@
 import { isOwner, signedInUserId } from "../../../lib/account";
-import { stopBrowser } from "../../../lib/browser-use";
+import { stopBrowser, stopWarmBrowser } from "../../../lib/browser-use";
 import type { Website } from "../../../lib/capabilities";
 import { removeAppListing } from "../../../lib/marketplace";
 import { pendingOrderKey, stopOrder } from "../../../lib/order";
@@ -43,6 +43,7 @@ async function deleteApp(app: Website) {
   });
   const apps = await deleteStoredApp(app.id, appKeys(app.id));
   await removeAppListing(app);
+  await stopWarmBrowser(app.id);
   if (pending?.browserId) {
     try {
       await stopBrowser(pending.browserId);

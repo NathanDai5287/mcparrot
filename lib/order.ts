@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Redis } from "@upstash/redis";
 import type { RunCreateBody, RunSummary } from "browser-use-sdk/v4";
 import { z } from "zod";
-import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser } from "./browser-use";
+import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, stopWarmBrowser } from "./browser-use";
 import type { Ordering, Website } from "./capabilities";
 import { signedOutMessage } from "./run-task";
 import { withLock } from "./sign-in";
@@ -147,6 +147,7 @@ export function prepareOrder(app: Website, request: string) {
   return withOrderLock(app.id, () => Sentry.startSpan({ name: "browser_use.agent_order_prepare" }, async () => {
     const current = await readOrder(app.id);
     if (current && isActive(current)) throw new OrderRefused("in_progress", orderInProgressMessage);
+    await stopWarmBrowser(app.id);
     const run = await browserUse().runs.create({
       task: prepareTask(app.url, request),
       browserSettings: { profileId },

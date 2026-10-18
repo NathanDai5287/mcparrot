@@ -4,7 +4,7 @@ import { Redis } from "@upstash/redis";
 import { BrowserUseError, type RunCreateBody, type SecretBinding } from "browser-use-sdk/v4";
 import type { Page } from "playwright-core";
 import { z } from "zod";
-import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, withPage } from "./browser-use";
+import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, stopWarmBrowser, withPage } from "./browser-use";
 import { automaticSignInOf, type Website } from "./capabilities";
 import { readLogin, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
@@ -80,13 +80,14 @@ async function frameHosts(page: Page) {
   return [...new Set(hosts.filter(Boolean))];
 }
 
-function runSignInAgent(spanName: string, body: RunCreateBody, waitMilliseconds: number, outcomes: readonly [string, ...string[]] = passwordOutcomes) {
+function runSignInAgent(appId: string, spanName: string, body: RunCreateBody, waitMilliseconds: number, outcomes: readonly [string, ...string[]] = passwordOutcomes) {
   const SignInResult = z.object({ outcome: z.enum(outcomes) });
   return Sentry.startSpan({ name: spanName }, async (span) => {
     let run: { id: string; sessionId: string } | undefined;
     let outcome = "failed";
     let timedOut = false;
     try {
+      await stopWarmBrowser(appId);
       run = await browserUse().runs.create({ ...body, keepAlive: pendingSignInSeconds, maxCostUsd: agentRunMaxCostUsd, outputSchema: z.toJSONSchema(SignInResult) });
       const finished = await browserUse().runs.waitForCompletion(run.id, { timeout: waitMilliseconds });
       const result = SignInResult.safeParse(finished.output);
@@ -103,7 +104,8 @@ function runSignInAgent(spanName: string, body: RunCreateBody, waitMilliseconds:
   });
 }
 
-async function stopSavingProfile(browserId: string) {
+async function stopSavingProfile(appId: string, browserId: string) {
+  await stopWarmBrowser(appId);
   try {
     await stopBrowser(browserId);
   } catch (error) {
@@ -131,13 +133,13 @@ async function agentBrowser(appId: string, sessionId?: string) {
 
 async function finishSignedIn(appId: string, browserId: string | undefined, lookupFailed: boolean) {
   if (lookupFailed) throw new Error(signInFailedMessage);
-  if (browserId) await stopSavingProfile(browserId);
+  if (browserId) await stopSavingProfile(appId, browserId);
   await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
 }
 
 async function signIn(app: SigningInApp, login: Login, hash: string, waitMilliseconds: number) {
   Sentry.logger.info("Automatic sign-in started", { appId: app.id });
-  const { sessionId, outcome, timedOut } = await runSignInAgent("browser_use.agent_sign_in", {
+  const { sessionId, outcome, timedOut } = await runSignInAgent(app.id, "browser_use.agent_sign_in", {
     task: signInTask(app.url),
     browserSettings: { profileId: app.browserProfileId },
     secretBindings: [secret("username", login.username, login.hosts), secret("password", login.password, login.hosts)],
@@ -161,7 +163,7 @@ async function signIn(app: SigningInApp, login: Login, hash: string, waitMillise
 
 async function googleSignIn(app: SigningInApp, googleEmail: string | undefined, attempt: string, waitMilliseconds: number) {
   Sentry.logger.info("Automatic Google sign-in started", { appId: app.id });
-  const { sessionId, outcome, timedOut } = await runSignInAgent("browser_use.agent_google_sign_in", {
+  const { sessionId, outcome, timedOut } = await runSignInAgent(app.id, "browser_use.agent_google_sign_in", {
     task: googleSignInTask(app.url, googleEmail),
     browserSettings: { profileId: app.browserProfileId },
   }, waitMilliseconds, googleOutcomes);
@@ -267,7 +269,7 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
   let outcome = "failed";
   try {
     const hosts = await withPage(pending.cdpUrl, frameHosts);
-    ({ outcome } = await runSignInAgent("browser_use.agent_verification_code", {
+    ({ outcome } = await runSignInAgent(app.id, "browser_use.agent_verification_code", {
       task: codeTask(app.url),
       sessionId: pending.sessionId,
       secretBindings: [secret("verification_code", code, hosts)],
@@ -282,7 +284,7 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
   }
   let stopped = true;
   try {
-    await stopSavingProfile(pending.browserId);
+    await stopSavingProfile(app.id, pending.browserId);
   } catch (error) {
     stopped = false;
     Sentry.logger.warn("Sign-in browser stop failed", { appId: app.id, reason: errorReason(error) });
