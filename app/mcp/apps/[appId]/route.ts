@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { isReadingTask, runTask } from "../../../../lib/run-task";
@@ -17,7 +18,7 @@ function inputSchema(task: Task) {
 }
 
 function appServer(app: Website) {
-  const server = new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" });
+  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: true, recordOutputs: false });
   for (const task of app.tasks.filter(isReadingTask)) {
     server.registerTool(toolName(task.name), {
       title: task.name,
@@ -31,6 +32,7 @@ function appServer(app: Website) {
 
 async function handle(request: Request, { params }: RouteContext<"/mcp/apps/[appId]">) {
   const { appId } = await params;
+  Sentry.setTag("app.id", appId);
   const app = (await readWorkspace())?.find((candidate) => candidate.id === appId);
   if (!app) return Response.json({ error: "This MCParrot app does not exist." }, { status: 404 });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
