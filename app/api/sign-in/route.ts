@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
+import { signedInUserId } from "../../../lib/account";
 import { browserUse, startBrowser, stopBrowser, withPage } from "../../../lib/browser-use";
-import { changeApp, readWorkspace, updateStoredApp } from "../../../lib/workspace";
+import { changeApp, ownedApp, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,13 +9,14 @@ export const maxDuration = 60;
 const signInMinutes = 15;
 
 export async function POST(request: Request) {
+  const userId = await signedInUserId();
   if (!process.env.BROWSER_USE_API_KEY) return Response.json({ error: "Sign-in is not set up. Add BROWSER_USE_API_KEY to the server environment." }, { status: 500 });
   const { appId } = await request.json().catch(() => ({})) as { appId?: string };
   if (!appId) return Response.json({ error: "Missing appId." }, { status: 400 });
   let browser: Awaited<ReturnType<typeof startBrowser>>;
   let profileId: string;
   try {
-    const app = (await readWorkspace() ?? []).find((storedApp) => storedApp.id === appId);
+    const app = await ownedApp(userId, appId);
     if (!app) return Response.json({ error: "App not found." }, { status: 404 });
     Sentry.logger.info("Sign-in started", { app: app.name, newProfile: !app.browserProfileId });
     profileId = app.browserProfileId ?? (await browserUse().profiles.create({ name: `MCParrot ${app.name}` })).id;
@@ -38,11 +40,15 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const userId = await signedInUserId();
   const { searchParams } = new URL(request.url);
   const browserId = searchParams.get("browserId");
   const appId = searchParams.get("appId");
   const finished = searchParams.get("finished") !== "false";
   if (!browserId || !appId) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
+  const profileId = (await ownedApp(userId, appId))?.browserProfileId;
+  const browser = profileId && await browserUse().browsers.get(browserId).catch(() => undefined);
+  if (!browser || browser.metadata.profileId !== profileId) return Response.json({ error: "Sign-in browser not found." }, { status: 404 });
   try {
     await stopBrowser(browserId).catch(async (error) => {
       if ((await browserUse().browsers.get(browserId)).status !== "stopped") throw error;

@@ -1,0 +1,27 @@
+"use client";
+
+import { useState } from "react";
+
+export function AddToMyApps({ listingId, signedIn }: { listingId: string; signedIn: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!signedIn) return <a className="button" href={`/sign-in?redirect_url=${encodeURIComponent(`/marketplace#${listingId}`)}`}>Sign in to add</a>;
+
+  async function add() {
+    setBusy(true);
+    setError("");
+    const response = await fetch("/api/marketplace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "install", listingId }) }).catch(() => null);
+    const result = await response?.json().catch(() => ({})) ?? {};
+    if (response?.ok) {
+      window.location.assign(`/apps/${result.appId}`);
+      return;
+    }
+    setBusy(false);
+    setError(result.error ?? "MCParrot could not add this app. Try again.");
+  }
+
+  return <span className="listing-action">
+    <button className="button primary" disabled={busy} onClick={add}>{busy ? "Adding…" : "Add to my apps"}</button>
+    {error && <span className="pilot-error" role="alert">{error}</span>}
+  </span>;
+}

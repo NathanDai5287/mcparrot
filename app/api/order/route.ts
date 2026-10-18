@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { isOwner, signedInUserId } from "../../../lib/account";
 import { appIdSchema, type Website } from "../../../lib/capabilities";
 import { cancelOrder, checkOrder, OrderRefused, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus } from "../../../lib/order";
-import { readWorkspace } from "../../../lib/workspace";
+import { ownedApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -14,11 +15,13 @@ const OrderAction = z.discriminatedUnion("action", [
 
 type OrderAction = z.infer<typeof OrderAction>;
 
-const findApp = async (appId: string) => (await readWorkspace())?.find((app) => app.id === appId);
 const appNotFound = () => Response.json({ error: "This app no longer exists in MCParrot." }, { status: 404 });
+const ownerOnly = () => Response.json({ error: "Only the MCParrot owner can use ordering." }, { status: 403 });
 
 export async function GET(request: Request) {
-  const app = await findApp(new URL(request.url).searchParams.get("appId") ?? "");
+  const userId = await signedInUserId();
+  if (!await isOwner(userId)) return ownerOnly();
+  const app = await ownedApp(userId, new URL(request.url).searchParams.get("appId") ?? "");
   if (!app) return appNotFound();
   const [link, order] = await Promise.all([readLinkStatus(), checkOrder(app)]);
   return Response.json({ link: link ? { connected: link.isConnected, mode: link.mode ?? null } : null, order });
@@ -31,9 +34,11 @@ function apply(action: OrderAction, app: Website) {
 }
 
 export async function POST(request: Request) {
+  const userId = await signedInUserId();
+  if (!await isOwner(userId)) return ownerOnly();
   const action = OrderAction.safeParse(await request.json().catch(() => null));
   if (!action.success) return Response.json({ error: "The order request is not valid. Describe the order in 1 to 1,000 characters." }, { status: 400 });
-  const app = await findApp(action.data.appId);
+  const app = await ownedApp(userId, action.data.appId);
   if (!app) return appNotFound();
   try {
     return Response.json({ order: await apply(action.data, app) });

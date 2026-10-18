@@ -1,3 +1,4 @@
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 function isCrossSite(request: NextRequest) {
@@ -12,11 +13,13 @@ function isCrossSite(request: NextRequest) {
   }
 }
 
-export function proxy(request: NextRequest) {
-  if (request.method !== "GET" && request.method !== "HEAD" && isCrossSite(request)) {
+export default clerkMiddleware((_auth, request) => {
+  const isWrite = request.method !== "GET" && request.method !== "HEAD";
+  if (request.nextUrl.pathname.startsWith("/api/") && isWrite && isCrossSite(request)) {
     return NextResponse.json({ error: "Cross-site requests are not allowed." }, { status: 403 });
   }
-  return NextResponse.next();
-}
+}, { signInUrl: "/sign-in" });
 
-export const config = { matcher: "/api/:path*" };
+export const config = {
+  matcher: ["/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/api/(.*)"],
+};

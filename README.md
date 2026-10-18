@@ -26,8 +26,10 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
 | [Ordering with Pay with Link](#ordering-with-pay-with-link) | How ChatGPT and the app page place test-mode orders that Browser Use pays for with Stripe Link |
+| [Accounts and ownership](#accounts-and-ownership) | Sign-in with Clerk, one workspace for each user, and the owner-only features |
+| [Shared app marketplace](#shared-app-marketplace) | Publishing an app's tasks, browsing the marketplace, and adding a shared app |
 | [Production deployment setup](#production-deployment-setup) | Publishing on request, hosting, storage, and the service architecture |
-| [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, and recordings |
+| [Authentication and private data](#authentication-and-private-data) | Account access, the connection link token, saved logins, and recordings |
 | [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
 | [Workspace navigation behavior](#workspace-navigation-behavior) | Stable app addresses, Back and Forward, and deleting an app |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
@@ -56,6 +58,7 @@ This rule covers both managing MCParrot and running taught website tasks.
 Each website app's connection runs its saved reading tasks and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
 Running a task and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
 Ordering has both paths: the app page's **Test order** box and the app connection's ordering tools call the same operations, and `check_order` reports the Pay with Link status that the app page shows.
+Both paths enforce the same account rules: each operation reaches only the apps of its user, and ordering only the owner's apps, as [accounts and ownership](#accounts-and-ownership) describes.
 The table maps each frontend capability to its aspirational management MCP equivalent.
 
 | Frontend capability | Aspirational management MCP equivalent |
@@ -74,8 +77,11 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Delete one task | `delete_task` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
-| Copy the app's connection link | `get_connection_link` |
+| Create or regenerate the app's connection link | `regenerate_connection_link` |
 | Turn ordering on or off and set its spending limit | `set_ordering` |
+| Publish, update, or unpublish the app on the marketplace | `publish_app`, `unpublish_app` |
+| Browse the marketplace | `browse_marketplace` |
+| Add a marketplace app to my apps | `install_from_marketplace` |
 | Delete an app and its tasks | `delete_app` |
 
 These operation names are examples.
@@ -125,9 +131,13 @@ It rejects a URL pattern on another origin, placeholders that do not match the i
 A saved task appears on the app page, where **Delete** removes it, and becomes its own tool in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
 Nathan chose that ChatGPT saves tasks without asking him first, and he accepted that unwanted tasks can appear until he deletes them on the app page.
 
-Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
-The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
-Vercel gives that secret to each deployment as `VERCEL_AUTOMATION_BYPASS_SECRET`, and the app page shows the full link with a **Copy link** button and setup steps.
+Nathan chose a private connection link for each app instead of MCP sign-in.
+The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?token=<token>`, where the token is 32 random bytes that MCParrot creates when the user selects **Create link** or **Regenerate link** on the app page.
+MCParrot stores only the token's SHA-256 hash with the app and shows the full link once, with a **Copy link** button and setup steps, because a stored hash cannot reveal the link; a lost link means selecting **Regenerate link**.
+Regenerating replaces the hash, so the old link stops working at once.
+The route compares hashes in constant time and returns 401 for a missing or wrong token.
+Older links in the form `?x-vercel-protection-bypass=<secret>`, where the secret is the project's `VERCEL_AUTOMATION_BYPASS_SECRET`, still work, but only for the owner's apps, so Nathan's existing ChatGPT connectors keep working.
+While Vercel Authentication protects production, Vercel blocks the new token links before they reach MCParrot, so they work only after Nathan turns Vercel Authentication off; the older links work in both states.
 In ChatGPT, the user opens Settings, then Plugins, selects **Browse directory**, then **Add** and **Add custom MCP server**.
 The user names the plugin, pastes the link as the Server URL, sets Authentication to No authentication, accepts the risk notice, and selects **Create as a plugin**.
 Workspace accounts can have custom MCP servers disabled by an administrator.
@@ -222,7 +232,7 @@ Nathan chose short real-value samples because they make Composer's suggestions m
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Composer in a sample.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
-Vercel Authentication protects the production site, so only Nathan, or anyone with a connection link, can start discovery.
+Only a signed-in user can start discovery, and only on their own apps; every user's discovery runs on Nathan's Cursor key, which the [status page](STATUS.md) lists as a risk.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
 
 ## Browser visibility by phase
@@ -335,11 +345,13 @@ This ordering path is a gap until a live check passes, as the [status page](STAT
 
 ### Ordering settings
 
-Each app page has an **Ordering** section with an **Allow ordering from ChatGPT and from this page** switch, which is off by default, and a spending limit for each order in US dollars.
+Each of the owner's app pages has an **Ordering** section with an **Allow ordering from ChatGPT and from this page** switch, which is off by default, and a spending limit for each order in US dollars.
+Nathan decided that only the owner can turn on and use ordering, because orders use his Browser Use account and its Link connection.
+Other users do not see the section, and the server refuses `setOrdering`, `/api/order`, and the ordering tools for them.
 The limit can be at most $500, because Link refuses larger payments.
 The `setOrdering` workspace operation stores both with the app.
 The section also shows whether Pay with Link is connected and whether its mode is test or live, and live mode shows that it is blocked.
-The app's connection lists the four ordering tools only while the switch is on.
+The app's connection lists the four ordering tools only while the switch is on and the app belongs to the owner.
 
 ### Order steps
 
@@ -379,6 +391,45 @@ A card saved in the website account is a risk that the code cannot fully block, 
 The user must remove every saved card from the website account before testing.
 When a payment run fails for another reason, the order may still have gone through, so the message tells the user to check the website's order history before trying again.
 
+## Accounts and ownership
+
+Nathan decided that MCParrot has real accounts, so other people can use it with their own apps.
+Users sign in with Google through Clerk, which Nathan installed from the Vercel Marketplace; the `/sign-in` page shows Clerk's sign-in box, and the sidebar has an account button to sign out.
+The dashboard and every `/api` route need a signed-in user, except the marketplace page and its read route, and `/docs`, `/monitoring`, `/sign-in`, and the app connections at `/mcp/apps/<app-id>` are public; each connection checks its own token.
+Each page and route checks the session itself, because Clerk deprecates path matching in middleware, and `proxy.ts` runs Clerk's middleware and still rejects cross-site `/api` writes.
+A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards.
+
+Each user has one workspace under the Redis key `workspace:<user-id>`, and the key `app-owner:<app-id>` records which user owns each app.
+Every route and connection finds the app's owner from that key, and each route checks that the owner is the signed-in user before it reads or changes any per-app key; another user's app returns 404.
+Creating an app sets its owner key in the same atomic step as the workspace change and fails when the key already exists, and deleting an app removes the key in the same way.
+
+The owner is the account whose verified primary email matches `MCPARROT_OWNER_EMAIL`.
+The first time the owner opens the dashboard, MCParrot moves the older single `workspace` value to `workspace:<owner-id>` and writes an owner key for each of its apps, in one atomic Redis step that runs only while the older value exists, so it runs once.
+Until then, the older apps have no owner key and their connections return 404, so Nathan must open the dashboard once right after this change is published.
+Only the owner can turn on and use ordering.
+Nathan chose no usage limits for other users, so every user's discovery spends his Cursor credit and every sign-in and task spends his Browser Use credit, which the [status page](STATUS.md) lists as a risk.
+
+## Shared app marketplace
+
+Nathan decided that users can share an app's tasks on a public marketplace at `/marketplace`, which anyone can open without signing in.
+It lists each published app's name, website address, short description, task count and task names, publisher name, and published date, newest first.
+`GET /api/marketplace` returns the same summaries without signing in.
+
+1. On the app page, select **Publish to marketplace** in the **Marketplace** section.
+2. Write a short description of up to 500 characters, and read the preview of exactly what will be shared.
+3. Select **Publish** to confirm.
+
+The listing holds the app name, website address, description, the publisher's name from their Clerk account, and each task's name, description, requests, inputs, and returns.
+When ordering is on for the app, the listing says only "Supports ordering", and copies always start with ordering off.
+A listing never holds logins, Browser Use profile IDs, sign-in times, connection tokens, recordings, discovery results, or orders.
+After publishing, the section shows the published date with **Update listing**, which publishes the app's current tasks and description again under the same listing, and **Unpublish**, which removes the listing; deleting the app also removes it.
+
+Each marketplace item has **Add to my apps**, which copies it into the signed-in user's workspace as a new app with new app and task IDs, ordering off, no sign-in, and no connection link, then opens that app.
+A signed-out visitor sees **Sign in to add**, which opens the sign-in page and then returns to the marketplace.
+Redis keeps the listing IDs in the set `marketplace` and each listing under `listing:<listing-id>`, and the app keeps its listing ID, published date, and description.
+The server validates each listing with zod and refuses an app with more than 100 tasks, a listing longer than 200,000 characters, and a new listing when the marketplace holds 200.
+Matching marketplace MCP operations are aspirational, as the [UI and MCP parity section](#ui-and-mcp-parity) records.
+
 ## Production deployment setup
 
 The Vercel project `mcparrot` is linked to the public GitHub repository on the Pro plan.
@@ -388,14 +439,15 @@ To publish, run `npx vercel deploy --prod` from an up-to-date `main` checkout.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
-Vercel Authentication protects every deployment, including the production domain; only requests that carry the automation bypass secret skip it.
+The Next.js app deploys the workspace, the pages `/marketplace` and `/sign-in`, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, `/api/connection`, `/api/marketplace`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
+Vercel Authentication still protects every deployment, including the production domain, and only requests that carry the automation bypass secret skip it.
+Nathan decided to turn Vercel Authentication off for production once accounts ship, so that other people can reach the Clerk sign-in.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
-MCParrot has one owner for now, because Vercel Authentication lets only Nathan, and anyone with a connection link, reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
-The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, login-saved time, and ordering setting; it holds no credentials, and recorded requests stay in the extension.
+Each user's workspace is one JSON value under `workspace:<user-id>`, as [accounts and ownership](#accounts-and-ownership) describes.
+The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, login-saved time, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
 Each app's last discovery result is a separate value under `discovery:<app-id>`.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
@@ -416,8 +468,9 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each task in a hidden browser, and sign in again with the saved login |
 | Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
-| Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
-| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, Browser Use profile IDs, encrypted saved logins, pending sign-ins, and last discovery results |
+| Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
+| Accounts | Clerk from the Vercel Marketplace, with Google sign-in | Give each user their own workspace and identify the owner |
+| Persistent storage | Upstash Redis from the Vercel Marketplace | Store each user's apps and tasks, owner keys, Browser Use profile IDs, encrypted saved logins, pending sign-ins, last discovery results, and marketplace listings |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
@@ -430,16 +483,16 @@ For work that takes longer than one request, durable operation status that clien
 ## Authentication and private data
 
 Keep every connection, browser profile, task, and pending operation limited to its owner.
-Vercel Authentication protects the dashboard and its routes, but the connection link carries the bypass secret, so anyone with the link has the same access as Nathan.
+Clerk sign-in protects the dashboard and its routes, and each route reaches only the signed-in user's apps.
 
-The connection link is the only access control on MCP use, and Nathan accepted this trade-off for the first version.
-Anyone with the link can use the whole site, not only that app's tools, because the bypass secret skips Vercel Authentication for every page and route.
-With it, a person can read the workspace and the bypass secret through `GET /api/workspace`, create and delete apps and tasks through `PATCH /api/workspace`, save or delete logins through `/api/login`, run discovery on Nathan's Cursor key through `/api/discover`, and start a live Browser Use browser on an app's signed-in profile through `POST /api/sign-in`.
-Whether to limit the bypass to the MCP route is an open decision for Nathan.
-The server rejects cross-site `/api/*` requests that change data, so another website cannot use Nathan's signed-in browser to call them, and every page forbids framing by other websites.
-Keep the link private, and regenerate the secret if it leaks: open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, and regenerate it.
-After a new secret, redeploy, copy each app's new link, and replace the URL in each ChatGPT connector.
-MCP sign-in for each owner remains aspirational.
+An app's connection link is the only access control on MCP use, and Nathan accepted this trade-off.
+Anyone with the link can run that app's tools, read its website's pages with its saved sign-in, save tasks to it, and, for the owner's apps, order, but the link reaches nothing else.
+Keep the link private, and select **Regenerate link** on the app page if it leaks, then replace the URL in the ChatGPT connector.
+MCParrot never logs tokens, and Sentry removes `token` and `x-vercel-protection-bypass` query values.
+An older owner link carries the Vercel bypass secret, which also skips Vercel Authentication on every page while it is on; after Vercel Authentication is off, that secret only opens the owner's app connections.
+To stop older links, regenerate the bypass secret: open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, regenerate it, and redeploy.
+The server rejects cross-site `/api/*` requests that change data, so another website cannot use a signed-in browser to call them, and every page forbids framing by other websites.
+MCP sign-in for each user remains aspirational.
 
 The Browser Use profile holds the website's cookies inside Browser Use, and MCParrot stores only its ID.
 A sign-in browser's live view address works like a password while the browser runs, so MCParrot shows it only on the protected app page.
@@ -447,7 +500,7 @@ MCParrot encrypts each saved login with AES-256-GCM before it reaches Redis, usi
 That key is a Sensitive Vercel variable in production and preview, separate from the Redis credentials, so a Redis leak alone does not reveal passwords.
 Only the automatic sign-in step on the server decrypts a login, and it passes the username and password to Browser Use only as secret bindings for the app's website and sign-in hosts.
 The password never returns to the dashboard, never appears in MCP results, and never reaches an AI model, a log, or Sentry.
-Vercel Authentication is the only owner check for saved logins, because MCParrot has one owner; per-owner authorization for each credential record is aspirational.
+`/api/login` checks that the app belongs to the signed-in user before it saves or deletes a login.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
 Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in paths, and both the extension and `/api/discover` redact secret-looking values, as [recording in the explore tab](#recording-in-the-explore-tab) and [discovery data sent to Composer](#discovery-data-sent-to-composer) describe.
@@ -460,7 +513,7 @@ Sentry is a service that collects errors, traces, logs, and session recordings t
 MCParrot uses `@sentry/nextjs` in the browser and on the server, and it sends everything to the Sentry project `nathan-s4/mcparrot`.
 The SDK reads `NEXT_PUBLIC_SENTRY_DSN`, and the build uploads source maps with `SENTRY_AUTH_TOKEN`, so stack traces show the original code.
 Browser events go through the same-site route `/monitoring`, which forwards them to Sentry, so ad blockers do not drop them and Vercel Authentication lets them through.
-MCParrot keeps every trace and every session because it has one user, and it sends logs through the SDK instead of a Vercel Log Drain.
+MCParrot keeps every trace and every session because it has few users, and it sends logs through the SDK instead of a Vercel Log Drain.
 
 | Sentry product | What MCParrot sends |
 | --- | --- |
@@ -474,7 +527,7 @@ Spans carry only non-secret attributes, such as the app ID, task name, request c
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
 MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses; `read_page` logs carry only the app ID, the result size, and any failure reason, never the page text.
 Order logs and spans never carry the delivery address, the items, the order request, the Link connection ID, or the Link email.
-Before sending, the SDK removes URL query strings from span names, events, and breadcrumbs, and replaces the bypass secret with `[Filtered]` in spans, events, and logs.
+Before sending, the SDK removes URL query strings from span names, events, and breadcrumbs, and replaces `token` and bypass secret query values with `[Filtered]` in spans, events, and logs.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
@@ -485,7 +538,7 @@ Sentry ignores that expected error, and also the expected tool outcomes for a si
 
 App and exploration pages have stable addresses under `/apps/<app-id>` and `/apps/<app-id>/explore`.
 Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tasks.
-The same apps appear on any device where Nathan opens the dashboard.
+The same apps appear on any device where the user signs in.
 Select **Delete app** inside an app, then confirm inline to remove that app and its tasks from MCParrot and delete its recorded requests in the extension.
 Deletion does not remove the website account.
 An old link to a deleted app shows an unavailable page with a return to the app list.
@@ -501,7 +554,9 @@ The production key is Sensitive and cannot be pulled, so logins saved locally ca
 The pulled `KV_REST_API_URL` and `KV_REST_API_TOKEN` point at the production Redis, so a login saved from a local server overwrites the app's production login with one that production cannot decrypt, and other local changes reach production apps too.
 Replace those two values with a separate Redis database before you save logins or change apps locally.
 Add `NEXT_PUBLIC_SENTRY_DSN` to send diagnostics and `SENTRY_AUTH_TOKEN` to upload source maps during `npm run build`; without them, Sentry stays off.
-The connection link appears only on Vercel, where `VERCEL_AUTOMATION_BYPASS_SECRET` exists.
+Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk integration, and `MCPARROT_OWNER_EMAIL`; the app needs the Clerk keys to start.
+Signing in locally as the owner moves the production `workspace` value when the pulled Redis values point at production.
+The development server listens on `localhost`, because Clerk's development middleware sends requests to that host name.
 
 ```sh
 npm install

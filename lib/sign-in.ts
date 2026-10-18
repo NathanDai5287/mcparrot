@@ -8,7 +8,7 @@ import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, wit
 import type { Website } from "./capabilities";
 import { readLogin, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
-import { readWorkspace, updateStoredApp } from "./workspace";
+import { findApp, updateStoredApp } from "./workspace";
 
 const pendingSignInSeconds = 900;
 const agentWaitMilliseconds = 150_000;
@@ -96,7 +96,7 @@ async function stopSavingProfile(browserId: string) {
 }
 
 async function profileId(app: Website) {
-  const stored = (await readWorkspace())?.find((storedApp) => storedApp.id === app.id);
+  const stored = (await findApp(app.id))?.app;
   if (stored?.browserProfileId) return stored.browserProfileId;
   const { id } = await browserUse().profiles.create({ name: `MCParrot ${app.name}` });
   await updateStoredApp(app.id, { browserProfileId: id });

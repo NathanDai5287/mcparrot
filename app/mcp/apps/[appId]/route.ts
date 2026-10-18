@@ -2,12 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { isOwner } from "../../../../lib/account";
 import type { Task, Website } from "../../../../lib/capabilities";
+import { connectionAllowed } from "../../../../lib/connection";
 import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isReadingTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
-import { readWorkspace } from "../../../../lib/workspace";
+import { findApp } from "../../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -71,7 +73,7 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
   }, async ({ orderId }) => textResult(orderText(await cancelOrder(app, orderId))));
 }
 
-function appServer(app: Website) {
+function appServer(app: Website, orderLimitUsd?: number) {
   const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
   const tasks = app.tasks.filter(isReadingTask);
   const usedNames = new Set(connectionToolNames);
@@ -126,17 +128,19 @@ function appServer(app: Website) {
     inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
   }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
-  if (app.ordering?.enabled) registerOrderTools(server, app, app.ordering.limitUsd);
+  if (orderLimitUsd) registerOrderTools(server, app, orderLimitUsd);
   return server;
 }
 
 async function POST(request: Request, { params }: RouteContext<"/mcp/apps/[appId]">) {
   const { appId } = await params;
   Sentry.setTag("app.id", appId);
-  const app = (await readWorkspace())?.find((candidate) => candidate.id === appId);
-  if (!app) return Response.json({ error: "This MCParrot app does not exist." }, { status: 404 });
+  const found = await findApp(appId);
+  if (!found) return Response.json({ error: "This MCParrot app does not exist." }, { status: 404 });
+  if (!await connectionAllowed(request, found.app, found.ownerId)) return Response.json({ error: "This connection link is not valid. Copy a new link from the app page in MCParrot." }, { status: 401 });
+  const orderLimitUsd = found.app.ordering?.enabled && await isOwner(found.ownerId) ? found.app.ordering.limitUsd : undefined;
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await appServer(app).connect(transport);
+  await appServer(found.app, orderLimitUsd).connect(transport);
   return transport.handleRequest(request);
 }
 
