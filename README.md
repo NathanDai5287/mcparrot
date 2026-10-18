@@ -112,7 +112,8 @@ Users who manage apps only through the UI do not need the management connection,
 
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
-Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter.
+Its initialize result carries server instructions of fewer than 450 characters, which tell ChatGPT to call the matching saved tool directly, to use `read_page` only when no saved tool fits, to set `fullAnswer` only when a needed field is missing, to tell the user and stop when a result says the website is signed out, and to run independent tools at once.
+Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes an optional text parameter whose description says that it defaults to the recorded example, because a run fills a missing input with that example.
 A tool whose requests all use GET has the annotation `readOnlyHint: true`, and a tool with any POST request has `readOnlyHint: false`, `destructiveHint: false`, and `openWorldHint: true`, because a POST request can change website data.
 The MCP tool name is the saved tool's name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
@@ -134,7 +135,7 @@ He accepted the trade-off that ChatGPT can read any page his account can see on 
 Each connection also has a read-only `view_image` tool, titled "Read an image on <app name>", whose one input `url` is an image address that an earlier tool answer named, such as the `src` of an `<image>` element in an Ed post.
 Nathan asked for it because an Ed announcement showed a class's score mean and standard deviation only inside a picture.
 ChatGPT connectors do not pass MCP image results to the model, so the tool returns text: Claude Opus 5.5 reads the picture and the tool returns Claude's copy of every text and number in it and a short description of any chart.
-Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, and it says that the tool opens images on the app's website with the sign-in and `https` images on other websites without it, so images reach the chat only when they are needed.
+Its description tells ChatGPT to read one image address from an earlier answer only when that image holds the answer, so images reach the chat only when they are needed.
 The app page's **View image** box takes the same address, calls `/api/image`, and shows the picture with the same text.
 
 1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is on the website for `https://edstem.org`.

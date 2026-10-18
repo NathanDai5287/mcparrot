@@ -16,11 +16,13 @@ import { findApp } from "../../../../lib/workspace";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const fullAnswerInput = z.boolean().optional().describe("Use only when the short answer lacks something needed. It skips the field filter; MCParrot still shortens the answer.");
+const fullAnswerInput = z.boolean().optional().describe("Set true only if a field you need is missing from the answer.");
 
 function inputSchema(task: Task) {
-  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} For example, ${input.example}.`)])), fullAnswer: fullAnswerInput };
+  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput };
 }
+
+const serverInstructions = (app: Website) => `Tools read ${app.name} as the signed-in user. Call the saved tool that matches the request directly; one call returns the whole answer. Use read_page only when no saved tool fits. Answers are already shortened; set fullAnswer only if a needed field is missing. If a result says the site is signed out, tell the user and stop. Run independent tools at once.`;
 
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
@@ -78,7 +80,7 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
 }
 
 function appServer(app: Website, orderLimitUsd?: number) {
-  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
+  const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }, { instructions: serverInstructions(app) }), { recordInputs: false, recordOutputs: false });
   const tasks = app.tasks.filter(isRunnableTask);
   const usedNames = new Set(connectionToolNames);
   const names = new Map<Task, string>();
@@ -110,13 +112,13 @@ function appServer(app: Website, orderLimitUsd?: number) {
   const website = new URL(app.url).origin;
   server.registerTool("read_page", {
     title: `Read a page on ${app.name}`,
-    description: `Open any page on ${website} that the signed-in user can see and return its text. Use it for pages that no other tool covers, such as a link that the user shares.`,
+    description: `Open any page on ${website} that the signed-in user can see and return its text. Use only when no other tool covers the page, such as a link that the user shares.`,
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
-    description: `Read one image and return its text and numbers and a short description of any chart. It opens images on ${website} with the user's sign-in and https images on any other website, such as an image server that ${website} uses, without the sign-in. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
+    description: "Read the text, numbers, and charts in one image address from an earlier answer. Use only when that image holds the answer.",
     inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult((await viewImage(app, url)).text));
