@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Agent, CursorAgentError, JsonlLocalAgentStore, type Run, type RunResult, type SDKAgent } from "@cursor/sdk";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
-import { appIdSchema, type Capability, type Discovery, type Website } from "../../../lib/capabilities";
+import { appIdSchema, type Capability, type Discovery, type Task, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
 import { discoveryKey, readWorkspace, storage, StorageUnavailable } from "../../../lib/workspace";
 
@@ -108,8 +108,12 @@ function scrubbed(requests: CapturedRequest[]) {
   return requests.map(({ kind, method, url, pattern, status, contentType, sample }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample) }));
 }
 
+function scrubbedTasks(tasks: Task[]) {
+  return redactValue(tasks.map((task) => ({ ...task, requests: task.requests.map(({ method, urlPattern }) => ({ method, urlPattern: withoutTokens(urlPattern.replace(/#.*/, "")) })) })));
+}
+
 function discoveryPrompt(app: Website, requests: CapturedRequest[]) {
-  const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: redactValue(app.tasks), requests: scrubbed(requests) }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(app.url).origin} while we recorded the pages they opened and the data requests those pages made.
 Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; secret-looking values are replaced with "${redacted}".
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
@@ -317,7 +321,8 @@ export async function POST(request: Request) {
       Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
       return Response.json({ error: "Composer returned no capabilities. Explore more pages, then try again." }, { status: 502 });
     }
-    const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, app) };
+    const latestApp = await savedApp(appId);
+    const discovery: Discovery = { discoveredAt: new Date().toISOString(), capabilities: capabilitiesFrom(result.result, latestApp) };
     Sentry.logger.info("Discovery finished", { capabilityCount: discovery.capabilities.length });
     await storage().set(discoveryKey(app.id), discovery).catch((error) => Sentry.captureException(error));
     return Response.json(discovery);
