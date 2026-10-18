@@ -20,7 +20,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [UI and MCP parity](#ui-and-mcp-parity) | The rule that every app capability has a matching MCP operation |
 | [Assistant connection architecture](#assistant-connection-architecture) | The management connection and one connection per website app |
 | [Teaching website tasks](#teaching-website-tasks) | How a user explores a website, finds what it can do, and chooses tasks |
-| [Discovery data sent to Gemini](#discovery-data-sent-to-gemini) | What discovery sends to Gemini and what it never includes |
+| [Discovery data sent to Composer](#discovery-data-sent-to-composer) | What discovery sends to Cursor Composer and what it never includes |
 | [Browser visibility by phase](#browser-visibility-by-phase) | A visible teaching window and hidden browser work during MCP use |
 | [Using saved tasks](#using-saved-tasks) | How an assistant runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | How a task continues after a website sign-in expires |
@@ -110,7 +110,7 @@ Canvas is a useful example, but the same flow works on any website.
 3. Select **Explore website**, install MCParrot Explorer once, then select **Open website and explore**.
 4. Sign in normally in the new tab and complete any required verification, such as Duo.
 5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
-6. Select **Find what this site can do** to send the recorded requests to Gemini and receive a list of capabilities.
+6. Select **Find what this site can do** to send the recorded requests to Cursor Composer 2.5 Fast and receive a list of capabilities.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
@@ -140,22 +140,22 @@ The extension is not published in an extension store, and website policies can d
 
 ### Limits of discovery
 
-Gemini's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
+Composer's capabilities are suggestions inferred from one visit, not proof that a task works for this user.
 Unvisited pages and actions remain unavailable unless separately explored and tested.
 Some pages return HTML or use browser state rather than a separate data response; those tasks still need a tested execution path.
 The application must verify a reusable request sequence with valid authentication before it enables a task as a tool.
 The first milestone supports reading only, and discovery must not automatically submit changes to website data.
 
-## Discovery data sent to Gemini
+## Discovery data sent to Composer
 
-Discovery sends the recorded requests, including their truncated response samples, to Google Gemini `gemini-flash-latest` through the server route `/api/discover`.
-Nathan chose short real-value samples because they make Gemini's suggestions more accurate.
+Discovery sends the recorded requests, including their truncated response samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
+The agent runs in an empty temporary folder and receives an instruction to use no tools and reply only with capabilities JSON.
+Nathan chose short real-value samples because they make Composer's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
-The server reads `GEMINI_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
+The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Vercel Authentication protects the production site, so only Nathan can start discovery.
-When Gemini is busy, the server retries twice, then tries `gemini-flash-lite-latest` once.
-If the key is missing or the Gemini call still fails, the exploration screen shows a clear error.
+If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
 
 ## Browser visibility by phase
 
@@ -255,7 +255,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | --- | --- | --- |
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, discovery, verification, and task status |
 | Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Record data requests and short response samples in one opened tab |
-| Capability discovery | Google Gemini through a Next.js server route | Suggest capabilities from recorded requests |
+| Capability discovery | Cursor Composer 2.5 Fast through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud | Sign in and pass authentication when tasks run through MCP later |
 | Task execution | Application-owned HTTP execution | Run chosen tasks as verified API request sequences |
 | Assistant connection | Official MCP TypeScript SDK, authenticated Streamable HTTP | Provide a remote MCP address for compatible assistants |
@@ -298,7 +298,7 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 ## Running the frontend
 
 Use Node.js 24 or later.
-The frontend does not need a Browser Use API key, but discovery needs `GEMINI_API_KEY` in `.env.local`.
+The frontend does not need a Browser Use API key, but discovery needs `CURSOR_API_KEY` in `.env.local`.
 
 ```sh
 npm install

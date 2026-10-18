@@ -107,7 +107,7 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
           {state.requests.map((request) => <div className="candidate-button" key={`${request.method} ${request.pattern}`}><span>{request.method} {request.pattern}<small>{request.status} · {request.contentType}</small></span></div>)}
         </div>
       </details>
-      <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to Google Gemini.</p>
+      <p className="field-help">Headers, cookies, and sign-in traffic are not recorded. Selecting Find what this site can do sends these requests and their short samples to Cursor Composer.</p>
       <div className="pilot-controls">
         <button className="button primary" disabled={busy !== ""} onClick={discover}>{busy === "discovery" ? "Finding what this site can do…" : "Find what this site can do"}</button>
         <button className="button" disabled={busy !== ""} onClick={() => operate("clear")}>Delete recorded requests</button>

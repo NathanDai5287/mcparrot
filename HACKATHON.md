@@ -82,14 +82,13 @@ Pursue these only if the demo supports them.
 Devpost also lists many MLH category prizes, such as Gemini, Snowflake, ElevenLabs, Vultr, Solana, Tiger Data, and a GoDaddy domain.
 It also lists sponsor cash prizes from companies such as Visa, Workday, Even Realities, Espressif, and veri.studio.
 Target one of these prizes only if the demo integrates that technology in a meaningful way.
-Discovery uses Gemini to find what a website can do, so the MLH Gemini prize fits if the demo shows discovery.
 The authoritative prize amounts and rules are in each prize's own description on Devpost and on the event site.
 Devpost lists the LA Hacks grand prize amounts as TBD, so confirm them at [ai.lahacks.com](https://ai.lahacks.com).
 
 ## Demo planning implications
 
 Prove one complete path before building a wide interface.
-The strongest path explores a website once, lets Gemini find what it can do, and chooses a task.
+The strongest path explores a website once, lets Cursor Composer find what it can do, and chooses a task.
 It then shows that task's verified replay and an assistant calling it through MCP.
 This path addresses technical depth and execution better than a polished interface without working features.
 Lead with the user and the problem: a student or frequent user stops repeating tedious website navigation.

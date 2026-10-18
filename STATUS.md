@@ -7,8 +7,8 @@ Nathan reads the same facts in plain language in the [status guide](public/docs/
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authentication.
-Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Gemini to find what the site can do, and save the capabilities they choose as tasks in this browser's local storage.
-The discovery route returned capabilities from sample requests in a direct Gemini check; Nathan's live exploration and discovery still need a demonstration.
+Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in this browser's local storage.
+The discovery route returned capabilities from sample requests in a direct Composer check; Nathan's live exploration and discovery still need a demonstration.
 Task testing, request replay, remote MCP access, Browser Use sign-in during MCP use, persistent storage, and Sentry remain aspirational.
 
 ## Status word meanings
@@ -33,7 +33,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
 | Explore any website | gap | MCParrot Explorer 0.2.0 records data requests with short response samples in the opened tab; syntax checks pass; Nathan's live recording demonstration must pass |
-| Capability discovery with Gemini | shipped | `/api/discover` returned two capabilities with inputs from sample requests in a direct Gemini check on October 17, 2026; discovery from a live recording needs Nathan's demonstration |
+| Capability discovery with Cursor Composer | shipped | `/api/discover` returned three capabilities with inputs from three sample requests in a direct Node check through the Cursor SDK on October 17, 2026; discovery on Vercel and from a live recording needs Nathan's demonstration |
 | Choose and save tasks | shipped | The checklist saves ticked, edited capabilities as the app's tasks in local storage; automatic type and production build checks pass; Nathan tests the live flow |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; it is reserved for sign-in and authentication during later MCP use |
 | UI and MCP parity | gap | The dashboard has no MCP access, so no capability meets the parity rule |
@@ -60,8 +60,8 @@ It runs locally and at [mcparrot.vercel.app](https://mcparrot.vercel.app), where
 The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026.
 In that check, the dashboard and its JavaScript assets returned successfully, and the local sign-in and private-state paths returned 404.
 
-On October 17, 2026, the discovery route sent two sample requests from a public test website to Gemini and returned two capabilities with their requests and inputs.
-That check called the route handler directly; it does not prove discovery from a live recording.
+On October 17, 2026, the discovery route sent three sample requests from a public test website to Cursor Composer 2.5 Fast through the Cursor SDK and returned three capabilities with their requests and inputs in about five seconds.
+That check called the route handler directly from Node; it does not prove discovery on Vercel or from a live recording.
 
 ## Known gaps
 

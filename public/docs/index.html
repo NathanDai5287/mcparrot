@@ -31,7 +31,7 @@
           <li><a href="#idea">How the product works</a></li>
           <li><a href="#teach">Teaching a website task</a></li>
           <li><a href="#recording">What the extension records</a></li>
-          <li><a href="#gemini">What Gemini sees</a></li>
+          <li><a href="#composer">What Composer sees</a></li>
           <li><a href="#use">Using your assistant</a></li>
           <li><a href="#connections">Two kinds of connections</a></li>
           <li><a href="#agent-access">Equal controls for agents</a></li>
@@ -58,7 +58,7 @@
             <tr><th scope="row"><a href="#idea">How the product works</a></th><td>Website apps, tasks, and your assistant</td></tr>
             <tr><th scope="row"><a href="#teach">Teaching a website task</a></th><td>Explore a website, find what it can do, and choose tasks</td></tr>
             <tr><th scope="row"><a href="#recording">What the extension records</a></th><td>What the browser extension keeps and what it never copies</td></tr>
-            <tr><th scope="row"><a href="#gemini">What Gemini sees</a></th><td>The short samples sent to Gemini when you ask</td></tr>
+            <tr><th scope="row"><a href="#composer">What Composer sees</a></th><td>The short samples sent to Cursor Composer when you ask</td></tr>
             <tr><th scope="row"><a href="#use">Using your assistant</a></th><td>How your assistant repeats a task for you</td></tr>
             <tr><th scope="row"><a href="#connections">Two kinds of connections</a></th><td>How you connect your assistant to your apps</td></tr>
             <tr><th scope="row"><a href="#agent-access">Equal controls for agents</a></th><td>Why your agent can do everything you can do</td></tr>
@@ -71,7 +71,7 @@
 
       <section id="today">
         <h2>What exists today</h2>
-        <p>You can <a href="https://mcparrot.vercel.app">open the hosted workspace</a> today and create website apps, explore them, let Gemini find what each site can do, and save the tasks you choose, which is <span class="badge badge--shipped">shipped</span>. Your live test of exploring a website is still a <span class="badge badge--gap">gap</span>. Testing tasks and using them from your assistant are <span class="badge badge--aspirational">aspirational</span>, so the rest of this guide describes the finished experience. The <a href="status.html">status page</a> lists every feature with its status, the known gaps, and the order of the remaining work.</p>
+        <p>You can <a href="https://mcparrot.vercel.app">open the hosted workspace</a> today and create website apps, explore them, let Cursor Composer find what each site can do, and save the tasks you choose, which is <span class="badge badge--shipped">shipped</span>. Your live test of exploring a website is still a <span class="badge badge--gap">gap</span>. Testing tasks and using them from your assistant are <span class="badge badge--aspirational">aspirational</span>, so the rest of this guide describes the finished experience. The <a href="status.html">status page</a> lists every feature with its status, the known gaps, and the order of the remaining work.</p>
       </section>
 
       <section id="deployment">
@@ -85,7 +85,7 @@
               <tr><th scope="row">Website and short server work</th><td>Vercel</td></tr>
               <tr><th scope="row">Saved apps, tasks, and progress</th><td>A hosted PostgreSQL database, such as Supabase or Neon</td></tr>
               <tr><th scope="row">Exploration</th><td>Your normal browser with MCParrot Explorer</td></tr>
-              <tr><th scope="row">Finding what a site can do</th><td>Google Gemini, called from our website</td></tr>
+              <tr><th scope="row">Finding what a site can do</th><td>Cursor Composer 2.5 Fast through the Cursor SDK, called from our website</td></tr>
               <tr><th scope="row">Signing in when tasks run later</th><td>Browser Use Cloud</td></tr>
             </tbody>
           </table>
@@ -116,13 +116,13 @@
           <li><h3>Create your app</h3><p>Visit our website, select <strong>Create app</strong>, and enter the website address. For example, name the app after the site you use.</p></li>
           <li><h3>Install the extension once</h3><p>Select <strong>Explore website</strong>. Download MCParrot Explorer and extract its ZIP. Open your browser’s Extensions page, enable <strong>Developer mode</strong>, select <strong>Load unpacked</strong>, and choose the extracted folder. Reload MCParrot. It works in Chrome and Edge and is not in an extension store. To update it, remove the old copy first, then load the new folder.</p></li>
           <li><h3>Explore the website</h3><p>Select <strong>Open website and explore</strong>. A normal tab opens at the app’s website address. Sign in as usual and complete Duo or any other check. Browse the pages and features you want your assistant to use. Return to MCParrot and select <strong>Stop exploring</strong>.</p></li>
-          <li><h3>Find what the site can do</h3><p>Select <strong>Find what this site can do</strong>. Gemini reads the recorded requests and returns a list of things your assistant could do, such as listing assignments. Each item shows what it does, which values you can change, and what it returns.</p></li>
+          <li><h3>Find what the site can do</h3><p>Select <strong>Find what this site can do</strong>. Cursor Composer reads the recorded requests and returns a list of things your assistant could do, such as listing assignments. Each item shows what it does, which values you can change, and what it returns.</p></li>
           <li><h3>Choose your tasks</h3><p>Tick the items you want, change their names or descriptions if you like, and select <strong>Save tasks</strong>. Saving replaces the app’s current tasks, and the app page lists them. Your tasks stay in this browser.</p></li>
           <li><h3>Explore more when needed</h3><p>Select <strong>Continue exploring</strong> to add pages without losing earlier requests. Then find what the site can do again and choose again.</p></li>
         </ol>
         <aside class="note">
           <strong class="note-label">You are the teacher</strong>
-          <p>You browse pages once, then choose which suggested tasks to keep. Gemini’s list is a set of guesses from one visit, so a task is not a usable tool until a test with changed values passes. The first milestone only reads information. The app must not try actions that change website data automatically.</p>
+          <p>You browse pages once, then choose which suggested tasks to keep. Composer’s list is a set of guesses from one visit, so a task is not a usable tool until a test with changed values passes. The first milestone only reads information. The app must not try actions that change website data automatically.</p>
         </aside>
       </section>
 
@@ -133,10 +133,10 @@
         <p>Recording stops when you select <strong>Stop exploring</strong>, close the tab, close the debugging bar, or restart the browser. Recorded requests stay in the extension until you select <strong>Delete recorded requests</strong>, delete the app, or remove the extension. Apps keep stable addresses, so Back and Forward work. The extension works with the production website and with the local test website on your computer.</p>
       </section>
 
-      <section id="gemini">
-        <h2>What Gemini sees</h2>
-        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and their short samples to Google Gemini. You chose real short samples because they help Gemini make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Gemini until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
-        <p>Only you can use this feature, because Vercel asks you to sign in before you can open the website. If Gemini is busy, our website tries again a few times before it gives up. If Gemini is not set up or still does not answer, the page shows a clear error message.</p>
+      <section id="composer">
+        <h2>What Composer sees</h2>
+        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and their short samples to Cursor Composer 2.5 Fast through the Cursor SDK. Composer works in an empty folder, so it cannot read our project files, and it only replies with the list of tasks. You chose real short samples because they help Composer make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Composer until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
+        <p>Only you can use this feature, because Vercel asks you to sign in before you can open the website. If Composer is not set up, does not start, or does not finish, the page shows a clear error message.</p>
       </section>
 
       <section id="use">

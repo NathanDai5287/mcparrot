@@ -11,6 +11,7 @@
     "check": "node --check browser.mjs && node --check public/extension/background.js && node --check public/extension/bridge.js && next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@cursor/sdk": "^1.0.38",
     "browser-use-sdk": "^3.12.1",
     "next": "^16.4.2",
     "react": "^19.3.1",
