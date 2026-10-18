@@ -9,6 +9,17 @@ const nextConfig: NextConfig = {
     "/api/discover": ["./node_modules/@cursor/**"],
     "/**": ["./node_modules/playwright-core/**"],
   },
+  headers: async () => [
+    {
+      source: "/(.*)",
+      headers: [
+        { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+      ],
+    },
+  ],
   rewrites: async () => [{ source: "/apps/:path*", destination: "/" }],
   redirects: async () => [
     { source: "/docs", destination: "/docs/index.html", permanent: false },
