@@ -4,7 +4,7 @@ import { Redis } from "@upstash/redis";
 import { BrowserUseError, type RunCreateBody, type SecretBinding } from "browser-use-sdk/v4";
 import type { Page } from "playwright-core";
 import { z } from "zod";
-import { browserUse, stopBrowser, withPage } from "./browser-use";
+import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, withPage } from "./browser-use";
 import type { Website } from "./capabilities";
 import { readLogin, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
@@ -15,7 +15,7 @@ const agentWaitMilliseconds = 150_000;
 const callBudgetMilliseconds = 280_000;
 const afterAgentMilliseconds = 20_000;
 const rereadMilliseconds = 60_000;
-const signInLockSeconds = 300;
+const lockSeconds = 300;
 const failedCooldownSeconds = 600;
 const agentRunMaxCostUsd = 2;
 const codeSentMessage = "MCParrot is signing in to the website, and the website sent a text-message code to the user's phone. Ask the user for that code, then call submit_verification_code with it.";
@@ -56,9 +56,7 @@ const cooldownKey = (appId: string) => `sign-in-failed:${appId}`;
 const loginHash = (app: Website, login: Login) =>
   createHmac("sha256", Buffer.from(process.env.MCPARROT_CREDENTIAL_KEY!, "base64")).update(JSON.stringify([login.username, login.password, app.loginSavedAt ?? ""])).digest("base64");
 
-const errorReason = (error: unknown) => error instanceof BrowserUseError ? `BrowserUseError ${error.statusCode}` : (error as Error)?.name ?? "unknown";
 const isGone = (error: unknown) => error instanceof BrowserUseError && error.statusCode === 404;
-const ignoreErrors = async (work: () => Promise<unknown>) => { try { await work(); } catch {} };
 
 const secret = (alias: string, value: string, allowedDomains: string[]): SecretBinding => ({ alias, source: { type: "inline", value }, allowedDomains });
 
@@ -95,11 +93,6 @@ async function stopSavingProfile(browserId: string) {
   } catch (error) {
     if (!isGone(error)) throw error;
   }
-}
-
-async function sessionBrowser(sessionId: string) {
-  const { items } = await browserUse().browsers.list({ agentSessionId: sessionId, filterBy: "active" });
-  return items[0];
 }
 
 async function profileId(app: Website) {
@@ -160,18 +153,20 @@ async function waitingForCode(appId: string) {
   return false;
 }
 
-async function withSignInLock<T>(appId: string, work: () => Promise<T>) {
+export async function withLock<T>(key: string, busyMessage: string, work: () => Promise<T>) {
   const redis = Redis.fromEnv();
   const nonce = randomUUID();
-  if (await redis.set(lockKey(appId), nonce, { nx: true, ex: signInLockSeconds }) === null) return signInInProgressMessage;
+  if (await redis.set(key, nonce, { nx: true, ex: lockSeconds }) === null) return busyMessage;
   try {
     return await work();
   } finally {
     await ignoreErrors(async () => {
-      if (await redis.get(lockKey(appId)) === nonce) await redis.del(lockKey(appId));
+      if (await redis.get(key) === nonce) await redis.del(key);
     });
   }
 }
+
+const withSignInLock = <T>(appId: string, work: () => Promise<T>) => withLock(lockKey(appId), signInInProgressMessage, work);
 
 const signInOnce = (app: Website, login: Login, deadline: number) => withSignInLock(app.id, async () => {
   const redis = Redis.fromEnv();

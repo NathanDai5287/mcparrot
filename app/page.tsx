@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
+import { OrderingPanel } from "./ordering-panel";
 import type { DiscoveredCapability, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
 
@@ -229,6 +230,7 @@ export default function Workspace() {
             <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
             {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" aria-label={`Delete ${task.name}`} onClick={() => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: task.id })}>Delete</button></div>)}</div>}
             <AssistantPanel key={screen.app.id} app={screen.app} connectionSecret={connectionSecret} onChange={(changes) => updateApp(screen.app.id, changes)} />
+            <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={(ordering) => changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })} />
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" ref={deleteAppButton} onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
                 <h2 tabIndex={-1} ref={focusOnMount}>Delete {screen.app.name}?</h2>

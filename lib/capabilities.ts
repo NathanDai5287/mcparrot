@@ -16,6 +16,8 @@ export type DiscoveredCapability = Capability & { updatesTaskId?: string };
 
 export type Discovery = { discoveredAt: string; capabilities: DiscoveredCapability[] };
 
+export type Ordering = { enabled: boolean; limitUsd: number };
+
 export type Website = {
   id: string;
   name: string;
@@ -24,10 +26,12 @@ export type Website = {
   browserProfileId?: string;
   signedInAt?: string;
   loginSavedAt?: string;
+  ordering?: Ordering;
 };
 
 export const maxApps = 100;
 export const maxTasksPerApp = 500;
+export const maxOrderLimitUsd = 500;
 
 const shortText = z.string().max(200);
 const longText = z.string().max(4000);
@@ -42,6 +46,11 @@ export const capabilitySchema = z.object({
   inputs: z.array(z.object({ name: shortText, description: longText, example: longText })).max(50),
   returns: longText,
 }) satisfies z.ZodType<Capability>;
+
+export const orderingSchema = z.object({
+  enabled: z.boolean(),
+  limitUsd: z.number().positive().max(maxOrderLimitUsd),
+}) satisfies z.ZodType<Ordering>;
 
 export const taskSchema = capabilitySchema.extend({ id: z.string().min(1).max(80) }) satisfies z.ZodType<Task>;
 
