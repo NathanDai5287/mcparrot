@@ -19,14 +19,27 @@ const textResult = (text: string) => ({ content: [{ type: "text" as const, text 
 
 function appServer(app: Website) {
   const server = Sentry.wrapMcpServerWithSentry(new McpServer({ name: `MCParrot ${app.name}`, version: "1.0.0" }), { recordInputs: false, recordOutputs: false });
+  const tasks = app.tasks.filter(isReadingTask);
   const usedNames = new Set(connectionToolNames);
-  for (const task of app.tasks.filter(isReadingTask)) {
-    const idSuffix = task.id.slice(0, 8);
-    const baseName = toolName(task.name) || `task_${idSuffix}`;
-    const name = [baseName, `${baseName.slice(0, 55)}_${idSuffix}`].find((candidate) => !usedNames.has(candidate));
-    if (name !== toolName(task.name)) Sentry.logger.warn("Task tool name changed or skipped", { appId: app.id, taskId: task.id, toolName: name ?? null });
-    if (!name) continue;
+  const names = new Map<Task, string>();
+  for (const task of tasks) {
+    const name = toolName(task.name);
+    if (!name || usedNames.has(name)) continue;
+    names.set(task, name);
     usedNames.add(name);
+  }
+  for (const task of tasks.filter((candidate) => !names.has(candidate))) {
+    const baseName = toolName(task.name);
+    const name = baseName ? `${baseName.slice(0, 55)}_${task.id.slice(0, 8)}` : `task_${task.id.slice(0, 8)}`;
+    const free = !usedNames.has(name);
+    Sentry.logger.warn(free ? "Task tool renamed" : "Task tool skipped", { appId: app.id, taskId: task.id, toolName: name });
+    if (!free) continue;
+    names.set(task, name);
+    usedNames.add(name);
+  }
+  for (const task of tasks) {
+    const name = names.get(task);
+    if (!name) continue;
     server.registerTool(name, {
       title: task.name,
       description: `${task.description} Returns ${task.returns}.`,
