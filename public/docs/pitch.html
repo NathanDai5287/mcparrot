@@ -349,30 +349,27 @@
       </div>
     </section>
 
-    <section class="slide" aria-roledescription="slide" aria-label="Browser Use does the work" data-section="Pitch · 2 minutes">
-      <div class="slide-inner split">
-        <div>
-          <h2>Browser Use is the part that touches the web.</h2>
-          <p class="lede">MCParrot decides what should happen. Browser Use cloud browsers and agents do it on the real website, as you.</p>
+    <section class="slide" aria-roledescription="slide" aria-label="Live result: an agent fills a DoorDash cart but does not pay" data-section="Pitch · 2 minutes">
+      <div class="slide-inner shot-layout square">
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-doordash-add-to-cart.jpg" width="2008" height="1884" alt="ChatGPT conversation: asked to add a Mountain Mike's pepperoni pizza to the DoorDash cart without ordering, ChatGPT reports one mini pepperoni pizza at $12.64, fees $4.36, tip $2.00, total $19.00, and no order placed or payment made; asked which credit card is connected, it lists three saved cards." loading="lazy">
+            <span class="pin" style="--x: 29.5%; --y: 12.7%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 25.5%; --y: 42.6%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 90.8%; --y: 30%" aria-hidden="true">3</span>
+            <span class="pin" style="--x: 46%; --y: 78.6%" aria-hidden="true">4</span>
+          </div>
+          <figcaption>A real ChatGPT conversation. The delivery address is hidden.</figcaption>
+        </figure>
+        <div class="shot-side">
+          <h2>It fills the cart. It does not pay.</h2>
+          <ol class="notes">
+            <li><span>Nathan asks for a pizza in his DoorDash cart, but no order yet.</span></li>
+            <li><span>A <strong>Browser Use agent</strong> builds the cart in his signed-in DoorDash, stops at checkout, and reports the <span class="num">$19.00</span> total.</span></li>
+            <li><span>Nothing is placed or paid. Paying needs his approval of the exact total and a one-time Pay with Link card in test mode <span class="badge badge--gap">gap: payment</span></span></li>
+            <li><span>A follow-up question reads the saved cards on the account.</span></li>
+          </ol>
         </div>
-        <ul class="jobs">
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
-            <div><h3>Sign in once, in a live view <span class="badge badge--gap">gap: live demo</span></h3><p>You sign in yourself, Duo included, and the app’s profile remembers it.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
-            <div><h3>Run every tool call <span class="badge badge--shipped">shipped</span></h3><p>A hidden browser on your profile replays the tool’s requests from inside the signed-in page.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M20 4.5v4h-4"/></svg></span>
-            <div><h3>Sign back in by itself <span class="badge badge--shipped">shipped</span></h3><p>An agent types the saved login through secret bindings, so the model never sees the password, and relays codes through ChatGPT.</p></div>
-          </li>
-          <li>
-            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M3 10.5h18"/><path d="M7 15h3"/></svg></span>
-            <div><h3>Check out with Pay with Link <span class="badge badge--gap">gap: test mode only</span></h3><p>After you approve the total, an agent pays with a one-time Link card. It stays off until Link test mode is available.</p></div>
-          </li>
-        </ul>
       </div>
     </section>
 
@@ -427,6 +424,33 @@
           <a href="https://github.com/NathanDai5287/mcparrot">GitHub</a>
           <a href="devpost.html">Devpost write-up</a>
         </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Backup: what Browser Use does" data-section="Backup for questions">
+      <div class="slide-inner split">
+        <div>
+          <h2>Browser Use is the part that touches the web.</h2>
+          <p class="lede">MCParrot decides what should happen. Browser Use cloud browsers and agents do it on the real website, as you.</p>
+        </div>
+        <ul class="jobs">
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></span>
+            <div><h3>Sign in once, in a live view <span class="badge badge--gap">gap: live demo</span></h3><p>You sign in yourself, Duo included, and the app’s profile remembers it.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+            <div><h3>Run every tool call <span class="badge badge--shipped">shipped</span></h3><p>A hidden browser on your profile replays the tool’s requests from inside the signed-in page.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M20 4.5v4h-4"/></svg></span>
+            <div><h3>Sign back in by itself <span class="badge badge--shipped">shipped</span></h3><p>An agent types the saved login through secret bindings, so the model never sees the password, and relays codes through ChatGPT.</p></div>
+          </li>
+          <li>
+            <span class="flow-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="2"/><path d="M3 10.5h18"/><path d="M7 15h3"/></svg></span>
+            <div><h3>Check out with Pay with Link <span class="badge badge--gap">gap: test mode only</span></h3><p>After you approve the total, an agent pays with a one-time Link card. It stays off until Link test mode is available.</p></div>
+          </li>
+        </ul>
       </div>
     </section>
 
@@ -529,7 +553,7 @@
             <ul class="plain-list">
               <li>ChatGPT drops MCP image results; OpenAI support confirmed it in April 2026.</li>
               <li><code>view_image</code> opens the picture in the signed-in browser, shrinks it to 1,600 pixels, and has Claude Opus 5.5 copy its words and numbers.</li>
-              <li>That is how ChatGPT read the Ed exam statistics on slide 4.</li>
+              <li>That is how ChatGPT read the Ed exam statistics in the Gradescope and Ed example.</li>
             </ul>
           </div>
           <div>
