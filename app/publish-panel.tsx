@@ -58,7 +58,7 @@ export function PublishPanel({ app, onApps }: { app: Website; onApps: (apps: Web
   const errorMessage = error && <p className="pilot-error" role="alert">{error}</p>;
   return <SetupCard title="Marketplace" status={app.listing ? "Published" : "Not published"}>
     {reviewing ? <>
-      <p>Anyone can see the app name, website address, description, publisher, and tool names on the marketplace without signing in, and anyone who signs in and adds the app gets everything below, including the request bodies and headers. MCParrot never shares your saved login, browser sign-in, sign-in times, ChatGPT link, recordings, discovery results, or orders.</p>
+      <p>The name, address, description, and tool names become public. Anyone who adds the app gets everything below. Your logins and link stay private.</p>
       <form className="editor" onSubmit={publish}>
         <label htmlFor={`listing-description-${app.id}`}>Short description</label>
         <textarea id={`listing-description-${app.id}`} name="description" maxLength={500} required defaultValue={app.listing?.description} placeholder="For example, read your courses, assignments, and syllabus on Canvas" />
@@ -67,7 +67,7 @@ export function PublishPanel({ app, onApps }: { app: Website; onApps: (apps: Web
         <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Publishing…" : app.listing ? "Update listing" : "Publish"}</button><button className="button" type="button" disabled={busy} onClick={() => setReviewing(false)}>Cancel</button></div>
       </form>
     </> : <>
-      <p>{app.listing ? `Published on ${new Date(app.listing.publishedAt).toLocaleDateString()}. Anyone can see this app’s name, website address, description, and tool names on the marketplace, and anyone who adds it gets its tool definitions.` : "Share this app’s tools on the marketplace so other people can add them to their own apps. Your login, website sign-in, and ChatGPT link stay private."}</p>
+      <p>{app.listing ? `Published on ${new Date(app.listing.publishedAt).toLocaleDateString()}.` : "Share this app’s tools. Your logins stay private."}</p>
       {errorMessage}
       <div className="login-actions">
         <button className="button" disabled={busy} onClick={() => setReviewing(true)}>{app.listing ? "Update listing" : "Publish to marketplace"}</button>
