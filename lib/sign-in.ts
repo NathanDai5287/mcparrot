@@ -22,17 +22,20 @@ const agentRunMaxCostUsd = 2;
 const codeSentMessage = "MCParrot is signing in to the website, and the website sent a text-message code to the user's phone. Ask the user for that code, then call submit_verification_code with it.";
 const codeRejectedMessage = "The website rejected that code. Ask the user for a new text-message code, then call submit_verification_code with it.";
 const signInFinishedMessage = "Sign-in finished. Run the original tool again.";
+const signInFinishedText = (toolName?: string) => toolName ? `Signed in. Call ${toolName} again with the same inputs.` : signInFinishedMessage;
 const passwordRejectedMessage = "The website rejected the saved login. Open MCParrot, replace the login for this app, then try again.";
 const signInFailedMessage = "Browser Use could not finish signing in. Open MCParrot and select Sign in to website on this app, then try again.";
 const googleNeedsUserMessage = "Open MCParrot and select Sign in to website on this app, then try again.";
 const noPendingSignInMessage = "No sign-in is waiting for a code. Run the original tool again to start signing in.";
 const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original tool again.";
+const signInInProgressText = (toolName?: string) => toolName ? `MCParrot is already signing in to the website. Wait a minute, then call ${toolName} again with the same inputs.` : signInInProgressMessage;
 const signInTimedOutMessage = "Signing in to the website took too long. Wait a few minutes, then try again, or open MCParrot and select Sign in to website on this app.";
 const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, signInInProgressMessage, signInTimedOutMessage]);
 
 const passwordOutcomes = ["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"] as const;
 const googleOutcomes = ["signed_in", "needs_user", "failed"] as const;
-type PendingSignIn = { sessionId: string; browserId: string; cdpUrl: string };
+type ToolCall = { toolName: string };
+type PendingSignIn = { sessionId: string; browserId: string; cdpUrl: string } & Partial<ToolCall>;
 type SigningInApp = Website & { browserProfileId: string };
 
 const trustDeviceStep = `If the website asks whether to trust this browser or device, choose no, for example "No, other people use this device".`;
@@ -138,7 +141,7 @@ async function finishSignedIn(appId: string, browserId: string | undefined, look
   await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
 }
 
-async function signIn(app: SigningInApp, login: Login, hash: string, waitMilliseconds: number) {
+async function signIn(app: SigningInApp, login: Login, hash: string, waitMilliseconds: number, call?: ToolCall) {
   Sentry.logger.info("Automatic sign-in started", { appId: app.id });
   const { sessionId, outcome, timedOut } = await runSignInAgent(app.id, "browser_use.agent_sign_in", {
     task: signInTask(app.url),
@@ -148,7 +151,7 @@ async function signIn(app: SigningInApp, login: Login, hash: string, waitMillise
   Sentry.logger.info("Automatic sign-in finished", { appId: app.id, outcome });
   const { browser, lookupFailed } = await agentBrowser(app.id, sessionId);
   if (outcome === "code_sent" && browser) {
-    await Redis.fromEnv().set(pendingKey(app.id), { sessionId, browserId: browser.id, cdpUrl: browser.cdpUrl }, { ex: pendingSignInSeconds });
+    await Redis.fromEnv().set(pendingKey(app.id), { sessionId, browserId: browser.id, cdpUrl: browser.cdpUrl, ...call }, { ex: pendingSignInSeconds });
     return codeSentMessage;
   }
   const browserId = browser?.id;
@@ -225,13 +228,13 @@ async function agentWaitWithin(appId: string, attempt: string, deadline: number)
   return waitMilliseconds;
 }
 
-const signInOnce = (app: Website, login: Login, deadline: number) => guardedSignIn(app, async () => {
+const signInOnce = (app: Website, login: Login, deadline: number, call?: ToolCall) => guardedSignIn(app, async () => {
   if (await waitingForCode(app.id)) return codeSentMessage;
   const hash = loginHash(app, login);
   if (await Redis.fromEnv().get(rejectedKey(app.id)) === hash) throw new Error(passwordRejectedMessage);
   const waitMilliseconds = await agentWaitWithin(app.id, hash, deadline);
   const signingInApp = { ...app, browserProfileId: await profileId(app) };
-  return await signIn(signingInApp, login, hash, waitMilliseconds) ?? signingInApp;
+  return await signIn(signingInApp, login, hash, waitMilliseconds, call) ?? signingInApp;
 });
 
 const googleSignInOnce = (app: Website, googleEmail: string | undefined, deadline: number) => guardedSignIn(app, async () => {
@@ -244,12 +247,12 @@ const googleSignInOnce = (app: Website, googleEmail: string | undefined, deadlin
   return signingInApp;
 });
 
-async function signInAgain(app: Website, deadline: number) {
+async function signInAgain(app: Website, deadline: number, call?: ToolCall) {
   const automaticSignIn = automaticSignInOf(app);
   if (automaticSignIn.method === "google") return googleSignInOnce(app, automaticSignIn.googleEmail, deadline);
   const login = automaticSignIn.method === "password" ? await readLogin(app.id) : null;
   if (!login) throw new Error(signedOutMessage);
-  return signInOnce(app, login, deadline);
+  return signInOnce(app, login, deadline, call);
 }
 
 async function signInReleased(appId: string, until: number) {
@@ -260,17 +263,17 @@ async function signInReleased(appId: string, until: number) {
   }
 }
 
-async function readAfterOtherSignIn<T>(app: Website, read: (app: Website) => Promise<T>, deadline: number): Promise<T | string> {
+async function readAfterOtherSignIn<T>(app: Website, read: (app: Website) => Promise<T>, deadline: number, call?: ToolCall): Promise<T | string> {
   const started = Date.now();
   const released = await signInReleased(app.id, deadline - rereadMilliseconds);
   Sentry.logger.info("Waited for another sign-in", { appId: app.id, released, waitedMs: Date.now() - started });
-  if (!released) return signInInProgressMessage;
+  if (!released) return signInInProgressText(call?.toolName);
   const storedApp = (await findApp(app.id))?.app ?? app;
   if (usesPassword(storedApp) && await waitingForCode(storedApp.id)) return codeSentMessage;
   return read(storedApp);
 }
 
-export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>): Promise<T | string> {
+export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>, call?: ToolCall): Promise<T | string> {
   const deadline = Date.now() + callBudgetMilliseconds;
   if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
   try {
@@ -278,10 +281,10 @@ export async function readSigningIn<T>(app: Website, read: (app: Website) => Pro
   } catch (error) {
     if ((error as Error).message !== signedOutMessage) throw error;
   }
-  const signedIn = await signInAgain(app, deadline);
-  if (signedIn === signInInProgressMessage) return readAfterOtherSignIn(app, read, deadline);
+  const signedIn = await signInAgain(app, deadline, call);
+  if (signedIn === signInInProgressMessage) return readAfterOtherSignIn(app, read, deadline, call);
   if (typeof signedIn === "string") return signedIn;
-  return deadline - Date.now() < rereadMilliseconds ? signInFinishedMessage : read(signedIn);
+  return deadline - Date.now() < rereadMilliseconds ? signInFinishedText(call?.toolName) : read(signedIn);
 }
 
 export const submitVerificationCode = (app: Website, code: string) => withSignInLock(app.id, async () => {
@@ -313,5 +316,5 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
   await Redis.fromEnv().del(pendingKey(app.id));
   if (outcome !== "signed_in" || !stopped) throw new Error(signInFailedMessage);
   await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
-  return signInFinishedMessage;
+  return signInFinishedText(pending.toolName);
 });

@@ -105,7 +105,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
       description: `${task.description} Returns ${task.returns}.`,
       inputSchema: inputSchema(task),
       annotations: task.requests.every(isGetRequest) ? { readOnlyHint: true } : { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer))));
+    }, async ({ fullAnswer, ...inputs }) => textResult(await readSigningIn(app, (signedInApp) => runTask(signedInApp, task, inputs, fullAnswer), { toolName: name })));
   }
   const website = new URL(app.url).origin;
   server.registerTool("read_page", {
@@ -113,7 +113,7 @@ function appServer(app: Website, orderLimitUsd?: number) {
     description: `Open any page on ${website} that the signed-in user can see and return its text. Use it for pages that no other tool covers, such as a link that the user shares.`,
     inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
     annotations: { readOnlyHint: true },
-  }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
+  }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url), { toolName: "read_page" })));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
     description: `Read one image and return its text and numbers and a short description of any chart. It opens images on ${website} with the user's sign-in and https images on any other website, such as an image server that ${website} uses, without the sign-in. Call it only when a picture that an earlier tool answer named likely holds information the user needs, such as a chart, a score distribution, or a screenshot, and read one image at a time.`,
