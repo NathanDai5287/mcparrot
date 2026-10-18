@@ -122,7 +122,7 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
     return show(poll);
   }, [app.id, show]);
 
-  useEffect(() => { show(); }, [show]);
+  useEffect(() => { show().then(() => refresh()); }, [show, refresh]);
 
   const waiting = order?.status === "preparing" || order?.status === "placing";
   useEffect(() => {
