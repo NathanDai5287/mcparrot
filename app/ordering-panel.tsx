@@ -131,7 +131,7 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
   }
 
   return <SetupCard title="Ordering" status={app.ordering?.enabled ? "On" : "Off"}>
-    <p>Let your agent order from {app.name} with Pay with Link. You always approve the total first.</p>
+    <p>Let your agent order from {app.name} with Pay with Link. You always approve the total first. Remove saved cards from your {app.name} account before testing.</p>
     <p>{linkStatusText(link)}</p>
     <OrderingSettings app={app} onSave={onSave} />
     {app.ordering?.enabled && <TestOrder app={app} order={order} busy={busy} onAction={send} />}
