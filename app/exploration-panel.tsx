@@ -71,7 +71,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
 
   async function run(work: typeof busy, operation: () => Promise<void>) {
     working.current = true;
-    generation.current++;
+    if (work !== "exploration") generation.current++;
     setBusy(work);
     setError("");
     try {
@@ -129,6 +129,7 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
   }
 
   const clearRequests = () => run("exploration", async () => {
+    generation.current++;
     setState(await requestExtension("clear", appId, websiteUrl));
     setConnected(true);
     setChoices([]);
