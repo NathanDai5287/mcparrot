@@ -16,7 +16,7 @@ const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|be
 const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const bearerText = /\bbearer\s+[\w\-.~+/]+=*/gi;
 const secretName = "[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|session[_-]?id|sessionid|credential|signature|authorization)[\\w-]*";
-const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
+const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|<[^<>\\s]*>|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
 const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
 const longValueText = /[\w+=\-~]{32,}/g;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
@@ -110,7 +110,9 @@ function pathPattern(url) {
 function rememberRequest({ requestId, request }) {
   const url = new URL(request.url);
   if (!url.protocol.startsWith("http") || analyticsHost.test(url.hostname) || isAuthenticationPath(url.pathname)) return;
-  pendingRequests.set(requestId, { method: request.method, url: withoutSecrets(request.url), pattern: url.origin + pathPattern(url) });
+  const pattern = url.origin + pathPattern(url);
+  if (pattern.length > maximumUrlLength) return;
+  pendingRequests.set(requestId, { method: request.method, url: withoutSecrets(request.url), pattern });
 }
 
 function rememberResponse({ requestId, type, response }) {
@@ -167,9 +169,10 @@ async function recordPage(tabId) {
   const page = evaluation?.result?.value;
   if (page?.contentType !== "text/html") return;
   const url = new URL(page.url);
-  if (!url.protocol.startsWith("http") || isAuthenticationPath(url.pathname)) return;
+  const pattern = url.origin + pathPattern(url);
+  if (!url.protocol.startsWith("http") || isAuthenticationPath(url.pathname) || pattern.length > maximumUrlLength) return;
   const sample = redactText(page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength * 2)).slice(0, maximumSampleLength);
-  await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern: url.origin + pathPattern(url), status: page.status, contentType: page.contentType, sample });
+  await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern, status: page.status, contentType: page.contentType, sample });
 }
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
