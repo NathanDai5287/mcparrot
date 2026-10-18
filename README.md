@@ -106,12 +106,12 @@ One recording session can suggest several tasks, rather than requiring a separat
 
 1. Open the hosted app and select **Create app**.
 2. Name the website app and enter its website address.
-3. Select **Explore website**, then connect the visible teaching browser window.
+3. Select **Explore website**, install MCParrot Explorer once, then select **Open Canvas and explore**.
 4. Optionally list desired actions in plain words; these notes do not create working tasks.
-5. Sign in there and complete any required verification, such as Duo.
-6. Select **Start exploring** and browse the pages you want the app to understand.
+5. Use your normal browser sign-in and complete any required verification, such as Duo.
+6. Browse the pages you want the app to understand in the newly opened Canvas tab.
 7. Select **Review suggested actions** to see all observed reading requests together.
-8. Select **Continue exploring** to add more observations without removing earlier captures.
+8. Select **Continue exploring Canvas** to add observations without removing earlier captures.
 9. Confirm each task's name, description, variable inputs, and expected result.
 10. Test each task with changed inputs and compare its result with the website.
 11. Publish only the tasks whose tests pass, then connect the supplied authenticated MCP address to a compatible assistant.
@@ -126,8 +126,19 @@ The user should not need to record the same navigation again for each proposed t
 Changing a supported input must not require another recording after the changed-input test passes.
 Canvas is an example; the same discovery flow applies to other websites.
 
-Browser Use provides browser access; it does not convert recordings into reusable API requests.
-The user browses by default, and Browser Use does not perform the first exploration automatically.
+A browser extension observes supported reading routes in one explicitly opened normal-browser tab.
+The first pilot supports Berkeley Canvas on Chrome and Edge; it requires an unpacked extension installation, not a local server.
+Download the ZIP from the hosted exploration screen, extract it, enable Developer mode on the browser extensions page, and load the extracted folder.
+Reload MCParrot after installation.
+The extension records allowlisted GET paths and numeric course identifiers only; it discards all query values, headers, bodies, cookies, and response content.
+It does not read typed passwords or intercept authentication traffic.
+Observations stay in extension storage until deleted or the extension is removed; the active recording ends when its tab closes, the browser restarts, or the user stops it.
+Deleting an app asks the extension to delete its observations and stop its recording.
+The extension is not published in an extension store, and website policies can disable unpacked extensions.
+Browser Use is reserved for later browser-dependent execution and authentication; it does not convert observations into reusable API requests.
+Normal exploration must not open a streamed cloud browser.
+Earlier cloud sessions remain accessible separately without starting a new session automatically.
+Candidate transfer into authenticated cloud testing remains a gap: the extension captures no reusable authentication or private response data.
 The application must group observed requests into candidate tasks and separate useful requests from unrelated traffic and authentication data.
 Each candidate must show the user what it reads, which inputs may change, and what result to expect.
 The application must verify a reusable request sequence before it enables the task as a tool.
@@ -142,9 +153,9 @@ We must prove capture and reuse on a real authenticated website before we promis
 
 ## Browser visibility by phase
 
-During teaching, also called parroting, the product must open a visible browser window that the user can click through.
-The user signs in there, completes personal verification, and browses the selected pages while recording.
-The exact hosting and recording mechanism remains aspirational; this agreement does not require a particular browser delivery method.
+During teaching, also called parroting, the user browses a normal Chrome or Edge tab with the MCParrot Explorer extension.
+The extension observes only the selected tab and supported reading paths after explicit consent through **Open Canvas and explore**.
+The user signs in normally and completes personal verification; no cloud browser stream is used for normal exploration.
 
 During MCP use, the product must never open a visible website browser window.
 It runs direct API requests where supported and uses a hidden browser only for steps that require browser state or sign-in recovery.
@@ -176,9 +187,15 @@ The first implementation must prove a reading task before it supports tasks that
 
 ## Reconnecting expired sessions
 
-During normal use, tasks run without another sign-in while the saved website session is valid.
-Users can choose to save their credentials securely so the product can help them sign in again.
-Saved credentials are optional, and users can always sign in manually instead.
+During normal use, tasks run without another sign-in while the website session is valid.
+Users can optionally save a username and password for each website app through a private form inside MCParrot.
+They can replace or delete those saved details and can use manual sign-in instead.
+Saved details belong to one owner, one website app, and its approved login origin.
+Never reuse one app's password on another website or assume the website origin matches its separate sign-in provider.
+For example, Berkeley Canvas uses its approved CalNet login origin.
+The product must not capture typed passwords while exploring or import passwords from the user's normal browser.
+A normal-browser sign-in does not automatically sign in the separate Browser Use session.
+User-managed saved logins remain aspirational; the current private Canvas pilot uses fixed owner credentials, as the [status page](STATUS.md) records.
 When a session expires, the product follows these steps:
 
 1. Detect the expired session and keep the pending operation.
@@ -195,6 +212,11 @@ Store pending status so users can see whether a task needs verification, is runn
 Assistant clients differ, so do not assume every client resumes a tool call automatically after verification.
 The client may need to check status or request the result again.
 When an interrupted operation resumes, do not repeat a write that already finished.
+
+The user manages saved-login status, replacement, and deletion through the same authorized operations in the UI and management MCP.
+MCP operations return saved status only; they never return a stored password or accept a password through an assistant message.
+An agent can request a private entry link and resume sign-in after the user completes it.
+Do not retain SMS codes after submission, and do not retry rejected passwords automatically.
 
 School rules, device checks, and Duo settings can prevent automated sign-in.
 In that case, use supported in-app verification without opening a visible website browser, or show a clear failure.
@@ -227,14 +249,15 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Part | Choice | Purpose |
 | --- | --- | --- |
 | App and server | Next.js, React, TypeScript, and Node.js on Vercel | Manage website apps, teaching, verification, and task status |
-| Browser sessions | Browser Use Cloud | Host interactive browsers and support browser-dependent actions |
+| Exploration | Normal Chrome or Edge tab with MCParrot Explorer | Observe supported reading routes without a streamed browser or local server |
+| Browser sessions | Browser Use Cloud | Support later browser-dependent execution and authentication |
 | Recording and task execution | Application-owned request capture and HTTP execution | Turn demonstrated tasks into verified API request sequences |
 | Assistant connection | Official MCP TypeScript SDK, authenticated Streamable HTTP | Provide a remote MCP address for compatible assistants |
 | Persistent storage | Hosted PostgreSQL | Store user-owned connections, task definitions, and operation status |
 | Diagnostics | Sentry error monitoring, Tracing, and Logs | Find and explain failures and delays |
 
-In the complete product, the user visits a website and does not install a Chrome extension or other local software.
-Browser Use hosts the browser work, and our app shows progress and verification controls.
+The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.
+Browser Use hosts later browser-dependent work, and our app shows progress and verification controls.
 A Vercel request must not wait for a whole browser session to finish.
 For work that takes longer than one request, store durable operation status and let clients check progress.
 The exact recording interface, secure session transfer, and long-task coordination still need technical proof.
@@ -244,6 +267,10 @@ The exact recording interface, secure session transfer, and long-task coordinati
 Keep every connection, browser profile, task, and pending operation limited to its owner.
 Require authentication for MCP access and verification links.
 Use encrypted storage and controlled access for saved credentials, cookies, and tokens.
+Before adding user-managed saved logins, provide durable encrypted storage, a separate managed encryption key, and server-enforced owner authorization for every access.
+Vercel deployment access alone does not establish product ownership for each credential record.
+Only the authentication worker may decrypt the selected app's password for its approved login origin; neither the UI nor MCP can read it back.
+Deleting saved login details removes the credential record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
 Recordings can contain passwords and private website content, so record only the network data that the task needs.
 Define how long recordings are kept and how they are deleted before you store captures in production.
@@ -266,13 +293,15 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 
 ## Hosted teaching requirement
 
-Teaching and testing must run through the production app without a local worker, local browser helper, or loopback popup.
-The dashboard keeps draft metadata but shows that recording is unavailable until a hosted browser is connected.
+Exploration starts from the production app and uses MCParrot Explorer in a normal browser tab.
+No local server, recording worker, loopback pairing page, or streamed cloud browser is used by default.
+The extension keeps sanitized observed route metadata locally; it never transfers browser cookies or website credentials to the cloud.
+The separate Browser Use session needs its own authentication before a captured action can become a tested tool.
+Earlier cloud exploration sessions remain available under **Earlier cloud exploration session** until they expire.
+That legacy interface retains its own capture and testing controls, but does not automatically import extension observations.
 The local teaching worker is dormant and is not linked from the product UI.
 Its earlier request captures were memory-only and are unavailable after that worker stopped.
-The earlier local diagnostic evidence does not establish hosted teaching or replay support.
-Browser Use Cloud needs configuration and an authenticated owner-scoped session before production teaching can run.
-See the [status page](STATUS.md) for the hosted browser gap.
+See the [status page](STATUS.md) for the remaining production proof and cloud handoff gaps.
 
 ## Local sign-in test
 

@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "MCParrot Explorer",
+  "version": "0.1.0",
+  "description": "Observe supported Canvas reading routes in the tab you choose, without copying passwords or website content.",
+  "permissions": ["storage", "webRequest"],
+  "host_permissions": ["https://bcourses.berkeley.edu/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{ "matches": ["https://mcparrot.vercel.app/*"], "js": ["bridge.js"] }]
+}

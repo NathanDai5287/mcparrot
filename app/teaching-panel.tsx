@@ -16,7 +16,7 @@ function interactiveBrowserUrl(liveUrl: string) {
   return url.href;
 }
 
-export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: string; taskId: string; websiteUrl: string; active: boolean }) {
+export function CloudTeachingPanel({ appId, taskId, websiteUrl, active }: { appId: string; taskId: string; websiteUrl: string; active: boolean }) {
   const [state, setState] = useState<TeachingState>(emptyState);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -68,19 +68,6 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
     return teachingWindow;
   }
 
-  async function connectBrowser() {
-    const openedNewWindow = !browserWindow.current || browserWindow.current.closed;
-    const teachingWindow = openBrowser();
-    if (!teachingWindow) return;
-    const next = await operate("create_teaching_session");
-    if (!next?.liveUrl) {
-      if (openedNewWindow) teachingWindow.close();
-      return;
-    }
-    teachingWindow.location.href = interactiveBrowserUrl(next.liveUrl);
-    await operate("continue_canvas_signin");
-  }
-
   async function submitVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = verificationCode;
@@ -104,19 +91,16 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
   return <section className="teaching-pilot" aria-label="Explore website and review reading actions" aria-busy={busy}>
     <ol className="teaching-progress"><li aria-current={step === "connect" ? "step" : undefined}>Connect</li><li aria-current={step === "teach" ? "step" : undefined}>Explore</li><li aria-current={step === "review" ? "step" : undefined}>Review</li></ol>
     {!state.ready && <div className="teaching-step">
-      <h2>Open your teaching browser</h2>
-      <p>A separate Canvas window opens for sign-in and teaching. The browser runs in the cloud.</p>
-      <button className="button primary" disabled={busy} onClick={connectBrowser}>{busy ? "Opening hosted browser…" : "Connect Canvas"}</button>
-      <p className="field-help">This private pilot uses your Browser Use credits. Each session ends after 30 minutes.</p>
+      <h2>No earlier cloud session is connected</h2>
+      <p>Use the extension above to explore Canvas. New cloud exploration sessions are not opened here.</p>
     </div>}
     {state.ready && <>
       <div className="teaching-step">
         <h2>{state.recording ? "Explore the pages you use" : state.candidates.length ? "Review what we observed" : authentication?.stage === "signed_in" ? "Canvas is ready" : "Continue Canvas sign-in"}</h2>
-        <p>{state.recording ? "Visit the course pages you use in the Canvas window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without navigating Canvas again." : authentication?.stage === "signed_in" ? "Start exploring, then browse course pages such as assignments, materials, and the syllabus. Some pages have no supported reading request." : "We can enter your saved Berkeley sign-in details. You complete the text-code check here."}</p>
+        <p>{state.recording ? "Visit the course pages you use in the Canvas window. Return here when you are ready to review." : state.candidates.length ? "Review all observed reading actions below. Select each action to test it without navigating Canvas again." : authentication?.stage === "signed_in" ? "Use the normal-browser exploration above for new observations. This older session remains available for sign-in recovery and earlier reading tests." : "We can enter your saved Berkeley sign-in details. You complete the text-code check here."}</p>
         <div className="pilot-controls">
           {liveUrl && <button className="button" onClick={() => openBrowser(liveUrl)}>Open Canvas window</button>}
-          {state.recording ? <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Review suggested actions</button> : state.candidates.length === 0 && authentication?.stage === "signed_in" && <button className="button primary" disabled={busy} onClick={() => operate("start_recording")}>Start exploring</button>}
-          {!state.recording && state.candidates.length > 0 && <button className="button" disabled={busy} onClick={() => operate("resume_recording")}>Continue exploring</button>}
+          {state.recording && <button className="button primary" disabled={busy} onClick={() => operate("stop_recording")}>Stop earlier recording</button>}
           <span>{state.recording ? "Recording course reading requests" : `${state.candidates.length} observed requests`}</span>
         </div>
       </div>
@@ -143,12 +127,12 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
       </div>}
       <details className="teaching-details"><summary>Session details</summary>
         <p>This session and its observed requests remain available here until the session ends. Only reading requests are supported.</p>
-        <p>Task publication and assistant connections are not available yet. Continue exploring keeps these captures; replacing removes them.</p>
+        <p>Task publication and assistant connections are not available yet. Use the extension above for new exploration.</p>
         {selected && <label htmlFor={`course-${appId}-${taskId}`}>Test another course ID<input id={`course-${appId}-${taskId}`} inputMode="numeric" pattern="[0-9]+" value={courseId} onChange={(event) => setCourseId(event.target.value)} /></label>}
-        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => { setSelectedId(""); void operate("start_recording"); }}>Replace all captured actions</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
+        <div className="pilot-controls"><button className="button" disabled={busy} onClick={() => operate("get_teaching_status")}>Refresh status</button><button className="button" disabled={busy || state.recording} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session and delete captures</button></div>
       </details>
     </>}
-    {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The browser connection ended. Close this session before opening another.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}
+    {!state.ready && state.expiresAt && <div className="pilot-controls"><p>The earlier browser connection ended. End this session and use the extension above for exploration.</p><button className="button" disabled={busy} onClick={() => operate("end_teaching_session")}>End session</button></div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
   </section>;
 }
