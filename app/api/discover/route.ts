@@ -15,8 +15,9 @@ const discoveryDeadlineMs = 50_000;
 const maximumBodyBytes = 2_000_000;
 const maximumPromptBodyCharacters = 300_000;
 const redacted = "[redacted]";
-const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", "pwd", "session", "sid", "sig", "signature", "auth", "authorization", "csrf", "xsrf", "jwt", "bearer", "verifier", "code", "credential", "credentials", "nonce", "otp", "cookie"]);
-const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|session|verifier|signature/i;
+const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", "pwd", "sid", "sig", "signature", "auth", "authorization", "csrf", "xsrf", "jwt", "bearer", "verifier", "code", "credential", "credentials", "nonce", "otp", "cookie"]);
+const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|verifier|signature/i;
+const sessionSecretNames = new Set(["session", "sessionid", "sessiontoken", "sessionkey", "sid", "jsessionid", "phpsessid"]);
 const jwtLike = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
 const secretLabels = String.raw`password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code`;
@@ -37,7 +38,7 @@ const capturedRequestSchema = z.object({
   body: clipped(maximumBodyLength).optional(),
   requestContentType: clipped(200).optional(),
   requestHeaders: z.record(z.string().max(80), clipped(200)).optional(),
-  tokenHeaders: z.array(z.object({ header: z.string().max(80), fromLocalStorage: z.string().max(200) })).max(10).optional(),
+  tokenHeaders: z.array(z.object({ header: z.string().max(80), fromLocalStorage: z.string().max(200), prefix: z.string().max(20).optional(), path: z.string().max(200).optional() })).max(10).optional(),
 });
 const discoveryBodySchema = z.object({
   appId: appIdSchema,
@@ -66,7 +67,7 @@ class DiscoveryError extends Error {
 
 function isSecretKey(key: string) {
   const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/);
-  return words.some((word) => secretKeyWords.has(word)) || secretKeyFragments.test(key);
+  return words.some((word) => secretKeyWords.has(word)) || secretKeyFragments.test(key) || sessionSecretNames.has(key.toLowerCase().replace(/[^a-z0-9]/g, ""));
 }
 
 function looksRandom(text: string) {
