@@ -5,7 +5,7 @@ import { z } from "zod";
 import { isOwner } from "../../../../lib/account";
 import type { Task, Website } from "../../../../lib/capabilities";
 import { connectionAllowed } from "../../../../lib/connection";
-import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
+import { cancelOrder, checkOrder, noOrderMessage, orderIdSchema, orderWaitMilliseconds, orderRequestSchema, placeOrder, prepareOrder, readLinkStatus, type LinkStatus, type OrderView } from "../../../../lib/order";
 import { isRunnableTask, readPage, runTask } from "../../../../lib/run-task";
 import { connectionToolNames, saveTask, toolName } from "../../../../lib/save-task";
 import { readSigningIn, submitVerificationCode } from "../../../../lib/sign-in";
@@ -31,9 +31,9 @@ const readOnlyAnnotations = { readOnlyHint: true, destructiveHint: false, idempo
 const textResult = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
 const orderStatusText: Record<OrderView["status"], string> = {
-  preparing: "Browser Use is building the cart. Call check_order again in about 30 seconds.",
+  preparing: "Browser Use is building the cart. Call check_order again now; it waits up to 4 minutes.",
   ready: "The cart is at checkout and nothing has been paid. Show the user every item, the fees, the tip, the total, the delivery address, and the delivery estimate. Call place_order only after the user clearly approves this exact total.",
-  placing: "Browser Use is checking the total and paying with Pay with Link. The user approves the payment in the Link app on their phone. Call check_order again in about 30 seconds.",
+  placing: "Browser Use is checking the total and paying with Pay with Link. The user approves the payment in the Link app on their phone. Call check_order again now; it waits up to 4 minutes.",
   placed: "The website confirmed the order.",
   failed: "The order did not finish.",
   cancelled: "The order was cancelled.",
@@ -61,11 +61,11 @@ function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
   }, async ({ request }) => textResult(orderText(await prepareOrder(app, request))));
   server.registerTool("check_order", {
     title: `Check an order on ${app.name}`,
-    description: "Return the order's progress, its cart and total when it is ready, or its confirmation after payment, and the Pay with Link status.",
+    description: "Wait up to 4 minutes for a running order step to finish, then return the order's progress, its cart and total when it is ready, or its confirmation after payment, and the Pay with Link status.",
     inputSchema: orderIdInput,
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, async ({ orderId }) => {
-    const [order, link] = await Promise.all([checkOrder(app), readLinkStatus()]);
+    const [order, link] = await Promise.all([checkOrder(app, orderWaitMilliseconds), readLinkStatus()]);
     if (order && order.orderId !== orderId) throw new Error(noOrderMessage);
     return textResult(`${orderText(order)}\n${linkText(link)}`);
   });

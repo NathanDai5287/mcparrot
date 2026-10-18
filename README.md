@@ -480,11 +480,11 @@ The app's connection lists the four ordering tools only while the switch is on a
 
 1. The user asks ChatGPT to order something, or types the request in the app page's **Test order** box and selects **Prepare order**.
 2. `prepare_order` starts a Browser Use agent run with the app's browser profile; the agent builds the cart, opens the checkout page, and stops without selecting any place-order or pay button. The tool returns at once with an order ID.
-3. `check_order`, or the app page every 5 seconds, reads the run; when it finishes, the result lists the items, subtotal, fees, tip, total, delivery address, and delivery estimate.
+3. `check_order` waits on the server, checking the run every 3 seconds for up to 4 minutes, and the app page reads the run every 5 seconds; when it finishes, the result lists the items, subtotal, fees, tip, total, delivery address, and delivery estimate.
 4. ChatGPT shows the cart and asks the user to approve the exact total, and the app page shows the cart with **Place order for $total** and **Cancel order**.
 5. `place_order` checks the safety rules, then runs a short agent step in the same browser that reads the checkout total again without paying, and compares it with the approved total.
 6. When every rule passes, MCParrot starts the payment run with the Link connection, and Link asks the user to approve the payment in the Link app on their phone.
-7. `check_order` reports the website's confirmation or why the payment failed, and MCParrot stops the browser.
+7. `check_order` waits the same way, then reports the website's confirmation or why the payment failed, and MCParrot stops the browser.
 
 `cancel_order`, or **Cancel order**, cancels the agent run and stops its browser, but the cart can stay in the website account.
 Only one order runs at a time for each app; preparing another order while one is preparing, ready, or placing returns a message to check or cancel it first.
