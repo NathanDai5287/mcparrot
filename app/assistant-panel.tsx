@@ -70,9 +70,11 @@ function ConnectionSection({ app, connectionSecret }: { app: Website; connection
       <p>This private link contains a secret code. Anyone with the link can use MCParrot, so keep it private. ChatGPT gets this app’s reading tasks only.</p>
       <ol className="field-help">
         <li>Copy the link.</li>
-        <li>In ChatGPT, open Settings, then Apps &amp; Connectors, then Advanced settings, and turn on Developer mode.</li>
-        <li>Select Create, name the connector {app.name}, paste the link as the MCP server URL, and choose No authentication.</li>
-        <li>In a new chat, ask ChatGPT to use {app.name}.</li>
+        <li>In ChatGPT, open Settings, then Plugins, and select Browse directory.</li>
+        <li>Select Add, then Add custom MCP server.</li>
+        <li>Name it {app.name}, paste the link as the Server URL, and set Authentication to No authentication.</li>
+        <li>Tick I understand and want to continue, then select Create as a plugin.</li>
+        <li>In a new chat, turn on the {app.name} plugin and ask ChatGPT to use it.</li>
       </ol>
     </div>
     <button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>

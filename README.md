@@ -99,7 +99,9 @@ Tasks that use other methods stay off the connection, because the first version 
 Nathan chose a private connection link instead of MCP sign-in, because Vercel Authentication protects every page and ChatGPT cannot pass it.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?x-vercel-protection-bypass=<secret>`, where the secret is the project's Vercel Protection Bypass for Automation secret.
 Vercel gives that secret to each deployment as `VERCEL_AUTOMATION_BYPASS_SECRET`, and the app page shows the full link with a **Copy link** button and setup steps.
-In ChatGPT, the user opens Settings, then Apps & Connectors, then Advanced settings, turns on Developer mode, selects Create, pastes the link as the MCP server URL, and chooses No authentication.
+In ChatGPT, the user opens Settings, then Plugins, selects **Browse directory**, then **Add** and **Add custom MCP server**.
+The user names the plugin, pastes the link as the Server URL, sets Authentication to No authentication, accepts the risk notice, and selects **Create as a plugin**.
+Workspace accounts can have custom MCP servers disabled by an administrator.
 Do not promise automatic connector installation or identical support across assistant clients.
 
 Management through MCP must also start and stop exploration, list recorded requests, run discovery, save chosen tasks, report status, and request sign-in recovery.
