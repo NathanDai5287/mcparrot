@@ -31,6 +31,14 @@ export type ListingSummary = Omit<Listing, "ownerId" | "tasks"> & { taskNames: s
 
 export class ListingRejected extends Error {}
 
+export class AlreadyInstalled extends ListingRejected {
+  constructor(readonly appId: string) {
+    super("This app is already in your apps.");
+  }
+}
+
+export const appFromListing = (apps: Website[], listingId: string) => apps.find((app) => [app.listing?.id, app.installedFrom, listingIdFor(app.id)].includes(listingId));
+
 const sharedTasks = (app: Website) => app.tasks.map(({ name, description, requests, inputs, returns }) => ({ name, description, requests, inputs, returns }));
 
 const summary = ({ ownerId, tasks, ...shared }: Listing): ListingSummary => ({ ...shared, taskNames: tasks.map((task) => task.name) });
@@ -87,7 +95,11 @@ export async function installListing(userId: string, listingId: string) {
   const listing = listingSchema.safeParse(await storage().get(listingKey(listingId)));
   if (!listing.success) throw new ListingRejected("This app is no longer in the marketplace.");
   const { name, url, tasks } = listing.data;
-  const app: Website = { id: crypto.randomUUID(), name, url, tasks: tasks.map((task) => ({ ...task, id: crypto.randomUUID() })) };
-  const apps = await changeApps(userId, (current) => [...current, app], { newAppIds: [app.id] });
+  const app: Website = { id: crypto.randomUUID(), name, url, tasks: tasks.map((task) => ({ ...task, id: crypto.randomUUID() })), installedFrom: listingId };
+  const apps = await changeApps(userId, (current) => {
+    const existing = appFromListing(current, listingId);
+    if (existing) throw new AlreadyInstalled(existing.id);
+    return [...current, app];
+  }, { newAppIds: [app.id] });
   return { apps, appId: app.id };
 }

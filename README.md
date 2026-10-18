@@ -428,8 +428,10 @@ A listing never holds logins, Browser Use profile IDs, sign-in times, connection
 After publishing, the section shows the published date with **Update listing**, which publishes the app's current tools and description again under the same listing, and **Unpublish**, which removes the listing; deleting the app also removes it.
 
 Each marketplace item has **Add to my apps**, which copies it into the signed-in user's workspace as a new app with new app and tool IDs, ordering off, no sign-in, and no connection link, then opens that app.
+For a listing that the signed-in user published or already added, the item shows **In your apps** with **Open** instead, and a repeated add returns status 409 with "This app is already in your apps." and the existing app ID, so it never makes a copy.
+Copies added before this check have no source listing ID, so the marketplace does not recognize them.
 A signed-out visitor sees **Sign in to add**, which opens the sign-in page and then returns to the marketplace.
-Redis keeps the listing IDs in the set `marketplace` and each listing under `listing:<listing-id>`, and the app keeps its listing ID, published date, and description.
+Redis keeps the listing IDs in the set `marketplace` and each listing under `listing:<listing-id>`, the published app keeps its listing ID, published date, and description, and an added app keeps its source listing ID in `installedFrom`.
 The server validates each listing with zod and refuses an app with more than 100 tools, a listing longer than 200,000 characters, and a new listing when the marketplace holds 200.
 Matching marketplace MCP operations are aspirational, as the [UI and MCP parity section](#ui-and-mcp-parity) records.
 

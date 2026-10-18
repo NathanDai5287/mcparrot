@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
-import { readListings } from "../../lib/marketplace";
+import { appFromListing, readListings } from "../../lib/marketplace";
+import { readWorkspace } from "../../lib/workspace";
 import { AddToMyApps } from "./add-to-my-apps";
 
 export const metadata: Metadata = { title: "MCParrot — Marketplace" };
@@ -9,6 +10,7 @@ const publishedDate = (publishedAt: string) => new Date(publishedAt).toLocaleDat
 
 export default async function MarketplacePage() {
   const [{ userId }, listings] = await Promise.all([auth(), readListings()]);
+  const myApps = userId ? await readWorkspace(userId) ?? [] : [];
   return (
     <div className="workspace-shell">
       <aside className="sidebar">
@@ -35,7 +37,7 @@ export default async function MarketplacePage() {
               <span className="website-address">{listing.taskNames.length} {listing.taskNames.length === 1 ? "tool" : "tools"}: {listing.taskNames.join(", ") || "none"}</span>
               <span className="website-address">Published by {listing.publisher} on {publishedDate(listing.publishedAt)}</span>
             </span>
-            <AddToMyApps listingId={listing.id} signedIn={!!userId} />
+            <AddToMyApps listingId={listing.id} signedIn={!!userId} myAppId={appFromListing(myApps, listing.id)?.id} />
           </article>)}</div>}
         </main>
       </div>
