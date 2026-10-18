@@ -209,7 +209,7 @@
     .shot-pair img { max-height: calc((100dvh - var(--bar) - 12rem) / 2); }
     .shot-pair--row { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
     .shot-pair--row img { max-height: calc(100dvh - var(--bar) - 10rem); }
-    .rule-head { font-size: clamp(2.6rem, 1rem + 5vw, 5.4rem); white-space: nowrap; }
+    .slide-inner .rule-head { font-size: clamp(3rem, 1rem + 7.4vw, 8.2rem); white-space: nowrap; letter-spacing: -.02em; }
     .rule-asks { display: flex; flex-wrap: wrap; gap: .9rem; margin-top: clamp(1.4rem, 3vw, 2.2rem); }
     .rule-asks .ask-bubble { font-size: 1em; }
     .rule-head + .lede { font-size: 1.35em; max-width: 60ch; }
@@ -346,11 +346,6 @@
       <div class="slide-inner">
         <h2 class="rule-head">Click once. Ask forever.</h2>
         <p class="lede">Anything you can do by clicking through a website, your agent should be able to do by asking.</p>
-        <div class="rule-asks">
-          <span class="ask-bubble">Which assignments are due this week?</span>
-          <span class="ask-bubble">How did my last 10 chess games go?</span>
-          <span class="ask-bubble">Add my usual pizza to the cart.</span>
-        </div>
         <div class="engine">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg>
           <p><strong>We build MCParrot by the same rule.</strong> Each feature on its app page should also work by asking your agent.</p>
