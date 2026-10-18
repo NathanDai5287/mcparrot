@@ -196,7 +196,8 @@ A page is recorded as a GET with its URL, status, and the content type `text/htm
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts.
 It skips requests and pages whose path contains a sign-in word, such as `login`, `logout`, `signin`, `auth`, `oauth`, `token`, `session`, `password`, `sso`, `saml`, `refresh`, `otp`, `mfa`, or `verify`.
 For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 30,000 characters so that a whole GraphQL query fits, and the value of the request's `Content-Type` header as `requestContentType`.
-It also records, as `requestHeaders`, only these request headers when their value does not look like a secret: `accept`, `apollographql-client-name`, `apollographql-client-version`, `x-apollo-operation-name`, `x-channel-id`, `x-experience-id`, and `x-requested-with`.
+For every data request, including a GET, it also records, as `requestHeaders`, only these request headers when their value does not look like a secret: `accept`, `apollographql-client-name`, `apollographql-client-version`, `client-identifier`, `github-verified-fetch`, `notion-client-version`, `x-apollo-operation-name`, `x-channel-id`, `x-client-identifier`, `x-experience-id`, `x-notion-active-user-header`, `x-requested-with`, and `x-restli-protocol-version`.
+These headers have fixed or non-secret values that websites such as LinkedIn, GitHub, Instacart, and Notion require on their GET requests.
 For any request, when a request header whose name contains `auth`, `token`, `jwt`, `session`, or `apikey`, such as Ed's `x-token`, has a value that equals a value in the page's local storage, it records, as `tokenHeaders`, only the header name and the name of that local storage key, such as `{ "header": "x-token", "fromLocalStorage": "authToken" }`; it never records the value.
 It never records any other request header, such as `authorization` or `cookie`, any value of a sign-in header, any response header, or cookies.
 It removes URL fragments, and it replaces with `redacted` each query value whose name suggests a secret, such as `token`, `key`, `code`, `session`, `sig`, or `csrf`, each query value or path segment that looks like a secret, and each sample or request body value under a key such as `token`, `secret`, `password`, `apiKey`, `cookie`, `auth`, or `session`.
@@ -210,13 +211,14 @@ A page sample keeps the first 3,000 characters of its visible text, with spaces 
 Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
 Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.6.0, asks only for the `storage` and `debugger` permissions and no host permissions.
+The extension, version 0.6.1, asks only for the `storage` and `debugger` permissions and no host permissions.
 The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
 To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
 Version 0.4.0 does not record request bodies, and version 0.5.0 cuts each body to 2,000 characters, which cuts off most GraphQL queries, so a POST tool found from those recordings can fail until the user loads version 0.6.0, explores again, and finds tools again.
 Versions before 0.6.0 do not record `tokenHeaders`, so tools on a website that signs requests with a header, such as Ed, need a new recording with version 0.6.0 and a new discovery run.
+Versions before 0.6.1 do not record `requestHeaders` for GET requests, so a GET tool on a website that requires one of those headers, such as LinkedIn, needs a new recording with version 0.6.1 and a new discovery run.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
@@ -242,7 +244,7 @@ It tells Claude that tools can use GET and POST requests, to prefer GraphQL quer
 A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
 The instruction tells Claude to copy each body exactly, with the whole GraphQL query text, and never to shorten, rewrite, or invent query text.
 It explains step placeholders and tells Claude to use one, with the earlier request first, when a recorded request contains a value that also appears in an earlier recorded response sample.
-After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`, and the recorded `tokenHeaders` of any recorded request on the same host into each request on that host as `tokenHeaders`; Claude never sees them.
+After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each GET or POST request as `headers`, and the recorded `tokenHeaders` of any recorded request on the same host into each request on that host as `tokenHeaders`; Claude never sees them.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's website or its subdomains and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
@@ -335,7 +337,7 @@ Discovery, `save_task`, the connection's tool list, and every tool run apply the
 The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
 The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address, non-GraphQL body, or GraphQL operation name contains one of the words, such as a query named `paymentHistory`, is refused.
 `read_page` only opens pages with GET, so the guard does not apply to it.
-A POST tool sends its saved `headers`, filtered again to the same short list of header names, and it adds a fresh anti-forgery (CSRF) token as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many websites refuse a request without that header.
+A GET or POST tool sends its saved `headers`, filtered again to the same short list of header names, and a POST tool also adds a fresh anti-forgery (CSRF) token as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many websites refuse a request without that header.
 Before the requests, the run opens the website's home page in the signed-in browser and reads the token from the first of `meta[name=csrf-token]`, `meta[name=csrf_token]`, `meta[name=_csrf]`, `input[name=csrfmiddlewaretoken]`, and `input[name=authenticity_token]`, or else from a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`.
 When the page has `meta[name=_csrf_header]`, the run also sends the token under the header name in that tag.
 The value never leaves the website's page, and MCParrot never logs it.

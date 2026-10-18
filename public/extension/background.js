@@ -10,7 +10,7 @@ const maximumHeaderLength = 200;
 const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
-const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "x-apollo-operation-name", "x-channel-id", "x-experience-id", "x-requested-with"];
+const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "client-identifier", "github-verified-fetch", "notion-client-version", "x-apollo-operation-name", "x-channel-id", "x-client-identifier", "x-experience-id", "x-notion-active-user-header", "x-requested-with", "x-restli-protocol-version"];
 const tokenHeaderName = /auth|token|jwt|session|api-?key/i;
 const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
@@ -149,11 +149,11 @@ function rememberRequest({ requestId, request }) {
   const pattern = url.origin + pathPattern(url);
   if (pattern.length > maximumUrlLength) return;
   const tokenValues = Object.entries(request.headers ?? {}).filter(([name, value]) => tokenHeaderName.test(name) && value);
-  const captured = { method: request.method, url: withoutSecrets(request.url), pattern, ...(tokenValues.length ? { tokenValues } : {}) };
+  const requestHeaders = replayedHeaders(request.headers);
+  const captured = { method: request.method, url: withoutSecrets(request.url), pattern, ...(tokenValues.length ? { tokenValues } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}) };
   if (request.method === "GET") return pendingRequests.set(requestId, captured);
   const requestContentType = contentTypeOf(request.headers);
-  const requestHeaders = replayedHeaders(request.headers);
-  pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), ...(Object.keys(requestHeaders).length ? { requestHeaders } : {}), postData: request.postData, hasPostData: request.hasPostData });
+  pendingRequests.set(requestId, { ...captured, ...(requestContentType ? { requestContentType } : {}), postData: request.postData, hasPostData: request.hasPostData });
 }
 
 async function requestBody(tabId, requestId, { postData, hasPostData }) {
