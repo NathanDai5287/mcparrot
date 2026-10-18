@@ -37,7 +37,7 @@ export class AlreadyInstalled extends ListingRejected {
   }
 }
 
-export const appFromListing = (apps: Website[], listingId: string) => apps.find((app) => app.listing?.id === listingId || app.installedFrom === listingId);
+export const appFromListing = (apps: Website[], listingId: string) => apps.find((app) => [app.listing?.id, app.installedFrom, listingIdFor(app.id)].includes(listingId));
 
 const sharedTasks = (app: Website) => app.tasks.map(({ name, description, requests, inputs, returns }) => ({ name, description, requests, inputs, returns }));
 
