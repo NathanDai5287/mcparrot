@@ -5,22 +5,22 @@ import { signedInUserId } from "../../../lib/account";
 import { claudeModelName, runClaudeAgent } from "../../../lib/claude-agent";
 import { appIdSchema, capabilitySchema as storedCapabilitySchema, maximumBodyLength, type Capability, type DiscoveredCapability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
-import { bodyPlaceholderPattern, isOnWebsite } from "../../../lib/task-request";
+import { bodyPlaceholderPattern, isOnWebsite, replayedHeaders } from "../../../lib/task-request";
 import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const discoveryDeadlineMs = 50_000;
-const maximumBodyBytes = 2_000_000;
+const maximumBodyBytes = 4_000_000;
 const maximumPromptBodyCharacters = 300_000;
+const maximumSampleCharacters = 12_000;
+const maximumPromptSampleCharacters = 450_000;
 const redacted = "[redacted]";
-const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", "pwd", "sid", "sig", "signature", "auth", "authorization", "csrf", "xsrf", "jwt", "bearer", "verifier", "code", "credential", "credentials", "nonce", "otp", "cookie"]);
-const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|verifier|signature/i;
-const sessionSecretNames = new Set(["session", "sessionid", "sessiontoken", "sessionkey", "sid", "jsessionid", "phpsessid"]);
+const secretNameText = /token|secret|passw|apikey|privatekey|cookie|authorization|csrf|xsrf|jsessionid|phpsessid/;
 const jwtLike = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
-const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
-const secretLabels = String.raw`password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code`;
+const bearerLike = /\bbearer\s+[\w\-.~+/]+=*/gi;
+const secretLabels = String.raw`password|passwd|token|secret|api[ _-]?key|private[ _-]?key|cookie|authorization|csrf|xsrf`;
 const labelledSecret = new RegExp(String.raw`\b(${secretLabels})(\s*[:=]\s*)(\\?"[^"\\]*\\?"|'[^']*'|(?:[^\s&;,"'<>]|[&;,](?![\w.-]+=|(?:${secretLabels})\s*[:=]|\s|$))+)`, "gi");
 
 const labelledSecretString = new RegExp(String.raw`\b(${secretLabels})(\s*:\s*)"[^"]*"`, "gi");
@@ -35,7 +35,7 @@ const capturedRequestSchema = z.object({
   pattern: clipped(2000),
   status: z.number().int(),
   contentType: clipped(200),
-  sample: clipped(3000),
+  sample: clipped(maximumSampleCharacters),
   body: clipped(maximumBodyLength).optional(),
   requestContentType: clipped(200).optional(),
   requestHeaders: z.record(z.string(), clipped(200)).transform((headers) => Object.fromEntries(Object.entries(headers).filter(([name]) => name.length <= 80))).optional(),
@@ -81,20 +81,11 @@ class DiscoveryError extends Error {
 }
 
 function isSecretKey(key: string) {
-  const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/);
-  return words.some((word) => secretKeyWords.has(word)) || secretKeyFragments.test(key) || sessionSecretNames.has(key.toLowerCase().replace(/[^a-z0-9]/g, ""));
-}
-
-function looksRandom(text: string) {
-  if (!/[a-z]/.test(text) || !/[A-Z]/.test(text) || !/\d/.test(text)) return false;
-  const counts = new Map<string, number>();
-  for (const character of text) counts.set(character, (counts.get(character) ?? 0) + 1);
-  const entropy = [...counts.values()].reduce((sum, count) => sum - (count / text.length) * Math.log2(count / text.length), 0);
-  return entropy >= 4.2;
+  return secretNameText.test(key.toLowerCase().replace(/[^a-z0-9]/g, ""));
 }
 
 function withoutTokens(text: string) {
-  return text.replace(jwtLike, redacted).replace(tokenLike, (match) => looksRandom(match) ? redacted : match);
+  return text.replace(jwtLike, redacted).replace(bearerLike, `Bearer ${redacted}`);
 }
 
 function withoutLabelledSecrets(text: string) {
@@ -104,7 +95,7 @@ function withoutLabelledSecrets(text: string) {
 const redactGraphqlDocument = (text: string) => withoutTokens(text.replace(labelledSecretString, `$1$2"${redacted}"`));
 
 function redactValue(value: unknown, key = ""): unknown {
-  if (typeof value === "string") return key === "query" && graphqlDocument.test(value) ? redactGraphqlDocument(value) : withoutTokens(withoutLabelledSecrets(value));
+  if (typeof value === "string") return key === "query" && graphqlDocument.test(value) ? redactGraphqlDocument(value) : withoutLabelledSecrets(withoutTokens(value));
   if (Array.isArray(value)) return value.map((item) => redactValue(item));
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, item !== null && isSecretKey(key) ? redacted : redactValue(item, key)]));
   return value;
@@ -115,7 +106,7 @@ function redactSample(sample: string) {
     return JSON.stringify(redactValue(JSON.parse(sample)));
   } catch {
     const withoutSecretFields = sample.replace(/("([^"\\]{1,100})"\s*:\s*)("(?:[^"\\]|\\.)*"?|[^\s,}\]]+)/g, (field, prefix: string, key: string) => isSecretKey(key) ? `${prefix}"${redacted}"` : field);
-    return withoutTokens(withoutLabelledSecrets(withoutSecretFields));
+    return withoutLabelledSecrets(withoutTokens(withoutSecretFields));
   }
 }
 
@@ -142,7 +133,8 @@ function websiteBodies(requests: CapturedRequest[], origin: string) {
 }
 
 function scrubbed(requests: CapturedRequest[], origin: string) {
-  return websiteBodies(requests, origin).map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
+  const sampleLength = Math.floor(maximumPromptSampleCharacters / requests.length);
+  return websiteBodies(requests, origin).map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample).slice(0, sampleLength), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
 }
 
 function scrubbedTasks(tasks: Task[]) {
@@ -152,13 +144,13 @@ function scrubbedTasks(tasks: Task[]) {
 function discoveryPrompt(app: Website, requests: CapturedRequest[]) {
   const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests, new URL(app.url).origin) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(app.url).origin} while we recorded the pages they opened and the data requests those pages made.
-Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}", or with redacted in URLs and request bodies; never copy either marker into a urlPattern or bodyPattern, and use a {placeholder} input for that value instead. Only requests on the website itself or its subdomains keep their request body.
+Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}", or with redacted in URLs and request bodies; never copy either marker into a urlPattern or bodyPattern, and use a {placeholder} input for that value instead. Only requests on the website's domain, such as api.example.com or example.com for www.example.com, keep their request body.
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
 List the distinct, useful things an assistant could do for this person with these requests, such as listing, searching, or reading information.
 Suggest page-reading tasks for pages whose text is useful, such as "Read course syllabus" with a {courseId} input, especially when no data request returns the same information.
 Ignore analytics, tracking, advertising, configuration, feature flags, and authentication requests, such as third-party pixels.
 Tasks can use GET and POST requests. Many websites read data through POST GraphQL requests with JSON bodies; prefer GraphQL queries for reading. Other POST requests and GraphQL mutations are allowed, but never suggest a request for checkout, payment, purchase, or placing or creating an order; MCParrot rejects those.
-For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method GET or POST and full URL pattern on the same website or one of its subdomains, with {placeholders} for values that change; for POST, also bodyPattern, the request body as a string with {placeholders} inside JSON string values, and contentType, the request body's content type), the inputs a person could change (name, description, and an example taken from the requests; one input for each placeholder in the URL patterns and bodies other than step placeholders), and what it returns.
+For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method GET or POST and full URL pattern on the website's domain, with {placeholders} for values that change; for POST, also bodyPattern, the request body as a string with {placeholders} inside JSON string values, and contentType, the request body's content type), the inputs a person could change (name, description, and an example taken from the requests; one input for each placeholder in the URL patterns and bodies other than step placeholders), and what it returns.
 A task's requests run in order, and a later request can use a value from an earlier request's JSON response with a step placeholder {stepN.path.to.value}, where N is the 1-based position of the earlier request in the same task and array positions are numbers, such as {step1.cart.id} or {step2.items.0.id}. Step placeholders are not inputs. When a recorded request contains a value, such as a cart ID, that also appears in the sample of an earlier recorded response, include that earlier request first and use a step placeholder for the value instead of an input.
 When the last request of a task returns JSON, give keepFields: the JSON paths in that response that a person needs for the task's purpose, such as names, titles, text, dates, scores, prices, and ids that other tasks take as inputs, chosen from the recorded response samples. Write each path with dots between keys and [] for every element of an array, such as "threads[].title", "threads[].user.name", or "data.store.menu[].items[].price". MCParrot answers with only these fields unless the assistant asks for the full answer. Leave keepFields empty for page-reading tasks and when every field is useful.
 Copy each bodyPattern exactly from a recorded request body, including the whole GraphQL query text, and only replace values that change with {placeholders}. Never shorten, rewrite, or invent query text, and never suggest a POST request whose body is not in the recorded data.
@@ -252,7 +244,7 @@ const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: s
 function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
   const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
   const tokenSource = recorded.find((candidate) => candidate.tokenHeaders?.length && originOf(candidate.pattern, origin) === originOf(request.urlPattern, origin));
-  return { ...request, ...(match ? { headers: match.requestHeaders } : {}), ...(tokenSource ? { tokenHeaders: tokenSource.tokenHeaders } : {}) };
+  return { ...request, ...(match ? { headers: replayedHeaders(match.requestHeaders) } : {}), ...(tokenSource ? { tokenHeaders: tokenSource.tokenHeaders } : {}) };
 }
 
 function capabilitiesFrom(reply: string, app: Website, recorded: CapturedRequest[]) {
