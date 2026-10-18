@@ -304,7 +304,7 @@ export default function Workspace() {
             <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }, { label: app.name, screen: { view: "app", app } }]} current="Explore" onNavigate={navigate} />
             <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tools to keep." />
             <ExplorationPanel appId={app.id} websiteUrl={app.url} tasks={app.tasks} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
-            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tools appear in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
+            <div className="teaching-actions"><p>MCParrot Explorer keeps recorded requests on your computer for 30 days, or until you delete them. Tools you save show up in ChatGPT for this app.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
 
         </main>
