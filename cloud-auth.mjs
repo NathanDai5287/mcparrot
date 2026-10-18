@@ -154,7 +154,11 @@ async function handle(request, response) {
   let body = "";
   for await (const chunk of request) { body += chunk; if (body.length > 12000) throw new Error("Invalid request."); }
   const input = JSON.parse(body);
-  if (input.name === "get_authentication_status") return response.end(JSON.stringify(authentication));
+  if (input.name === "get_authentication_status") {
+    const observed = await inspectAuthentication();
+    if (observed.state.stage === "signed_in") authentication = observed.state;
+    return response.end(JSON.stringify(authentication));
+  }
   if (busy) return response.end(JSON.stringify({ stage: "signing_in", message: "The previous sign-in step is still running." }));
   busy = true;
   let payload;

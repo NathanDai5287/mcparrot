@@ -155,7 +155,7 @@ export async function operateTeaching(name: TeachingOperation, session: Session 
     authentication = await authenticationOperation(sandbox, name, payload);
   }
   const operation = name === "create_teaching_session" || authenticationAction ? "get_teaching_status" : name;
-  const state = await recorderOperation(sandbox, operation, input);
+  const state = await recorderOperation(sandbox, operation, authenticationAction ? {} : input);
   authentication ??= await authenticationStatus(sandbox);
   const browser = await browserRequest(`/${session.browserId}`) as Browser;
   return { session, state: { ...state, authentication, liveUrl: browser.liveUrl, expiresAt: session.expiresAt } };

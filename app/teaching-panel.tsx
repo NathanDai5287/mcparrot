@@ -126,6 +126,7 @@ export function TeachingPanel({ appId, taskId, websiteUrl, active }: { appId: st
           <input id={`verification-${taskId}`} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required />
           <button className="button primary" disabled={busy} type="submit">{busy ? "Checking code…" : "Submit code"}</button>
         </form> : <button className="button primary" disabled={busy} onClick={() => operate("continue_canvas_signin")}>{busy ? "Continuing sign-in…" : authentication ? "Check sign-in" : "Sign in automatically"}</button>}
+        {verificationRequired && <button className="button" disabled={busy} onClick={() => operate("continue_canvas_signin")}>Check sign-in</button>}
         <p className="field-help">You can also continue manually in the Canvas window. We never approve your phone verification for you.</p>
       </div>}
       {state.candidates.length > 0 && !state.recording && <div className="pilot-candidates">
