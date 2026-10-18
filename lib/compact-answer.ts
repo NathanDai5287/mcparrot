@@ -3,7 +3,7 @@ const stringCharacters = 2_000;
 const tableRows = 3;
 const sharedColumnShare = 0.6;
 const noiseKey = /^__typename$|tracking(?![-_]?(?:number|url|link|code|status|id))|analytics|telemetry|experiment|logging/i;
-const opaqueToken = /^(?!\/)[\w\-.=+/]{80,}$/;
+const opaqueToken = /^(?![./])(?![\w\-.=+/]*\.[a-z]\w{1,4}$)[\w\-.=+/]{80,}$/i;
 const markup = /<\/?[a-z][\w:-]*(\s[^<>]*)?\/?>/i;
 const namedEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
 
@@ -99,17 +99,18 @@ function compactBody(body: string, keepFields: string[]) {
   try {
     const parsed: unknown = JSON.parse(body);
     const filtered = keepFields.length ? compacted(picked(parsed, keepFields.map(fieldPath))) : undefined;
-    return rendered(filtered !== undefined && isPresent(filtered) ? filtered : compacted(parsed));
+    const isFiltered = filtered !== undefined && isPresent(filtered);
+    return { ...rendered(isFiltered ? filtered : compacted(parsed)), isFiltered };
   } catch {
-    return { text: markup.test(body) ? plainText(body) : body, tables: [] };
+    return { text: markup.test(body) ? plainText(body) : body, tables: [], isFiltered: false };
   }
 }
 
-const narrowRequest = "fullAnswer will not show more. Ask the user to narrow the request.";
 
 export function compactAnswer(body: string, keepFields: string[] = []) {
-  const { text, tables } = compactBody(body, keepFields);
+  const { text, tables, isFiltered } = compactBody(body, keepFields);
   if (text.length <= answerCharacters) return text;
+  const narrowRequest = `${isFiltered ? "fullAnswer adds the other fields but not more of this answer" : "fullAnswer will not show more"}. Ask the user to narrow the request.`;
   const cutTable = tables.find(({ start, lineEnds }) => start <= answerCharacters && lineEnds.at(-1)! > answerCharacters);
   if (!cutTable) return `${text.slice(0, answerCharacters)}\n[answer shortened: ${text.length - answerCharacters} more characters were cut. ${narrowRequest}]`;
   const shownLines = cutTable.lineEnds.filter((end) => end <= answerCharacters);
