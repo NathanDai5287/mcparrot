@@ -192,10 +192,10 @@ export default function Workspace() {
 
   useEffect(() => {
     fetch("/api/workspace").then(async (response) => {
-      if (response.status === 401) return goToSignIn();
       const workspace: { apps?: Website[] | null; isOwner?: boolean } | null = await response.json().catch(() => null);
+      if (response.status === 401 || (response.status === 404 && !workspace)) return goToSignIn();
       if (!response.ok || !workspace || !(workspace.apps === null || Array.isArray(workspace.apps))) {
-        setWarning(response.status === 404 && !workspace ? signedOutWarning : storageWarning);
+        setWarning(storageWarning);
         return;
       }
       const savedApps = workspace.apps ?? [];
@@ -262,12 +262,8 @@ export default function Workspace() {
       showApps(result.apps);
       return { apps: result.apps, skipped: skippedTools(result.skipped) };
     }
-    if (response?.status === 401) {
+    if (response?.status === 401 || (response?.status === 404 && !result)) {
       goToSignIn();
-      return { error: signedOutWarning };
-    }
-    if (response?.status === 404 && !result) {
-      setWarning(signedOutWarning);
       return { error: signedOutWarning };
     }
     setWarning(!response || response.ok || response.status === 503 ? storageWarning : "");
