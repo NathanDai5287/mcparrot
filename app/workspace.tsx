@@ -232,7 +232,7 @@ export default function Workspace() {
     <div className="workspace-shell">
       <aside className="sidebar">
         <button className="wordmark" onClick={() => navigate({ view: "apps" })} aria-label="MCParrot home">
-          <svg width="29" height="29" viewBox="0 0 29 29" fill="none" aria-hidden="true"><rect x="1" y="1" width="27" height="27" rx="8" /><path d="M8 18V10l6.5 6 6.5-6v8" /></svg>
+          <img src="/logo.svg" width={29} height={29} alt="" />
           <span>MCParrot</span>
         </button>
         <button className="sidebar-apps-link" onClick={() => navigate({ view: "apps" })}>Apps</button>
