@@ -159,6 +159,8 @@ Every agent who works on the [pitch slideshow](public/docs/pitch.html) or on any
 The main slides must fit the 2-minute science fair pitch, and the whole talk must never pass the 3-minute Round 2 limit; any slides beyond that serve only as backup for questions.
 Be direct and concise, and lead with the idea and the product rather than technical depth, because judges ask follow-up questions when they want more detail.
 Use many visuals, such as screenshots, diagrams, and numbers, because they make technical complexity easy to see.
+Give each slide one idea and few words, keep jargon out of the main slides, and explain any term in plain words on a backup slide.
+The pitch slides show status labels only on the slide about next steps.
 Rehearse many times, ask other people to judge a practice run, share the talk equally between teammates, and speak with energy rather than in a quiet monotone.
 
 The organizers say that no single formula works, and they suggest two structures:
