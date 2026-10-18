@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Capability, CapturedRequest } from "../lib/capabilities";
+import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabilities";
 
 type Exploration = { recording: boolean; requests: CapturedRequest[] };
-type Choice = Capability & { selected: boolean };
+type Choice = DiscoveredCapability & { selected: boolean };
 const emptyExploration: Exploration = { recording: false, requests: [] };
 const connectionToolNames = ["read_page", "save_task", "submit_verification_code"];
 const toolName = (taskName: string) => taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
 const isText = (value: unknown) => typeof value === "string";
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
-function isCapability(value: unknown): value is Capability {
+function isCapability(value: unknown): value is DiscoveredCapability {
   return isObject(value) && isText(value.name) && isText(value.description) && isText(value.returns)
+    && (value.updatesTaskId === undefined || isText(value.updatesTaskId))
     && Array.isArray(value.inputs) && value.inputs.every((input) => isObject(input) && isText(input.name) && isText(input.description) && isText(input.example))
     && Array.isArray(value.requests) && value.requests.length > 0 && value.requests.every((request) => isObject(request) && isText(request.method) && isText(request.urlPattern));
 }
@@ -45,10 +46,10 @@ export function requestExtension(action: string, appId: string, websiteUrl?: str
   });
 }
 
-function CapabilityChoice({ choice, problem, problemId, onChange }: { choice: Choice; problem: string; problemId: string; onChange: (changes: Partial<Choice>) => void }) {
+function CapabilityChoice({ choice, updatedTask, problem, problemId, onChange }: { choice: Choice; updatedTask?: Task; problem: string; problemId: string; onChange: (changes: Partial<Choice>) => void }) {
   const inputs = choice.inputs.map((input) => `${input.name} (for example, ${input.example})`).join(", ");
   return <div className="capability">
-    <label className="capability-pick"><input type="checkbox" checked={choice.selected} onChange={(event) => onChange({ selected: event.target.checked })} />Keep this task</label>
+    <label className="capability-pick"><input type="checkbox" checked={choice.selected} onChange={(event) => onChange({ selected: event.target.checked })} />Keep this task · {updatedTask ? `Updates ${updatedTask.name}` : "New"}</label>
     <input aria-label="Task name" value={choice.name} maxLength={80} aria-invalid={problem ? true : undefined} aria-describedby={problem ? problemId : undefined} onChange={(event) => onChange({ name: event.target.value })} />
     {problem && <p className="pilot-error" id={problemId}>{problem}</p>}
     <textarea aria-label="Task description" value={choice.description} rows={2} maxLength={500} onChange={(event) => onChange({ description: event.target.value })} />
@@ -57,11 +58,12 @@ function CapabilityChoice({ choice, problem, problemId, onChange }: { choice: Ch
   </div>;
 }
 
-export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave }: { appId: string; websiteUrl: string; taskNames: string[]; active: boolean; onSave: (tasks: Capability[]) => Promise<boolean> }) {
+export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: { appId: string; websiteUrl: string; tasks: Task[]; active: boolean; onSave: (capabilities: DiscoveredCapability[]) => Promise<boolean> }) {
   const [state, setState] = useState(emptyExploration);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState<"" | "exploration" | "discovery">("");
   const [choices, setChoices] = useState<Choice[]>([]);
+  const [discoveredAt, setDiscoveredAt] = useState("");
   const [error, setError] = useState("");
   const working = useRef(false);
 
@@ -84,16 +86,28 @@ export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave 
     setConnected(true);
   });
 
+  function showDiscovery(discovery: { discoveredAt?: unknown; capabilities?: unknown }) {
+    if (!Array.isArray(discovery.capabilities) || !isText(discovery.discoveredAt)) throw new Error("Discovery returned a reply MCParrot could not read. Try again.");
+    const capabilities: DiscoveredCapability[] = discovery.capabilities.filter(isCapability);
+    setChoices(capabilities.map((capability) => ({ ...capability, selected: true })));
+    setDiscoveredAt(discovery.discoveredAt);
+    const skipped = discovery.capabilities.length - capabilities.length;
+    if (skipped) setError(`MCParrot skipped ${skipped} suggested ${skipped === 1 ? "task" : "tasks"} it could not read.`);
+  }
+
   const discover = () => run("discovery", async () => {
-    const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ websiteUrl, requests: state.requests }) });
+    const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId, requests: state.requests }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "Discovery failed. Try again.");
-    if (!Array.isArray(result.capabilities)) throw new Error("Discovery returned a reply MCParrot could not read. Try again.");
-    const capabilities: Capability[] = result.capabilities.filter(isCapability);
-    setChoices(capabilities.map((capability) => ({ ...capability, selected: true })));
-    const skipped = result.capabilities.length - capabilities.length;
-    if (skipped) setError(`MCParrot skipped ${skipped} suggested ${skipped === 1 ? "task" : "tasks"} it could not read.`);
+    showDiscovery(result);
   });
+
+  async function showLastDiscovery() {
+    const response = await fetch(`/api/discover?appId=${encodeURIComponent(appId)}`).catch(() => null);
+    const result = await response?.json().catch(() => ({})) ?? {};
+    if (!response?.ok) setError(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
+    else if (result.discovery) showDiscovery(result.discovery);
+  }
 
   const clearRequests = () => run("exploration", async () => {
     setState(await requestExtension("clear", appId, websiteUrl));
@@ -106,7 +120,9 @@ export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave 
   }
 
   const chosen = choices.filter((choice) => choice.selected);
-  const problems = choices.map((choice) => choice.selected ? nameProblem(choice.name, [...taskNames, ...chosen.filter((other) => other !== choice).map((other) => other.name)]) : "");
+  const otherTaskNames = (choice: Choice) => tasks.filter((task) => task.id !== choice.updatesTaskId).map((task) => task.name);
+  const problems = choices.map((choice) => choice.selected ? nameProblem(choice.name, [...otherTaskNames(choice), ...chosen.filter((other) => other !== choice).map((other) => other.name)]) : "");
+  const lastSearch = discoveredAt && new Date(discoveredAt).toLocaleString();
   const namesValid = problems.every((problem) => !problem);
 
   async function save() {
@@ -121,6 +137,10 @@ export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave 
     window.addEventListener("focus", refresh);
     refresh();
     return () => window.removeEventListener("focus", refresh);
+  }, [active, appId]);
+
+  useEffect(() => {
+    if (active) void showLastDiscovery();
   }, [active, appId]);
 
   return <section className="teaching-pilot" aria-label="Explore the website in your browser" aria-busy={busy !== ""}>
@@ -153,10 +173,12 @@ export function ExplorationPanel({ appId, websiteUrl, taskNames, active, onSave 
         <button className="button" disabled={busy !== ""} onClick={clearRequests}>Delete recorded requests</button>
       </div>
     </div>}
+    {lastSearch && choices.length === 0 && <p className="field-help">The last search, on {lastSearch}, found nothing new to save.</p>}
     {choices.length > 0 && <div className="pilot-candidates">
       <h3>Choose the tasks to keep</h3>
-      <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} problem={problems[index]} problemId={`${appId}-task-name-${index}`} onChange={(changes) => changeChoice(index, changes)} />)}</div>
-      <p className="field-help">Saving adds these tasks and skips ones that match an existing task. Reading tasks become tools in this app’s ChatGPT connection.</p>
+      <p className="field-help">Found on {lastSearch}. Find what this site can do again for a new list.</p>
+      <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} updatedTask={tasks.find((task) => task.id === choice.updatesTaskId)} problem={problems[index]} problemId={`${appId}-task-name-${index}`} onChange={(changes) => changeChoice(index, changes)} />)}</div>
+      <p className="field-help">Saving adds new tasks, replaces each task that an update changes, and skips ones that match another task. Reading tasks become tools in this app’s ChatGPT connection.</p>
       <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0 || !namesValid} onClick={save}>Save {chosen.length} {chosen.length === 1 ? "task" : "tasks"}</button>{!namesValid && <span className="field-help">Fix the task names above to save.</span>}</div>
     </div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}

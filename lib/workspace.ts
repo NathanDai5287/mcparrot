@@ -17,8 +17,11 @@ export const workspaceOperationSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("createApp"), app: websiteSchema }),
   z.object({ operation: z.literal("deleteApp"), appId: appIdSchema }),
   z.object({ operation: z.literal("addTasks"), appId: appIdSchema, capabilities: z.array(capabilitySchema).min(1).max(200) }),
+  z.object({ operation: z.literal("replaceTask"), appId: appIdSchema, taskId: z.string().min(1).max(80), capability: capabilitySchema }),
   z.object({ operation: z.literal("deleteTask"), appId: appIdSchema, taskId: z.string().min(1).max(80) }),
 ]);
+
+export const discoveryKey = (appId: string) => `discovery:${appId}`;
 
 export type WorkspaceOperation = z.infer<typeof workspaceOperationSchema>;
 

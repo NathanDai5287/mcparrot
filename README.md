@@ -66,7 +66,9 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Stop recording | `stop_exploration` |
 | List or delete recorded requests | `list_recorded_requests`, `delete_recorded_requests` |
 | Find what the website can do | `discover_capabilities` |
+| Open the last discovery result | `get_last_discovery` |
 | Save chosen capabilities as tasks | `save_tasks` |
+| Replace a task with a suggested update | `replace_task` |
 | Delete one task | `delete_task` |
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
@@ -145,11 +147,18 @@ Canvas is a useful example, but the same flow works on any website.
 3. Select **Explore website**, install MCParrot Explorer once, then select **Open website and explore**.
 4. Sign in normally in the new tab and complete any required verification, such as Duo.
 5. Browse the pages and features you want the assistant to use, then select **Stop exploring** in MCParrot.
-6. Select **Find what this site can do** to send the recorded requests to Cursor Composer 2.5 Fast and receive a list of capabilities.
+6. Select **Find what this site can do** to send the recorded requests and the app's saved tasks to Cursor Composer 2.5 Fast and receive a list of capabilities that are new or that improve a saved task.
 7. Tick the capabilities to keep, edit their names and descriptions if needed, and select **Save tasks**.
 
 Each capability shows a name, a plain description, the requests it uses as a method and URL pattern, the inputs that can change with an example, and what it returns.
-Saving adds the ticked capabilities to the app's current tasks, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing task, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
+Each capability is marked **New** or **Updates <task name>**, where an update is a clearly better version of that saved task.
+Saving adds the ticked new capabilities to the app's current tasks, skipping any whose name gives an unusable tool name or whose tool name or URL pattern matches an existing task, by the same rules as `save_task`, and the app page lists them with a **Delete** button for each.
+Saving a ticked update replaces that task in place and keeps its ID, by the same name rules, compared with the app's other tasks; an update whose task was deleted, or whose name or URL pattern breaks those rules, is skipped.
+
+The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another Composer run.
+The list hides each new capability that now matches a saved task and each update that its task already equals, so saved items disappear after a save or reload.
+An update that the user renamed before saving no longer equals its task, so it appears again until the next discovery run.
+Select **Find what this site can do** again to replace the saved result with a new run.
 An app holds at most 500 tasks, and the workspace holds at most 100 apps.
 Select **Continue exploring** to add requests without removing earlier ones, then find capabilities again.
 MCParrot stores chosen tasks with the app, and each saved reading task becomes a tool in the app's connection right away.
@@ -194,12 +203,17 @@ The first milestone supports reading only, and discovery must not automatically 
 ## Discovery data sent to Composer
 
 Discovery sends the recorded requests and pages, including their truncated samples, to Cursor Composer 2.5 Fast through the Cursor SDK in the server route `/api/discover`.
+The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tasks from storage and adds each task's ID, name, description, requests, inputs, and returns to the recorded data.
 The agent runs with its tools disabled by configuration, in an empty temporary folder, and inside the SDK's sandbox; when the server does not support the sandbox, it runs again without it.
 The server deletes the temporary folders after each run and stops waiting after 50 seconds with a timeout error.
 The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tasks where a page's text is useful, in the same capability shape as data tasks.
-It marks the recorded data as untrusted website content that Composer must never follow as instructions.
+It asks Composer to skip anything a saved task already does and to suggest a change to a saved task only when it clearly improves that task, with the task's ID as `updatesTaskId`.
+It marks the recorded data, including the saved tasks, as untrusted website content that Composer must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys, JWTs, long random-looking strings, and values after labels such as `password:` again.
 It keeps at most 50 replied capabilities, and only those whose requests all use GET on the app's own origin and whose placeholders match their inputs one to one.
+It treats a capability whose `updatesTaskId` is not a saved task of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved task, and updates that equal their task.
+After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tasks.
+When nothing is new or better, the result is an empty list, unless the app has no saved tasks, which stays an error.
 Nathan chose short real-value samples because they make Composer's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a secret that neither the extension's nor the server's patterns match can still reach Composer in a sample.
@@ -323,10 +337,11 @@ Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read
 MCParrot has one owner for now, because Vercel Authentication lets only Nathan, and anyone with a connection link, reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
 The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
+Each app's last discovery result is a separate value under `discovery:<app-id>`.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
-Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, or delete one task.
+Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, replace one task, or delete one task.
 The server reads the current workspace from Redis, changes only that app or task, and writes it back in one atomic Redis step only if no other change arrived in between, retrying otherwise; it then returns the updated apps, which the dashboard shows.
-Deleting an app removes its saved login and pending sign-in in that same step and stops the pending sign-in browser.
+Deleting an app removes its saved login, pending sign-in, and last discovery result in that same step and stops the pending sign-in browser.
 `/api/sign-in` stores the app's profile ID and sign-in time, and `/api/login` stores or clears its login-saved time, in the same way.
 So a task that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
@@ -342,7 +357,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each task in a hidden browser, and sign in again with the saved login |
 | Task execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a task's GET requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
 | Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with the automation bypass secret | Give ChatGPT one connection per website app |
-| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, Browser Use profile IDs, encrypted saved logins, and pending sign-ins |
+| Persistent storage | Upstash Redis from the Vercel Marketplace | Store apps, tasks, Browser Use profile IDs, encrypted saved logins, pending sign-ins, and last discovery results |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
 
 The user installs MCParrot Explorer in Chrome or Edge once and manages exploration through the production website.

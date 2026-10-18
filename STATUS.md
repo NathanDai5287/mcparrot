@@ -39,6 +39,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Explore any website | gap | MCParrot Explorer 0.4.0 records data requests with short response samples and whole pages with a short visible-text sample in the opened tab; syntax checks pass, and on October 17, 2026 its page snapshot returned the address, status 200, `text/html`, and visible text in local headless Chrome; Nathan's live recording demonstration must pass |
 | Capability discovery with Cursor Composer | shipped | `/api/discover` returned three capabilities with inputs from three sample requests in a direct Node check through the Cursor SDK on October 17, 2026; discovery on Vercel and from a live recording needs Nathan's demonstration |
 | Choose and save tasks | shipped | The checklist adds ticked, edited capabilities to the app's tasks and skips duplicates; on October 17, 2026, a direct Node check with an in-memory Redis replacement kept a task that `save_task` had saved after a dashboard with an older copy added tasks; Nathan tests the live flow |
+| Task-aware discovery and saved results | gap | `/api/discover` sends the app's saved tasks to Composer, marks each suggestion as new or as an update of a saved task, and saves the last result under `discovery:<app-id>`; on October 17, 2026, two runs against `next dev` on a throwaway JSONPlaceholder app did not suggest the saved task again, a third run returned an update with a real task ID that `replaceTask` saved in place, the saved result hid saved items, and deleting the app removed its keys; Nathan's live test of the **New** and **Updates** labels on the explore page must pass |
 | MCP server per website app | shipped | `/mcp/apps/<app-id>` answered initialize, listed only the GET task as a read-only tool, returned the signed-out tool error, and returned 404 for an unknown app in a direct Node check of the route handler on October 17, 2026; a later check that day answered an initialize request for protocol version 2026-07-28 with version 2025-11-25 and listed `submit_verification_code` |
 | Private ChatGPT connection link | gap | The Vercel automation bypass secret exists and the app page shows the link with **Copy link**; a live ChatGPT connector needs Nathan's test |
 | Sign-in through Browser Use | gap | `/api/sign-in` creates the app's Browser Use profile, starts a cloud browser with its live view, and stops it on **Done signing in**; it needs Nathan's live sign-in |
@@ -77,6 +78,11 @@ In that check, the dashboard and its JavaScript assets returned successfully, an
 
 On October 17, 2026, the discovery route sent three sample requests from a public test website to Cursor Composer 2.5 Fast through the Cursor SDK and returned three capabilities with their requests and inputs in about five seconds.
 That check called the route handler directly from Node; it does not prove discovery on Vercel or from a live recording.
+
+Also on October 17, 2026, a Node script called `/api/discover` and `PATCH /api/workspace` on `next dev` with the real Cursor key and storage, for a throwaway app with four JSONPlaceholder recordings.
+The first run returned four capabilities; after "Read post" was saved, `GET /api/discover` returned the saved result with its time and without that task, and the second run returned three capabilities without it.
+A second app with a weak saved "List posts" task got one update with that task's ID, and `replaceTask` replaced it in place with the same ID; a replacement named `Read page` was skipped.
+Deleting each app left none of its `discovery`, `login`, or `pending-sign-in` keys.
 
 On October 17, 2026, a direct Node check saved a test app with one GET task and one POST task to a temporary Upstash database and called the MCP route handler.
 The route answered initialize with the server name, listed only the GET task as a read-only tool with its input, returned the signed-out tool error because the app had no sign-in, and returned 404 for an unknown app.
@@ -122,6 +128,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Anyone with an app's connection link can use the whole site until the bypass secret is regenerated: read the workspace and the secret, change apps, tasks, and logins, run discovery, and start a live browser on an app's signed-in profile.
 - The extension and `/api/discover` redact secrets in samples and addresses only by matching patterns, such as secret-looking key names, JWTs, and long random strings, so a secret in another form can reach extension storage and Composer.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
+- The explore page's **New** and **Updates** labels, replacing a task from an update, and reopening the last discovery result need Nathan's live test; an update renamed before saving appears again in the saved result until the next run.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
 - Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
 

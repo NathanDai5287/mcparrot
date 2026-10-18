@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import type { Capability, Task, Website } from "./capabilities";
+import type { Capability, DiscoveredCapability, Task, Website } from "./capabilities";
 import { addressOnWebsite } from "./run-task";
 import { changeApp } from "./workspace";
 
@@ -34,6 +34,24 @@ const withNewTasks = (app: Website, capabilities: Capability[]) => ({
 });
 
 export const addTasks = (appId: string, capabilities: Capability[]) => changeApp(appId, (app) => withNewTasks(app, capabilities));
+
+function withReplacedTask(app: Website, taskId: string, capability: Capability) {
+  const otherTasks = app.tasks.filter((task) => task.id !== taskId);
+  if (otherTasks.length === app.tasks.length || taskNameProblem(capability.name) || duplicateOf(app.url, otherTasks, capability)) return app;
+  return { ...app, tasks: app.tasks.map((task) => task.id === taskId ? { ...capability, id: taskId } : task) };
+}
+
+export const replaceTask = (appId: string, taskId: string, capability: Capability) => changeApp(appId, (app) => withReplacedTask(app, taskId, capability));
+
+const taskContent = ({ name, description, requests, inputs, returns }: Capability) => JSON.stringify({ name, description, requests, inputs, returns });
+
+export function unsavedCapabilities(app: Website, capabilities: DiscoveredCapability[]): DiscoveredCapability[] {
+  return capabilities.flatMap(({ updatesTaskId, ...capability }) => {
+    const updatedTask = app.tasks.find((task) => task.id === updatesTaskId);
+    if (updatedTask) return taskContent(updatedTask) === taskContent(capability) ? [] : [{ ...capability, updatesTaskId }];
+    return duplicateOf(app.url, app.tasks, capability) ? [] : [capability];
+  });
+}
 
 function rejectionReason(app: Website, capability: Capability) {
   const { urlPattern } = capability.requests[0];

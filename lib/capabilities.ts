@@ -12,6 +12,10 @@ export type Capability = {
 
 export type Task = Capability & { id: string };
 
+export type DiscoveredCapability = Capability & { updatesTaskId?: string };
+
+export type Discovery = { discoveredAt: string; capabilities: DiscoveredCapability[] };
+
 export type Website = {
   id: string;
   name: string;
