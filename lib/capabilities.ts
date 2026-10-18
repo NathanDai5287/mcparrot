@@ -7,3 +7,15 @@ export type Capability = {
   inputs: { name: string; description: string; example: string }[];
   returns: string;
 };
+
+export type Task = Capability & { id: string };
+
+export type Website = {
+  id: string;
+  name: string;
+  url: string;
+  sample?: boolean;
+  tasks: Task[];
+  browserProfileId?: string;
+  signedInAt?: string;
+};

@@ -2,10 +2,8 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
-import type { Capability } from "../lib/capabilities";
+import type { Capability, Task, Website } from "../lib/capabilities";
 
-type Task = Capability & { id: string };
-type Website = { id: string; name: string; url: string; sample?: boolean; tasks: Task[] };
 type Screen =
   | { view: "apps" }
   | { view: "create-app" }
@@ -17,7 +15,7 @@ const sampleApps: Website[] = [
   { id: "youtube", name: "YouTube", url: "https://www.youtube.com", sample: true, tasks: [] },
 ];
 
-const workspaceStorageKey = "mcparrot-workspace-v1";
+const browserWorkspaceKey = "mcparrot-workspace-v1";
 
 function screenPath(screen: Screen) {
   if (screen.view === "apps" || screen.view === "missing") return "/";
@@ -48,6 +46,12 @@ function isWorkspace(value: unknown): value is Website[] {
 function isTask(task: Task) {
   return typeof task.id === "string" && typeof task.name === "string" && typeof task.description === "string"
     && typeof task.returns === "string" && Array.isArray(task.requests) && Array.isArray(task.inputs);
+}
+
+function browserSavedApps() {
+  const saved: unknown = JSON.parse(localStorage.getItem(browserWorkspaceKey) ?? "null");
+  if (!isWorkspace(saved)) return null;
+  return saved.map((app) => ({ ...app, tasks: app.tasks.filter(isTask) }));
 }
 
 function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }) {
@@ -89,33 +93,27 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
 }
 
 export default function Workspace() {
-  const [apps, setApps] = useState(sampleApps);
+  const [apps, setApps] = useState<Website[]>([]);
   const [screen, setScreen] = useState<Screen>({ view: "apps" });
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState(false);
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
 
   useEffect(() => {
-    let savedApps = sampleApps;
-    try {
-      const stored = localStorage.getItem(workspaceStorageKey);
-      const saved: unknown = stored ? JSON.parse(stored) : sampleApps;
-      if (isWorkspace(saved)) savedApps = saved.map((app) => ({ ...app, tasks: app.tasks.filter(isTask) }));
-    } catch {
-      setStorageError(true);
-    }
-    setApps(savedApps);
-    setScreen(screenAtPath(savedApps));
-    setLoaded(true);
+    fetch("/api/workspace").then(async (response) => {
+      if (!response.ok) throw new Error("Storage is unavailable.");
+      const workspace: { apps: Website[] | null } = await response.json();
+      const savedApps = workspace.apps ?? browserSavedApps() ?? sampleApps;
+      setApps(savedApps);
+      setScreen(screenAtPath(savedApps));
+      setLoaded(true);
+    }).catch(() => setStorageError(true));
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem(workspaceStorageKey, JSON.stringify(apps));
-    } catch {
-      setStorageError(true);
-    }
+    fetch("/api/workspace", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(apps) })
+      .then((response) => setStorageError(!response.ok), () => setStorageError(true));
     const restoreScreen = () => {
       setScreen(screenAtPath(apps));
       setDeletingAppId(null);
@@ -168,10 +166,10 @@ export default function Workspace() {
       <div className="page">
         <div className="topbar"><span>Workspace <span className="slash">/</span> {currentApp?.name ?? "Apps"}</span></div>
         <main id="main-content">
-          {storageError && <p className="workspace-warning" role="status">This browser cannot save your apps. Keep this page open to retain your changes.</p>}
-          {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted, or saved in another browser." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
+          {storageError && <p className="workspace-warning" role="status">MCParrot cannot reach its storage, so your apps may not load or save. Reload the page to try again.</p>}
+          {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
 
-          {screen.view === "apps" && <>
+          {loaded && screen.view === "apps" && <>
             <PageHeader title="Your apps" description="One website. Many tasks for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
             <div className="section-heading"><h2>Websites <span>{apps.length}</span></h2><span>Choose a website to explore</span></div>
             <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
@@ -179,7 +177,7 @@ export default function Workspace() {
               <span className="app-main"><span className="app-name">{app.name} {app.sample && <span className="badge">Sample</span>}</span><span className="website-address">{app.url}</span></span>
               <span className="app-status">Not connected<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
             </button>)}</div>
-            <p className="preview-note">Apps and chosen tasks stay in this browser. Recorded requests stay in MCParrot Explorer.</p>
+            <p className="preview-note">MCParrot stores apps and chosen tasks so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
           </>}
           {screen.view === "create-app" && <>
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
@@ -194,7 +192,7 @@ export default function Workspace() {
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
                 <h2>Delete {screen.app.name}?</h2>
-                <p>This removes this app and its tasks from this browser and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
+                <p>This removes this app and its tasks from MCParrot and deletes its recorded requests in MCParrot Explorer. Your website account stays intact.</p>
                 <div className="form-actions"><button className="button danger" onClick={() => deleteApp(screen.app)}>Delete app and tasks</button><button className="button" onClick={() => setDeletingAppId(null)}>Keep app</button></div>
               </div>}
             </section>
