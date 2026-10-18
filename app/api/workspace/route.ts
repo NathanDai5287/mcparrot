@@ -1,6 +1,6 @@
 import { stopBrowser } from "../../../lib/browser-use";
-import { addTasks } from "../../../lib/save-task";
-import { AppNotFound, changeApp, changeApps, deleteStoredApp, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
+import { addTasks, replaceTask } from "../../../lib/save-task";
+import { AppNotFound, changeApp, changeApps, deleteStoredApp, discoveryKey, readWorkspace, storage, StorageUnavailable, WorkspaceLimit, workspaceOperationSchema, type WorkspaceOperation } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,7 @@ export async function GET() {
   }
 }
 
-const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`];
+const appKeys = (appId: string) => [`login:${appId}`, `pending-sign-in:${appId}`, discoveryKey(appId)];
 
 async function deleteApp(appId: string) {
   const pendingKey = `pending-sign-in:${appId}`;
@@ -44,6 +44,7 @@ function apply(change: WorkspaceOperation) {
   }, appKeys(change.app.id));
   if (change.operation === "deleteApp") return deleteApp(change.appId);
   if (change.operation === "addTasks") return addTasks(change.appId, change.capabilities);
+  if (change.operation === "replaceTask") return replaceTask(change.appId, change.taskId, change.capability);
   return changeApp(change.appId, (app) => ({ ...app, tasks: app.tasks.filter((task) => task.id !== change.taskId) }));
 }
 

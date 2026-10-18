@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
-import type { Capability, Website } from "../lib/capabilities";
+import type { DiscoveredCapability, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
 
 type Screen =
@@ -163,8 +163,15 @@ export default function Workspace() {
     navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
   }
 
-  async function saveTasks(app: Website, capabilities: Capability[]) {
-    const savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities });
+  async function saveTasks(app: Website, capabilities: DiscoveredCapability[]) {
+    let savedApps: Website[] | null = apps;
+    for (const { updatesTaskId, ...capability } of capabilities) {
+      if (!updatesTaskId) continue;
+      savedApps = await changeWorkspace({ operation: "replaceTask", appId: app.id, taskId: updatesTaskId, capability });
+      if (!savedApps) return false;
+    }
+    const newCapabilities = capabilities.filter((capability) => !capability.updatesTaskId);
+    if (newCapabilities.length) savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities: newCapabilities });
     if (!savedApps) return false;
     navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
     return true;
@@ -227,7 +234,7 @@ export default function Workspace() {
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
             <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tasks to keep." />
-            <ExplorationPanel appId={app.id} websiteUrl={app.url} taskNames={app.tasks.map((task) => task.name)} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
+            <ExplorationPanel appId={app.id} websiteUrl={app.url} tasks={app.tasks} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
             <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tasks become tools in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
 
