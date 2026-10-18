@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { maxOrderLimitUsd, type Ordering, type Website } from "../lib/capabilities";
 import type { Cart, OrderView } from "../lib/order";
 import { SetupCard } from "./setup-card";
+import { cachedJson, forgetCachedJson, orderUrl } from "./json-cache";
 
 type LinkView = { connected: boolean; mode: "test" | "live" | null; hasConnection: boolean } | null;
 type OrderAction = { action: "prepare"; request: string } | { action: "place"; orderId: string; approvedTotal: number } | { action: "cancel"; orderId: string };
@@ -102,21 +103,26 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
   const latestRefresh = useRef(0);
   const refreshesInFlight = useRef(0);
 
-  const refresh = useCallback(async (poll = false) => {
+  const show = useCallback(async (poll = false) => {
     if (poll && refreshesInFlight.current) return;
     const id = ++latestRefresh.current;
     const startedAfter = latestAction.current;
     refreshesInFlight.current++;
-    const response = await fetch(`/api/order?appId=${encodeURIComponent(app.id)}`).catch(() => null);
-    const result: { link?: LinkView; order?: OrderView | null; error?: string } = await response?.json().catch(() => ({})) ?? {};
+    const reply = await cachedJson(orderUrl(app.id)).catch(() => null);
     refreshesInFlight.current--;
     if (id !== latestRefresh.current || startedAfter !== latestAction.current) return;
+    const result = (reply?.body ?? {}) as { link?: LinkView; order?: OrderView | null; error?: string };
     setLink(result.link ?? null);
     if (result.order !== undefined) setOrder(result.order);
-    setRefreshError(response?.ok && !result.error ? "" : result.error ?? "MCParrot could not check the order. It will try again.");
+    setRefreshError(reply?.ok && !result.error ? "" : result.error ?? "MCParrot could not check the order. It will try again.");
   }, [app.id]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const refresh = useCallback((poll = false) => {
+    forgetCachedJson(orderUrl(app.id));
+    return show(poll);
+  }, [app.id, show]);
+
+  useEffect(() => { show(); }, [show]);
 
   const waiting = order?.status === "preparing" || order?.status === "placing";
   useEffect(() => {
@@ -133,13 +139,14 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
     const result = await response?.json().catch(() => ({})) ?? {};
     latestAction.current++;
     setBusy(false);
+    forgetCachedJson(orderUrl(app.id));
     if (response?.ok) return setOrder(result.order);
     setError(result.error ?? "MCParrot could not reach Browser Use. Try again.");
     await refresh();
   }
 
   return <SetupCard title="Ordering" status={app.ordering?.enabled ? "On" : "Off"}>
-    <p>Let ChatGPT order from {app.name} with Browser Use Pay with Link. MCParrot always shows the cart and total first, and it places orders only while Link is in test mode. Remove every card saved in your {app.name} account before you test, because MCParrot cannot fully stop the agent from using one.</p>
+    <p>Let your agent order from {app.name} with Pay with Link. You always approve the total first.</p>
     <p>{linkStatusText(link)}</p>
     <OrderingSettings app={app} onSave={onSave} />
     {(app.ordering?.enabled || isActive(order)) && <TestOrder app={app} order={order} busy={busy} onAction={send} />}
