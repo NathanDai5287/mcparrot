@@ -47,6 +47,7 @@ Record settled behavior and open questions as soon as the conversation settles t
 Follow the [documentation rules](DOCUMENTATION.md) for where and how to write them.
 When Nathan corrects a premise, replace the old premise everywhere it affects the current plan.
 When a capability's status changes, update [the status page](STATUS.md) in the same change.
+Mark a capability aspirational until it is built, a gap while a piece or live check is missing, and shipped once a passing check proves it.
 Confirm shared understanding of important behavior before you implement it.
 Do not stop for another confirmation when the conversation already shows that agreement.
 

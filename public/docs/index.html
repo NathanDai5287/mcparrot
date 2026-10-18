@@ -37,6 +37,7 @@
           <li><a href="#use">Using your assistant</a></li>
           <li><a href="#agent-access">Equal controls for agents</a></li>
           <li><a href="#reconnect">Recovering an expired sign-in</a></li>
+          <li><a href="#navigation">Moving around the workspace</a></li>
           <li><a href="#limits">Questions that need proof</a></li>
           <li><a href="#next">Our first build milestone</a></li>
         </ul>
@@ -65,6 +66,7 @@
             <tr><th scope="row"><a href="#use">Using your assistant</a></th><td>How ChatGPT runs a task for you</td></tr>
             <tr><th scope="row"><a href="#agent-access">Equal controls for agents</a></th><td>Why your agent can do everything you can do</td></tr>
             <tr><th scope="row"><a href="#reconnect">Recovering an expired sign-in</a></th><td>What happens when a website asks you to sign in again</td></tr>
+            <tr><th scope="row"><a href="#navigation">Moving around the workspace</a></th><td>App addresses, Back and Forward, and deleting an app</td></tr>
             <tr><th scope="row"><a href="#limits">Questions that need proof</a></th><td>Limits we must still test</td></tr>
             <tr><th scope="row"><a href="#next">Our first build milestone</a></th><td>The first result we build and check</td></tr>
           </tbody>
@@ -92,7 +94,7 @@
             </tbody>
           </table>
         </div>
-        <p>You chose Upstash Redis so that ChatGPT’s connection can read the same apps and tasks you see. MCParrot has one owner for now, you, because Vercel asks for your sign-in before anyone can open the website, so all your apps are saved together. They appear on any device where you open MCParrot. The first time you open the new version, MCParrot copies the apps that this browser saved before. Each ChatGPT request to MCParrot must finish within five minutes. Saved logins are locked with a separate secret key before they reach Upstash, and browser profiles stay with Browser Use. These guides are part of the website too.</p>
+        <p>You chose Upstash Redis so that ChatGPT’s connection can read the same apps and tasks you see. MCParrot has one owner for now, you, because Vercel asks for your sign-in before anyone without an app’s private ChatGPT link can open the website, so all your apps are saved together. They appear on any device where you open MCParrot. The first time you open the new version, MCParrot copies the apps that this browser saved before. Each ChatGPT request to MCParrot must finish within five minutes. Saved logins are locked with a separate secret key before they reach Upstash, and browser profiles stay with Browser Use. These guides are part of the website too.</p>
       </section>
 
       <section id="idea">
@@ -132,14 +134,14 @@
         <h2>What the extension records</h2>
         <p>The extension records only in the tab it opens for you. While it records, your browser shows a bar that says MCParrot Explorer is debugging the browser. It keeps each data request the page makes: its type, its full address, whether it worked, the kind of answer, and a short sample of that answer. Long text is cut to 80 characters, lists keep only 2 items, and each sample stays small.</p>
         <p>You chose to also record each whole page you open, such as a course syllabus, because some pages arrive in one piece and never make a separate data request. For a page, the extension keeps its address, whether it worked, and the first 3,000 characters of the text you see on it, not the page’s code. Composer can then suggest tasks that read a page, such as “Read course syllabus” for any course.</p>
-        <p>It skips pictures, fonts, styles, scripts, and media. It skips common tracking services and sign-in pages. It never copies passwords, cookies, message headers, or what your browser sends to the website. Similar requests and pages are kept once, up to 150 for each app.</p>
+        <p>It skips pictures, fonts, styles, scripts, and media. It skips common tracking services and sign-in pages. It never copies passwords, cookies, message headers, or what your browser sends to the website. It hides address values whose names look secret, such as a token, but it only shortens the answers and page text it keeps, so a code that a website puts in an answer or shows on a page can still be kept. Similar requests and pages are kept once, up to 150 for each app.</p>
         <p>Recording stops when you select <strong>Stop exploring</strong>, close the tab, close the debugging bar, or restart the browser. Recorded requests stay in the extension until you select <strong>Delete recorded requests</strong>, delete the app, or remove the extension. Apps keep stable addresses, so Back and Forward work. The extension works with the production website and with the local test website on your computer.</p>
       </section>
 
       <section id="composer">
         <h2>What Composer sees</h2>
-        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and pages and their short samples to Cursor Composer 2.5 Fast through the Cursor SDK. Composer works in an empty folder, so it cannot read our project files, and it only replies with the list of tasks. You chose real short samples because they help Composer make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Composer until you select that button, and no passwords, cookies, headers, or sign-in traffic are included.</p>
-        <p>Only you can use this feature, because Vercel asks you to sign in before you can open the website. If Composer is not set up, does not start, or does not finish, the page shows a clear error message.</p>
+        <p>When you select <strong>Find what this site can do</strong>, our website sends the recorded requests and pages and their short samples to Cursor Composer 2.5 Fast through the Cursor SDK. Composer works in an empty folder, so it cannot read our project files, and it only replies with the list of tasks. You chose real short samples because they help Composer make better suggestions. Sending website content to the AI is fine; only secrets stay out. Nothing goes to Composer until you select that button, and no passwords, cookies, headers, or sign-in pages are included, although a sample can still hold a code that the website put in an answer or on a page.</p>
+        <p>Only you, or someone with an app’s private ChatGPT link, can use this feature, because Vercel asks everyone else to sign in before they can open the website. If Composer is not set up, does not start, or does not finish, the page shows a clear error message.</p>
       </section>
 
       <section id="sign-in">
@@ -156,7 +158,8 @@
       <section id="connections">
         <h2>Connecting ChatGPT</h2>
         <p>Each website app gets its own private connection link, which gives ChatGPT that app’s reading tasks. This link is a <span class="badge badge--gap">gap</span> until your live ChatGPT test passes. You chose to build only these app connections first. A separate MCParrot connection that would let ChatGPT manage your apps is <span class="badge badge--aspirational">aspirational</span>.</p>
-        <p>Each connection also has a tool called “Read a page on” your app’s name. ChatGPT gives it a page address on that website, such as a syllabus link you paste, and MCParrot opens the page with your saved sign-in in a hidden browser and returns its text. It refuses addresses on any other website. It uses the same length limit and the same sign-in recovery as tasks. You chose this trade-off: ChatGPT can read any page your account can see on that website, not only the tasks you chose, but it cannot change anything.</p>
+        <p>Only reading tasks appear in ChatGPT, and each one becomes a tool named after the task. Give every task in an app a different name, and do not name a task after a built-in tool, such as “Read page”, “Save task”, or “Submit verification code”. Each tool in a connection needs its own name.</p>
+        <p>Each connection also has a tool called “Read a page on” your app’s name. ChatGPT gives it a page address on that website, such as a syllabus link you paste, and MCParrot opens the page with your saved sign-in in a hidden browser and returns its text. It refuses addresses on any other website. It uses the same length limit and the same sign-in recovery as tasks. You chose this trade-off: ChatGPT can read any page your account can see on that website, not only the tasks you chose. It only opens pages, so it changes nothing unless just opening a page changes something on that website, such as a sign-out link.</p>
         <p>Each connection also has a tool called “Save a page as a task for” your app’s name, so your connection grows while you use it. When ChatGPT finds something useful with the page reader, such as your syllabus, it saves that page as a task and swaps values that change, such as the course number, for blanks it can fill next time. It refuses pages on other websites, blanks without a matching value, and tasks whose name or page address you already have. The task appears on the app page and becomes its own tool when you start a new ChatGPT chat. You chose to let ChatGPT save tasks without asking you first, so delete any task you do not want on the app page. Every change you make on the app page only touches that one app or task, so a page you opened earlier never removes a task ChatGPT saved.</p>
         <ol class="flow">
           <li><h3>Copy the link</h3><p>On the app page, select <strong>Copy link</strong>.</p></li>
@@ -166,7 +169,7 @@
         </ol>
         <aside class="note">
           <strong class="note-label">Keep the link secret</strong>
-          <p>The link contains a secret code that lets ChatGPT past Vercel’s sign-in. You chose this trade-off: anyone with the link can use the whole MCParrot website, not only that app. Keep it private. If it leaks, open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, and make a new secret. Then publish again, copy each app’s new link, and replace the link in each ChatGPT connector.</p>
+          <p>The link contains a secret code that lets ChatGPT past Vercel’s sign-in. You chose this trade-off: anyone with the link can use the whole MCParrot website, not only that app. With it, a person can see all your apps and their links, add or delete apps and tasks, save or delete logins, ask Composer for tasks, and open a live browser with an app’s sign-in. Whether to limit the link to ChatGPT’s connection is still your decision. Keep it private. If it leaks, open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, and make a new secret. Then publish again, copy each app’s new link, and replace the link in each ChatGPT connector.</p>
         </aside>
       </section>
 
@@ -207,6 +210,11 @@
           <strong class="note-label">Needs a real school test</strong>
           <p>The sign-in rules of a school, device checks, or Duo settings may stop automatic sign-in. In that case ChatGPT shows a clear message that tells you to select <strong>Sign in to website</strong> in MCParrot. No visible browser opens during ChatGPT use. We have not yet tested automatic sign-in on Berkeley Canvas.</p>
         </aside>
+      </section>
+
+      <section id="navigation">
+        <h2>Moving around the workspace</h2>
+        <p>Each app and its exploration page have their own web address, so your browser’s Back and Forward buttons return to the screen you saw, and refreshing the page keeps your apps and tasks. The same apps appear on any device where you open MCParrot. To remove an app, open it, select <strong>Delete app</strong>, and confirm on the same page. This removes the app and its tasks from MCParrot and deletes its recorded requests in the extension, but your account on the website stays. An old link to a deleted app shows a page that says the app is unavailable, with a way back to your app list.</p>
       </section>
 
       <section id="limits">

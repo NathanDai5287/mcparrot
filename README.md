@@ -28,6 +28,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, storage, and the service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, and recordings |
 | [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
+| [Workspace navigation behavior](#workspace-navigation-behavior) | Stable app addresses, Back and Forward, and deleting an app |
 | [Running the frontend](#running-the-frontend) | How to start the local frontend |
 | [Running the task runner](#running-the-task-runner) | How to start the dormant Browser Use Cloud task runner |
 
@@ -39,7 +40,7 @@ The product has two separate phases: teaching a task, and using the saved task l
 
 MCP means Model Context Protocol.
 It is a standard that lets an assistant discover and call tools from another application.
-Each saved task becomes an MCP tool with defined inputs and results.
+Each saved reading task, whose requests all use GET, becomes an MCP tool with defined inputs and results.
 The assistant can combine saved tools to answer a new request.
 
 ## UI and MCP parity
@@ -97,6 +98,8 @@ Users who manage apps only through the UI do not need the management connection,
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
 The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
 Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
+The tool name is the task name in lowercase, with each run of other characters replaced by an underscore and cut to 64 characters.
+So each task name must give a non-empty tool name that no other task in the app shares and that is not `read_page`, `save_task`, or `submit_verification_code`, because each tool in a connection needs its own name.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
 
@@ -104,7 +107,7 @@ Each connection also has a read-only `read_page` tool, titled "Read a page on <a
 It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a task does, as [using saved tasks](#using-saved-tasks) describes, with the same length limit, signed-out check, and automatic sign-in.
 It rejects any address on another origin with an error that names the allowed website, before it starts a browser.
 Nathan chose this tool so that ChatGPT can answer from pages that no saved task covers, such as a syllabus link he pastes.
-He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tasks he chose; it still cannot change anything, because it only opens pages.
+He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tasks he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
 
 Each connection also has a `save_task` tool, titled "Save a page as a task for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`.
@@ -156,7 +159,8 @@ It records data requests, such as fetch and XHR requests and other JSON or XML r
 Nathan chose to also record each whole page that loads in the tab, such as a server-rendered Canvas syllabus, because those pages never make a separate data request.
 A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts and sign-in, session, and token paths.
-It never records request or response headers, cookies, request bodies, or authorization values, and it replaces query values whose names suggest a secret, such as a token or key.
+It never records request or response headers, cookies, request bodies, or authorization values, and it replaces query values whose names suggest a secret, such as a token or key, with `redacted`.
+It shortens response samples and page text but does not filter them, so a token that a website returns in a response body or shows on a page can still appear in a sample.
 
 Each sample keeps at most 80 characters per text value and 2 items per list, up to about 3 KB per response.
 A page sample keeps the first 3,000 characters of its visible text, with spaces collapsed.
@@ -186,9 +190,9 @@ The agent runs in an empty temporary folder and receives an instruction to use n
 The instruction explains that page requests return the page's text and asks for page-reading tasks where a page's text is useful, in the same capability shape as data tasks.
 Nathan chose short real-value samples because they make Composer's suggestions more accurate.
 Sending private website content to the AI model is allowed; only secrets stay out of prompts.
-The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
+The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, request bodies, or sign-in, session, and token paths, although a sample can still contain a value, such as a token, that the website returned in a response or showed on a page.
 The server reads `CURSOR_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
-Vercel Authentication protects the production site, so only Nathan can start discovery.
+Vercel Authentication protects the production site, so only Nathan, or anyone with a connection link, can start discovery.
 If the key is missing, the agent does not start, or the agent does not finish, the exploration screen shows a clear error.
 
 ## Browser visibility by phase
@@ -302,7 +306,7 @@ Browser profiles, environment files, recordings, and local test state stay outsi
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
-MCParrot has one owner for now, because Vercel Authentication lets only Nathan reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
+MCParrot has one owner for now, because Vercel Authentication lets only Nathan, and anyone with a connection link, reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
 The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
 Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
@@ -336,10 +340,12 @@ For work that takes longer than one request, durable operation status that clien
 ## Authentication and private data
 
 Keep every connection, browser profile, task, and pending operation limited to its owner.
-Vercel Authentication protects the dashboard and its routes, so only Nathan can manage apps, start sign-in, or read the connection link.
+Vercel Authentication protects the dashboard and its routes, but the connection link carries the bypass secret, so anyone with the link has the same access as Nathan.
 
 The connection link is the only access control on MCP use, and Nathan accepted this trade-off for the first version.
-Anyone with the link can use the whole site, not only that app's tools, because the bypass secret skips Vercel Authentication for every page.
+Anyone with the link can use the whole site, not only that app's tools, because the bypass secret skips Vercel Authentication for every page and route.
+With it, a person can read the workspace and the bypass secret through `GET /api/workspace`, create and delete apps and tasks through `PATCH /api/workspace`, save or delete logins through `/api/login`, run discovery on Nathan's Cursor key through `/api/discover`, and start a live Browser Use browser on an app's signed-in profile through `POST /api/sign-in`.
+Whether to limit the bypass to the MCP route is an open decision for Nathan.
 Keep the link private, and regenerate the secret if it leaks: open the Vercel project, go to Settings, then Deployment Protection, then Protection Bypass for Automation, and regenerate it.
 After a new secret, redeploy, copy each app's new link, and replace the URL in each ChatGPT connector.
 MCP sign-in for each owner remains aspirational.
@@ -353,7 +359,8 @@ The password never returns to the dashboard, never appears in MCP results, and n
 Vercel Authentication is the only owner check for saved logins, because MCParrot has one owner; per-owner authorization for each credential record is aspirational.
 Deleting a saved login removes its record; ending existing website sessions is a separate action.
 Keep secrets out of prompts, public task definitions, logs, traces, documentation, and source control.
-Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and sign-in traffic.
+Recordings must not contain passwords, cookies, or tokens, so the extension skips headers, cookies, request bodies, and requests and pages on sign-in, session, and token paths, and it replaces query values with secret-looking names.
+Response samples and page text are only shortened, not filtered, so a token inside a response body or on a page can still reach the recording and Composer, which the [status page](STATUS.md) lists as a gap.
 Define how long recordings are kept and how they are deleted before you store captures in production.
 
 ## Diagnostics with Sentry
@@ -396,6 +403,8 @@ Use Node.js 24 or later.
 The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
 That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tasks again afterwards.
 Add `MCPARROT_CREDENTIAL_KEY` with a random 32-byte base64 key, for example from `openssl rand -base64 32`, to save logins; the production key is Sensitive and cannot be pulled, so logins saved locally cannot be read in production.
+The pulled `KV_REST_API_URL` and `KV_REST_API_TOKEN` point at the production Redis, so a login saved from a local server overwrites the app's production login with one that production cannot decrypt, and other local changes reach production apps too.
+Replace those two values with a separate Redis database before you save logins or change apps locally.
 Add `NEXT_PUBLIC_SENTRY_DSN` to send diagnostics and `SENTRY_AUTH_TOKEN` to upload source maps during `npm run build`; without them, Sentry stays off.
 The connection link appears only on Vercel, where `VERCEL_AUTOMATION_BYPASS_SECRET` exists.
 

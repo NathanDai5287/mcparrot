@@ -58,8 +58,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Long task status | aspirational | Store operation status for tasks that take longer than one 300-second request |
 | Sentry connection and source maps | shipped | `@sentry/nextjs` starts in the browser and on the server; on October 17, 2026, the production build uploaded source maps, and a direct Node event sent with the project's DSN reached `nathan-s4/mcparrot`, where the Sentry API returned it |
 | Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
-| Sentry Tracing | gap | Spans cover Composer discovery, Browser Use start and stop, the CDP connection, and each task request; traces from the deployed app need Nathan's use |
-| Sentry Logs | gap | Discovery, sign-in, and task outcomes go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
+| Sentry Tracing | gap | Spans cover Composer discovery (`discover.composer`), Browser Use start and stop, the CDP connection, each automatic sign-in and verification code agent run with its outcome (`browser_use.agent_sign_in`, `browser_use.agent_verification_code`), each request a task or `read_page` runs (`task.request`), each HTML page opened as text (`page.read`), and each `save_task` call (`task.save`); traces from the deployed app need Nathan's use |
+| Sentry Logs | gap | Discovery started and finished, sign-in started and done, login saved and deleted, automatic sign-in started and finished, each verification code outcome, each task run's and `read_page` call's outcome with whether the website was signed out, and each task saved from ChatGPT go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
 | Sentry Session Replay | gap | Every dashboard session is recorded with text and inputs masked; replays need Nathan's use |
 | Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
 | Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
@@ -115,9 +115,11 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - ChatGPT first sends MCP protocol version 2026-07-28, which no MCP SDK supports; the route relies on ChatGPT falling back to version 2025-11-25, which Nathan's live connector test must confirm.
 - Saved tasks become tools without a test, run GET requests only, and fail when a website needs header tokens instead of cookies.
 - Running a task and reading a page with `read_page` work only through ChatGPT; the dashboard has no matching control.
-- `read_page` lets ChatGPT read any page Nathan's account can see on the app's website, not only chosen tasks, which Nathan accepted; it cannot change anything.
+- `read_page` lets ChatGPT read any page Nathan's account can see on the app's website, not only chosen tasks, which Nathan accepted; it only opens pages, so it changes nothing unless opening a page on that website has side effects, such as a sign-out link.
 - Pages that build their content only after later user actions can return incomplete text from page-reading tasks and `read_page`.
-- ChatGPT saves tasks with `save_task` without asking Nathan, which he accepted, so unwanted tasks stay until he deletes them on the app page.- Anyone with an app's connection link can use the whole site until the bypass secret is regenerated.
+- ChatGPT saves tasks with `save_task` without asking Nathan, which he accepted, so unwanted tasks stay until he deletes them on the app page.
+- Anyone with an app's connection link can use the whole site until the bypass secret is regenerated: read the workspace and the secret, change apps, tasks, and logins, run discovery, and start a live browser on an app's signed-in profile.
+- The extension shortens response samples and page text but does not filter them, so a token that a website returns in a response body or shows on a page can reach extension storage and Composer.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
 - Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
