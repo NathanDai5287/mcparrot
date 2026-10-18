@@ -136,6 +136,8 @@ Nathan asked for it because an Ed announcement showed a class's score mean and s
 ChatGPT connectors do not pass MCP image results to the model, so the tool returns text: Claude Opus 5.5 reads the picture and the tool returns Claude's copy of every text and number in it and a short description of any chart.
 Its description tells ChatGPT to call it only when a picture likely holds needed information, such as a chart, a score distribution, or a screenshot, and to read one image at a time, and it says that the tool opens images on the app's website with the sign-in and `https` images on other websites without it, so images reach the chat only when they are needed.
 The app page's **View image** box takes the same address, calls `/api/image`, and shows the picture with the same text.
+The box shows a sign-in outcome, such as a sent text-message code, as an alert with status 409, a signed-out request as "Sign in again to use MCParrot." with status 401, and an unexpected failure as "MCParrot could not read the image. Try again.", which goes to Sentry.
+The whole read must finish within 280 seconds, so Claude gets at most 60 seconds and less after a late sign-in, and a read that runs out of time ends with "Reading the image took too long. Try again."
 
 1. MCParrot checks the address with the same website rule as `read_page`, so `static.us.edstem.org` is on the website for `https://edstem.org`.
 2. It opens an address on the website as a page in a hidden Browser Use browser with the app's saved sign-in, so the website's own cookies apply, with the same signed-out check, automatic sign-in, bot-check and CSRF messages, and 30-second limit as a tool.
