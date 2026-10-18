@@ -12,6 +12,7 @@ export type Capability = {
   requests: TaskRequest[];
   inputs: { name: string; description: string; example: string }[];
   returns: string;
+  keepFields?: string[];
 };
 
 export type Task = Capability & { id: string };
@@ -56,6 +57,7 @@ export const capabilitySchema = z.object({
   requests: z.array(z.object({ method: z.string().min(1).max(10), urlPattern: address.min(1), bodyPattern: z.string().max(maximumBodyLength).optional(), contentType: shortText.optional(), headers: z.record(shortText, shortText).optional(), tokenHeaders: z.array(z.object({ header: shortText, fromLocalStorage: shortText })).max(10).optional() })).min(1).max(50),
   inputs: z.array(z.object({ name: shortText, description: longText, example: longText })).max(50),
   returns: longText,
+  keepFields: z.array(shortText).max(50).optional(),
 }) satisfies z.ZodType<Capability>;
 
 export const orderingSchema = z.object({

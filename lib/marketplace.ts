@@ -39,7 +39,7 @@ export class AlreadyInstalled extends ListingRejected {
 
 export const appFromListing = (apps: Website[], listingId: string) => apps.find((app) => [app.listing?.id, app.installedFrom, listingIdFor(app.id)].includes(listingId));
 
-const sharedTasks = (app: Website) => app.tasks.map(({ name, description, requests, inputs, returns }) => ({ name, description, requests, inputs, returns }));
+const sharedTasks = (app: Website) => app.tasks.map(({ name, description, requests, inputs, returns, keepFields }) => ({ name, description, requests, inputs, returns, keepFields }));
 
 const summary = ({ ownerId, tasks, ...shared }: Listing): ListingSummary => ({ ...shared, taskNames: tasks.map((task) => task.name) });
 

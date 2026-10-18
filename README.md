@@ -149,7 +149,7 @@ MCParrot never logs or traces the picture, only its size and the length of Claud
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
-Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, an optional `earlierRequests` list of up to 9 requests with the same four request fields, `inputs` as a list of name, description, and example, and `returns`, which become the tool's requests in the same tool shape as a chosen tool, with the earlier requests first as steps 1, 2, and so on, and the main request last.
+Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, an optional `earlierRequests` list of up to 9 requests with the same four request fields, `inputs` as a list of name, description, and example, `returns`, and an optional `keepFields` list, as [using saved tools](#using-saved-tools) describes, which become the tool's requests in the same tool shape as a chosen tool, with the earlier requests first as steps 1, 2, and so on, and the main request last.
 Its description tells ChatGPT to use earlier requests with [step placeholders](#using-saved-tools) when a request needs a value, such as a cart ID, that an earlier JSON response returns.
 It rejects a URL pattern that is not on the app's website or one of its subdomains, a body on a GET request, a request that the checkout and payment guard refuses, a step placeholder that does not name an earlier request, placeholders other than step placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request list, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
@@ -194,7 +194,7 @@ Saving adds the ticked new capabilities to the app's current tools, skipping any
 A request matches another when its method, address, and body are the same after placeholder names are ignored, so two POST requests to one GraphQL address with different bodies are different requests.
 A request list matches another when it has the same requests in the same order, so a tool "Add item to cart" that first gets the cart can sit beside a tool "Get cart" with only that request.
 Saving a ticked update replaces that tool in place and keeps its ID, by the same name rules, compared with the app's other tools; an update whose tool was deleted, or whose name or request breaks those rules, is skipped.
-Selecting a tool on the app page shows its inputs, its result, and each request's step number, method, URL pattern, and body pattern, so a `{step1...}` placeholder points to a visible request.
+Selecting a tool on the app page shows its inputs, its result, its **Answer fields**, which list its `keepFields` or say **All**, and each request's step number, method, URL pattern, and body pattern, so a `{step1...}` placeholder points to a visible request.
 
 The server keeps the last discovery result for each app, with its time, so reopening the explore page shows that list without another discovery run.
 The list hides each new capability that now matches a saved tool and each update that its tool already equals, so saved items disappear after a save or reload.
@@ -255,7 +255,7 @@ A placeholder in a body sits inside a JSON string value, so a website that expec
 
 Discovery sends the recorded requests and pages, including their truncated samples, to Claude Opus 5.5 at low effort in fast mode, with a 300k context, through the Cursor SDK in the server route `/api/discover`.
 Nathan chose this model for discovery on October 17, 2026.
-The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tools from storage and adds each tool's ID, name, description, requests, inputs, and returns to the recorded data.
+The dashboard sends only the app ID and the recordings; the server reads the app's website address and saved tools from storage and adds each tool's ID, name, description, requests, inputs, returns, and `keepFields` to the recorded data.
 The agent runs with its tools disabled by configuration, in an empty temporary folder, and inside the SDK's sandbox; when the server does not support the sandbox, it runs again without it.
 The server deletes the temporary folders after each run and stops waiting after 50 seconds with a timeout error.
 The instruction asks for capabilities JSON only, explains that page requests return the page's text, and asks for page-reading tools where a page's text is useful, in the same capability shape as data tools.
@@ -263,8 +263,10 @@ It tells Claude that tools can use GET and POST requests, to prefer GraphQL quer
 A POST request in a capability has a `bodyPattern`, the request body as a string with `{placeholders}` inside JSON string values, and a `contentType`.
 The instruction tells Claude to copy each body exactly, with the whole GraphQL query text, and never to shorten, rewrite, or invent query text.
 It explains step placeholders and tells Claude to use one, with the earlier request first, when a recorded request contains a value that also appears in an earlier recorded response sample.
+It asks Claude for `keepFields` when a tool's last request returns JSON: the paths in that response that a person needs for the tool's purpose, such as names, titles, text, dates, scores, prices, and IDs that other tools take as inputs, chosen from the recorded samples and written like `threads[].title` or `data.store.menu[].items[].price`, and empty for page-reading tools.
+The server drops empty paths from the reply and keeps at most 50.
 After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each GET or POST request as `headers`, and the recorded `tokenHeaders` of any recorded request on the same host into each request on that host as `tokenHeaders`; Claude never sees them.
-It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
+It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, including `keepFields` for a saved tool that has none while its last response is recorded, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
 The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's website or its subdomains and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
 It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's website or its subdomains, have no body on a GET, pass the checkout and payment guard, whose step placeholders name only earlier requests, and whose other placeholders in URL patterns and bodies match their inputs one to one.
@@ -332,12 +334,17 @@ The tool returns each request's address, status, and compacted response text, an
 The browser reads up to 100,000 characters of each response, and step placeholders use that raw text, but the text sent back is compacted without AI so that ChatGPT reads it faster.
 A JSON response loses `null` values, empty strings, empty arrays and objects, `__typename` keys, and keys whose names contain `tracking`, `analytics`, `telemetry`, `experiment`, or `logging`, and it is written without indentation.
 Any text with HTML or XML markup, such as an Ed post's `<document><paragraph>` content or a whole response that is not JSON, becomes plain text with its tags removed, its entities decoded, and its spaces collapsed, and each `<img src>` or `<image src>` becomes `[image: address]`.
+A list of 3 or more objects whose keys mostly match, with at least 60% of the cells filled, becomes a table inside its brackets: one line of key names and one line for each item, with values separated by ` | `, `|` and line breaks in values written as `\|` and `\n`, and nested objects one level deep written as dotted keys such as `user.name`; a list whose items hold lists of objects stays JSON, so the inner lists become tables.
+When a tool has `keepFields`, the last request's JSON response keeps only those paths, in the same structure, before compaction, where each dot separates keys and `[]` means every array element, and a path that leaves out `[]` still reads every element; earlier requests and step placeholders still use their full responses.
+When no path matches, the answer is the whole compacted response.
+Every saved tool has an optional `fullAnswer` input, which ChatGPT is told to use only when the short answer lacks something it needs; it skips the field filter, and compaction still applies.
 A JSON text value longer than 2,000 characters ends with `… [N more characters]`, and a compacted response longer than 20,000 characters ends with `[answer shortened: N more characters]`.
 Each request and page read, including these waits, has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
 An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`, ignoring a leading `www.` on the website's host, so `https://www.doordash.com` also accepts `doordash.com` and `api.doordash.com`.
 A request with `tokenHeaders` reads each named local storage key inside the website's page when it runs and sends its value under the header name, such as Ed's `x-token` from `authToken`; the value never leaves the page, so it never reaches the server, the tool result, logs, or Sentry.
 A request to a subdomain runs from the website's page as a cross-origin `fetch`; it sends no cookies when it sends a token header, because websites such as Ed allow any origin but refuse cross-origin requests with cookies, and otherwise it includes cookies, so it works only when that subdomain allows it.
 Nathan chose the 20,000-character limit after compaction because long answers slowed ChatGPT down; on a made-up Ed thread of 44,947 characters, compaction removed 31% before that limit, and on a made-up DoorDash GraphQL response of 79,219 characters, it removed 64%.
+On October 18, 2026, tables cut a made-up 30-thread Ed list from 9,301 to 5,735 GPT tokens and a made-up DoorDash home feed from 8,362 to 5,515 tokens, both counted before the limit, and `keepFields` for each tool's purpose cut them to 1,896 and 2,227 tokens.
 The whole call must finish within the route's 300-second Vercel function limit.
 
 The tool treats the website as signed out when that origin lands on a sign-in page, a request or opened page redirects to a sign-in page, or a request or opened page returns 401 or 403 that is not one of the two cases below.
@@ -524,7 +531,7 @@ It lists each published app's name, website address, short description, tool cou
 2. Write a short description of up to 500 characters, and read the preview of exactly what will be shared.
 3. Select **Publish** to confirm.
 
-The listing holds the app name, website address, description, the publisher's name from their Clerk account, and each tool's name, description, requests, inputs, and returns.
+The listing holds the app name, website address, description, the publisher's name from their Clerk account, and each tool's name, description, requests, inputs, returns, and `keepFields`.
 When ordering is on for the app, the listing says only "Supports ordering", and copies always start with ordering off.
 A listing never holds logins, Browser Use profile IDs, sign-in times, connection tokens, recordings, discovery results, or orders.
 After publishing, the section shows the published date with **Update listing**, which publishes the app's current tools and description again under the same listing, and **Unpublish**, which removes the listing; deleting the app also removes it.
@@ -647,7 +654,7 @@ App and exploration pages have stable addresses under `/apps/<app-id>` and `/app
 Browser Back and Forward restore the matching workspace screen, and refreshing those addresses restores the stored apps and tools.
 The same apps appear on any device where the user signs in.
 Each app page shows the app name, its website address, **Delete app** beside **Explore website**, and status labels for sign-in, a saved login, and ordering.
-On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, and **Delete tool**.
+On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, its answer fields, its requests, and **Delete tool**.
 A filter box appears above the list when the app has more than 8 tools.
 A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, View image, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
 On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.

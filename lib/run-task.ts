@@ -177,7 +177,7 @@ async function unfollowedRedirect(page: Page, website: string, method: string, u
   return new TaskError("fetch_failed", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
 }
 
-async function readRequest(page: Page, website: string, request: FilledRequest, steps: RunSteps, step: string) {
+async function readRequest(page: Page, website: string, request: FilledRequest, steps: RunSteps, step: string, keepFields: string[]) {
   const { method, url } = request;
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
@@ -187,13 +187,13 @@ async function readRequest(page: Page, website: string, request: FilledRequest, 
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body)}` };
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
   const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url));
   if (status >= 400) throw httpError(method, url, status);
   return { body: text, summary: `${method} ${url} returned ${status}\n${compactAnswer(text)}` };
 }
 
-async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps) {
+async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps, keepFields: string[]) {
   await timed(steps, "websiteOpenMs", () => Sentry.startSpan({ name: "page.open_website" }, () => page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout })));
   requireOnWebsite(page, website);
   const responses: string[] = [];
@@ -202,7 +202,7 @@ async function readRequests(page: Page, website: string, requests: RequestFiller
     const request = fill(responses);
     if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
     const step = `request${index + 1}`;
-    const { body, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step));
+    const { body, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step, index === requests.length - 1 ? keepFields : []));
     responses.push(body);
     results.push(summary);
   }
@@ -242,7 +242,7 @@ async function inSignedInBrowser(app: Website, steps: RunSteps, read: (page: Pag
   return withWarmPage(app.id, app.browserProfileId, steps, read);
 }
 
-const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps));
+const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps, keepFields: string[] = []) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps, keepFields));
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -269,10 +269,10 @@ function logOutcome(name: string, attributes: Record<string, string | number>, r
   });
 }
 
-export function runTask(app: Website, task: Task, inputs: TaskInputs) {
+export function runTask(app: Website, task: Task, inputs: TaskInputs, fullAnswer = false) {
   return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, (steps) => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps);
+    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps, fullAnswer ? [] : task.keepFields);
   });
 }
 
