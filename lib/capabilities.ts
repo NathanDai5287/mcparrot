@@ -60,7 +60,7 @@ export const websiteSchema = z.object({
   id: appIdSchema,
   name: z.string().max(80).regex(/\S/, "Give the app a name."),
   url: z.url({ protocol: /^https?$/ }).max(2000),
-  tasks: z.array(taskSchema).max(0, "Create the app first, then add tasks."),
+  tasks: z.array(taskSchema).max(0, "Create the app first, then add tools."),
 }) satisfies z.ZodType<Website>;
 
 export const storedWebsiteSchema = z.object({

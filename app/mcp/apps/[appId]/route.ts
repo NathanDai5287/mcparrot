@@ -111,20 +111,20 @@ function appServer(app: Website, orderLimitUsd?: number) {
     annotations: { readOnlyHint: true },
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("save_task", {
-    title: `Save a page as a task for ${app.name}`,
-    description: `After read_page returns useful content for a kind of request the user may repeat, save that page as a reading task without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern, and give one input for each placeholder. The task becomes its own tool in a new chat.`,
+    title: `Save a page as a tool for ${app.name}`,
+    description: `Save a new tool for ${app.name} that reads a page. After read_page returns useful content for a kind of request the user may repeat, save that page without asking first. Replace values that change, such as a course ID, with {placeholders} in urlPattern, and give one input for each placeholder. The tool appears in a new chat.`,
     inputSchema: {
-      name: z.string().describe("A short plain task name, such as Read course syllabus."),
-      description: z.string().describe("What the task does, in one plain sentence."),
+      name: z.string().describe("A short plain tool name, such as Read course syllabus."),
+      description: z.string().describe("What the tool does, in one plain sentence."),
       urlPattern: z.string().describe(`A full address on ${website} or a path, with {placeholders} for values that change, such as /courses/{courseId}/assignments/syllabus.`),
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder, with the value from the page you read as the example."),
-      returns: z.string().describe("What the task returns, in a few words."),
+      returns: z.string().describe("What the tool returns, in a few words."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
-    description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a task result says that a code was sent.`,
+    description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a tool result says that a code was sent.`,
     inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
   }, async ({ code }) => textResult(await submitVerificationCode(app, code)));

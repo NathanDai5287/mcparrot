@@ -12,7 +12,7 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
     <html lang="en">
       <body style={{ fontFamily: "sans-serif", padding: 48 }}>
         <h1>Something went wrong</h1>
-        <p>MCParrot could not load. Your saved apps and tasks are unchanged.</p>
+        <p>MCParrot could not load. Your saved apps and tools are unchanged.</p>
         <button onClick={() => retry()}>Try again</button>
       </body>
     </html>

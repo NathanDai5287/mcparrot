@@ -36,7 +36,7 @@ const sharedTasks = (app: Website) => app.tasks.map(({ name, description, reques
 const summary = ({ ownerId, tasks, ...shared }: Listing): ListingSummary => ({ ...shared, taskNames: tasks.map((task) => task.name) });
 
 export async function publishApp(userId: string, app: Website, description: string) {
-  if (app.tasks.length > maxListingTasks) throw new ListingRejected(`Only apps with at most ${maxListingTasks} tasks can be published. Delete some tasks first.`);
+  if (app.tasks.length > maxListingTasks) throw new ListingRejected(`Only apps with at most ${maxListingTasks} tools can be published. Delete some tools first.`);
   const listing: Listing = {
     id: listingIdFor(app.id),
     ownerId: userId,
@@ -48,7 +48,7 @@ export async function publishApp(userId: string, app: Website, description: stri
     supportsOrdering: !!app.ordering?.enabled,
     publishedAt: new Date().toISOString(),
   };
-  if (JSON.stringify(listing).length > maxListingCharacters) throw new ListingRejected("This app is too large to publish. Delete some tasks first.");
+  if (JSON.stringify(listing).length > maxListingCharacters) throw new ListingRejected("This app is too large to publish. Delete some tools first.");
   const redis = storage();
   if (!app.listing && await redis.scard(marketplaceKey) >= maxListings) throw new ListingRejected("The marketplace is full. Try again later.");
   await redis.multi().set(listingKey(listing.id), listing).sadd(marketplaceKey, listing.id).exec();

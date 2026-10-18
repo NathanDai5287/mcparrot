@@ -81,7 +81,7 @@ function checkLimits(before: Website[], after: Website[]) {
   if (after.length > maxApps && after.length > before.length) throw new WorkspaceLimit(`MCParrot holds at most ${maxApps} apps. Delete an app first.`);
   const taskCounts = new Map(before.map((app) => [app.id, app.tasks?.length ?? 0]));
   const full = after.find((app) => app.tasks?.length > maxTasksPerApp && app.tasks.length > (taskCounts.get(app.id) ?? 0));
-  if (full) throw new WorkspaceLimit(`${full.name} holds at most ${maxTasksPerApp} tasks. Delete a task first.`);
+  if (full) throw new WorkspaceLimit(`${full.name} holds at most ${maxTasksPerApp} tools. Delete a tool first.`);
 }
 
 const readStoredWorkspace = (key: string) => stored((redis) => redis.get<string>(key));

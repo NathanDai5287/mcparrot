@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Website } from "../lib/capabilities";
+import { SetupCard } from "./setup-card";
 
 type AppChanges = Partial<Pick<Website, "browserProfileId" | "signedInAt" | "loginSavedAt">>;
 type SignInBrowser = { appId: string; browserId: string; liveUrl: string; startedAt: number };
@@ -79,16 +80,13 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
   }
 
   const status = app.signedInAt ? `Signed in on ${new Date(app.signedInAt).toLocaleString()}.` : "Not signed in yet.";
-  return <section className="assistant-section sentry-block">
-    <div>
-      <h2>Website sign-in</h2>
-      {browser ? <p>Sign in to {app.name} in the sign-in window, including any verification such as Duo. Then select Done signing in. If the window did not open, select Open the sign-in window.</p>
-        : <p>{status} Your assistant runs tasks in a hidden Browser Use browser that keeps this sign-in.</p>}
-      {error && <p className="pilot-error" role="alert">{error}</p>}
-    </div>
+  return <SetupCard title="Website sign-in" status={browser ? "Signing in" : app.signedInAt ? "Signed in" : "Not signed in"} className="sentry-block">
+    {browser ? <p>Sign in to {app.name} in the sign-in window, including any verification such as Duo. Then select Done signing in. If the window did not open, select Open the sign-in window.</p>
+      : <p>{status} Your assistant runs tools in a hidden Browser Use browser that keeps this sign-in.</p>}
+    {error && <p className="pilot-error" role="alert">{error}</p>}
     {browser ? <div className="login-actions"><button className="button primary" disabled={busy} onClick={() => stopSignIn(browser, true)}>{busy ? "Saving sign-in…" : "Done signing in"}</button><button className="button" disabled={busy} onClick={() => { popupRef.current = openSignInWindow(browser.liveUrl) ?? popupRef.current; }}>Open the sign-in window</button><button className="button" disabled={busy} onClick={() => stopSignIn(browser, false)}>Cancel</button></div>
-      : <button className="button" disabled={busy} onClick={startSignIn}>{busy ? "Opening browser…" : "Sign in to website"}</button>}
-  </section>;
+      : <div className="login-actions"><button className="button" disabled={busy} onClick={startSignIn}>{busy ? "Opening browser…" : "Sign in to website"}</button></div>}
+  </SetupCard>;
 }
 
 function LoginSection({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
@@ -124,18 +122,12 @@ function LoginSection({ app, onChange }: { app: Website; onChange: (changes: App
     onChange({ loginSavedAt: undefined });
   }
 
-  if (app.loginSavedAt && !replacing) return <section className="assistant-section">
-    <div>
-      <h2>Saved login</h2>
+  return <SetupCard title="Saved login" status={app.loginSavedAt ? "Saved" : "Not saved"}>
+    {app.loginSavedAt && !replacing ? <>
       <p>Login saved. When the website signs out, MCParrot signs in again with it and asks you in ChatGPT for any text-message code.</p>
       {error && <p className="pilot-error" role="alert">{error}</p>}
-    </div>
-    <div className="login-actions"><button className="button" disabled={busy} onClick={() => { setError(""); setReplacing(true); }}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
-  </section>;
-
-  return <section className="assistant-section">
-    <form className="editor" onSubmit={saveLogin}>
-      <h2>Save login</h2>
+      <div className="login-actions"><button className="button" disabled={busy} onClick={() => { setError(""); setReplacing(true); }}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
+    </> : <form className="editor" onSubmit={saveLogin}>
       <p>Save your username and password for {app.name} so MCParrot can sign in again when the website signs out. MCParrot encrypts them and never shows the password again.</p>
       <label htmlFor={`login-username-${app.id}`}>Username</label>
       <input id={`login-username-${app.id}`} name="username" autoComplete="off" required />
@@ -143,8 +135,8 @@ function LoginSection({ app, onChange }: { app: Website; onChange: (changes: App
       <input id={`login-password-${app.id}`} name="password" type="password" autoComplete="new-password" required />
       {error && <p className="pilot-error" role="alert">{error}</p>}
       <div className="form-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? "Saving login…" : "Save login"}</button>{replacing && <button className="button" type="button" onClick={() => { setError(""); setReplacing(false); }}>Cancel</button>}</div>
-    </form>
-  </section>;
+    </form>}
+  </SetupCard>;
 }
 
 function ConnectionSteps({ app }: { app: Website }) {
@@ -196,25 +188,21 @@ function ConnectionSection({ app, onApps }: { app: Website; onApps: (apps: Websi
   }
 
   const linkButton = <button className="button" disabled={busy} onClick={createLink}>{busy ? "Creating link…" : app.connectionTokenHash ? "Regenerate link" : "Create link"}</button>;
-  if (!link) return <section className="assistant-section">
-    <div>
-      <h2>Use tasks in ChatGPT</h2>
-      <p>{app.connectionTokenHash ? "This app has a private ChatGPT link. MCParrot shows a link only once, when you create it. Regenerate the link to get a new one, and the old link stops working." : "Create a private link that gives ChatGPT this app’s tasks."}</p>
-      {error && <p className="pilot-error" role="alert">{error}</p>}
-    </div>
-    {linkButton}
-  </section>;
-
-  return <section className="assistant-section">
-    <div>
-      <h2>Use tasks in ChatGPT</h2>
-      <p>Copy this link now, because MCParrot shows it only once. Anyone with the link can use this app’s tasks in ChatGPT, so keep it private.</p>
+  return <SetupCard title="Use in ChatGPT" status={app.connectionTokenHash ? "Link created" : "No link"}>
+    {link ? <>
+      <p>Copy this link now, because MCParrot shows it only once. Anyone with the link can use this app’s tools in ChatGPT, so keep it private.</p>
+      <div className="login-actions"><button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>{linkButton}</div>
+      {copyFailed && <><p className="pilot-error" role="alert">MCParrot could not copy the link. Copy it from this box instead.</p><input className="connection-link" aria-label="Connection link" readOnly value={link} autoFocus onFocus={(event) => event.currentTarget.select()} /></>}
+    </> : <>
+      <p>{app.connectionTokenHash ? "This app has a private ChatGPT link. MCParrot shows a link only once, when you create it. Regenerate the link to get a new one, and the old link stops working." : "Create a private link that gives ChatGPT this app’s tools."}</p>
+      <div className="login-actions">{linkButton}</div>
+    </>}
+    {error && <p className="pilot-error" role="alert">{error}</p>}
+    <details className="setup-steps">
+      <summary>How to add it to ChatGPT</summary>
       <ConnectionSteps app={app} />
-      {copyFailed && <><p className="pilot-error" role="alert">MCParrot could not copy the link. Copy it from this box instead.</p><input aria-label="Connection link" readOnly value={link} autoFocus onFocus={(event) => event.currentTarget.select()} /></>}
-      {error && <p className="pilot-error" role="alert">{error}</p>}
-    </div>
-    <div className="login-actions"><button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>{linkButton}</div>
-  </section>;
+    </details>
+  </SetupCard>;
 }
 
 export function AssistantPanel({ app, onChange, onApps }: { app: Website; onChange: (changes: AppChanges) => void; onApps: (apps: Website[]) => void }) {

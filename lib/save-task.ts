@@ -13,7 +13,7 @@ export function toolName(taskName: string) {
 
 export function taskNameProblem(taskName: string) {
   const name = toolName(taskName);
-  if (!name || connectionToolNames.includes(name)) return "Give the task a short plain name, such as Read course syllabus.";
+  if (!name || connectionToolNames.includes(name)) return "Give the tool a short plain name, such as Read course syllabus.";
 }
 
 const placeholders = (urlPattern: string) => [...new Set([...urlPattern.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]))];
@@ -60,7 +60,7 @@ function rejectionReason(app: Website, capability: Capability) {
   if (nameProblem) return nameProblem;
   if (!sameNames(placeholders(urlPattern), capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern needs exactly one input with the same name, and every input needs a placeholder.";
   const duplicate = duplicateOf(app.url, app.tasks, capability);
-  if (duplicate) return `${app.name} already has a task with this name or page, ${duplicate.name}. Use that tool in a new chat, or choose another name and page.`;
+  if (duplicate) return `${app.name} already has a tool with this name or page, ${duplicate.name}. Use that tool in a new chat, or choose another name and page.`;
 }
 
 export function saveTask(app: Website, { urlPattern, ...pageTask }: PageTask) {
@@ -75,6 +75,6 @@ export function saveTask(app: Website, { urlPattern, ...pageTask }: PageTask) {
     });
     if (!found) throw new Error("This app no longer exists in MCParrot.");
     Sentry.logger.info("Task saved", { appId: app.id, task: pageTask.name });
-    return `Saved ${pageTask.name} as a task for ${app.name}. It appears as its own tool, ${toolName(pageTask.name)}, in a new ChatGPT chat; in this chat, keep using read_page.`;
+    return `Saved ${pageTask.name} as a tool for ${app.name}. It appears as ${toolName(pageTask.name)} in a new ChatGPT chat; in this chat, keep using read_page.`;
   });
 }

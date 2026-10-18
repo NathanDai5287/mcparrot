@@ -188,7 +188,7 @@ function capabilitiesFrom(reply: string, app: Website) {
     return capability.success && isUsable(capability.data, origin) ? [{ ...capability.data, requests: capability.data.requests.map((request) => ({ ...request, method: "GET" })) }] : [];
   });
   const unsaved = unsavedCapabilities(app, capabilities).slice(0, maximumCapabilities);
-  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `Composer found no reading tasks on ${origin}. Explore more pages, then try again.`);
+  if (!unsaved.length && !app.tasks.length) throw new DiscoveryError("no_capabilities", 502, `Composer found no reading tools on ${origin}. Explore more pages, then try again.`);
   return unsaved;
 }
 

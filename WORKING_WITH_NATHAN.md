@@ -28,9 +28,9 @@ Separate the intended experience from capabilities that still need proof.
 Challenge contradictions instead of silently filling gaps or agreeing with statements that conflict.
 
 For this product, keep teaching and MCP use distinct in every explanation.
-Teaching is when the user shows the app a website task, and MCP use is when an assistant later runs that saved task.
-Check whether a new request combines known tasks or needs a new website action.
-Do not promise automatic task discovery or sign-in behavior without evidence.
+Teaching is when the user shows the app what a website can do, and MCP use is when an assistant later runs that saved tool.
+Check whether a new request combines known tools or needs a new website action.
+Do not promise automatic tool discovery or sign-in behavior without evidence.
 For each capability, explain both the UI path and the agent path, including the verification and browser steps that each path needs.
 
 ## Find answers before asking
