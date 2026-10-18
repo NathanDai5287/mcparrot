@@ -203,9 +203,10 @@
     .tour { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(16rem, .6fr); gap: clamp(1.5rem, 4vw, 4rem); align-items: center; }
     .tour .plain-list { margin-top: 1.2rem; }
     .tour h2 { font-size: clamp(1.8rem, 1rem + 2.2vw, 2.9rem); }
-    .placeholder { margin: 0; aspect-ratio: 16 / 10; display: grid; place-content: center; gap: .5rem; padding: 2rem; border: 2px dashed var(--teal-line); border-radius: .85rem; background: var(--surface); text-align: center; color: var(--muted); font-size: .9em; }
-    .placeholder strong { color: var(--teal); font-size: 1.1em; }
-    .placeholder span { max-width: 36ch; margin: 0 auto; }
+    .shot-pair { display: grid; gap: 1rem; justify-items: center; }
+    .shot-pair img { max-height: calc((100dvh - var(--bar) - 12rem) / 2); }
+    .rule-head { font-size: clamp(2.6rem, 1rem + 5vw, 5.4rem); max-width: 14ch; }
+    .rule-head + .lede { font-size: 1.35em; }
     .lanes { margin-top: clamp(1.25rem, 3vw, 2rem); }
     .lane-title { margin: 1.1rem 0 .55rem; color: var(--teal); font-size: .78em; font-weight: 700; }
     .lane { display: flex; align-items: stretch; }
@@ -329,6 +330,17 @@
             <ol class="trail"><li>Sign in</li><li>Billing</li><li>Top up</li><li>Enter amount</li><li>Pay</li></ol>
           </div>
           <span class="ask-bubble">Refill my DeepSeek credits with $20</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="The rule" data-part="pitch" data-section="Pitch · 2 minutes">
+      <div class="slide-inner">
+        <h2 class="rule-head">Anything you can click, you can ask.</h2>
+        <p class="lede">If a person can do it in the website, their agent should be able to do it by asking.</p>
+        <div class="engine">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 10.5h8"/></svg>
+          <p><strong>We build MCParrot by the same rule.</strong> Each feature on its app page should also work by asking ChatGPT.</p>
         </div>
       </div>
     </section>
@@ -513,11 +525,12 @@
           <ul class="next-list">
             <li>Next: MCParrot test-runs every new tool before ChatGPT sees it.</li>
             <li>Next: ChatGPT can set up a new website by itself.</li>
+            <li>Next: you can run MCParrot itself by asking ChatGPT.</li>
           </ul>
           <p class="learned" style="margin-top:1.6rem">Thank you. Questions?</p>
           <div class="jump">
-            <a href="#10">Product tour →</a>
-            <a href="#18">Appendix: questions judges may ask →</a>
+            <a href="#11">Product tour →</a>
+            <a href="#19">Appendix: questions judges may ask →</a>
           </div>
         </div>
       </div>
@@ -526,65 +539,155 @@
     <section class="slide divider" aria-roledescription="slide" aria-label="Product tour" data-part="tour" data-section="Product tour">
       <div class="slide-inner">
         <h2>Product tour</h2>
-        <p class="lede">The MCParrot app, one screen at a time. Show these after the pitch, if judges want to see the app.</p>
+        <p class="lede">The MCParrot app, one screen at a time. The same rule applies here: anything you click on these screens should also work by asking ChatGPT.</p>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: your apps" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>An app page, such as Canvas: the tools list on the left and the setup column on the right.</span></figure>
-        <div><h2>One app per website.</h2><p class="lede">Its tools on the left. Sign-in, the ChatGPT link, and sharing on the right.</p></div>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-apps.jpg" width="1580" height="860" alt="The Your apps page in MCParrot, listing five websites: Canvas with 21 tools, Gradescope with 4, DoorDash with 5, Edstem with 5, and Chess with 23, all signed in, with a Create app button." loading="lazy">
+            <span class="pin" style="--x: 81%; --y: 32%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 87%; --y: 7.2%" aria-hidden="true">2</span>
+          </div>
+          <figcaption>Nathan’s MCParrot account.</figcaption>
+        </figure>
+        <div>
+          <h2>Every website, in one place.</h2>
+          <ol class="notes">
+            <li><span>Each one signed in, with its own tools</span></li>
+            <li><span>Add another website</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" aria-roledescription="slide" aria-label="Tour: an app page" data-part="tour" data-section="Product tour">
+      <div class="slide-inner tour">
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-app-page.jpg" width="1400" height="1143" alt="The Canvas app page: a list of 21 tools that ChatGPT can use, such as List enrolled courses and View planner schedule, and a column with Website sign-in marked signed in, Use in ChatGPT with a Create link button, and Marketplace marked published." loading="lazy">
+            <span class="pin" style="--x: 0%; --y: 17.7%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 70%; --y: 18.9%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 70%; --y: 66.5%" aria-hidden="true">3</span>
+            <span class="pin" style="--x: 70%; --y: 85.7%" aria-hidden="true">4</span>
+          </div>
+        </figure>
+        <div>
+          <h2>One app per website.</h2>
+          <ol class="notes">
+            <li><span>What ChatGPT can do on Canvas</span></li>
+            <li><span>Your sign-in, saved</span></li>
+            <li><span>The private link for ChatGPT</span></li>
+            <li><span>Shared on the Marketplace</span></li>
+          </ol>
+        </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: explore and find tools" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>The Explore page after recording, with the results of “Find what this site can do” ticked.</span></figure>
-        <div><h2>Browse, then find what the site can do.</h2><p class="lede">Claude suggests tools from your recording. You tick the ones to keep.</p></div>
+        <figure class="shot shot-pair">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-explore.jpg" width="1400" height="660" alt="The Explore Chess page: 150 data requests recorded while browsing, a note that cookies, sign-in pages, and secret values are not recorded, and a Find what this site can do button." loading="lazy">
+            <span class="pin" style="--x: 43.5%; --y: 46.4%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 1.5%; --y: 84.2%" aria-hidden="true">2</span>
+          </div>
+          <div class="shot-frame">
+            <img src="images/pitch-tour-tool-result.jpg" width="2048" height="330" alt="A finished Ed tool named List my courses, which lists the courses the person is enrolled in on Ed, with course codes, names, terms, status, and their role." loading="lazy">
+            <span class="pin" style="--x: 0%; --y: 54%" aria-hidden="true">3</span>
+          </div>
+          <figcaption>Exploring Chess.com, and a finished Ed tool.</figcaption>
+        </figure>
+        <div>
+          <h2>Browse, then let Claude find the tools.</h2>
+          <ol class="notes">
+            <li><span>Recorded while you browsed</span></li>
+            <li><span>Find what this site can do</span></li>
+            <li><span>Claude turned recordings into tools like this</span></li>
+          </ol>
+        </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: tool details" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>One tool opened: its address, inputs, and Answer fields.</span></figure>
-        <div><h2>Every tool is readable.</h2><p class="lede">You can see what it asks the site for, and which answer fields it keeps.</p></div>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-tool-details.jpg" width="2048" height="920" alt="The List my courses tool on Ed, opened: no inputs; it returns enrolled courses with ids, codes, names, year, session, status, discussion categories, and role; its Answer fields list those paths; and its request is a GET to us.edstem.org/api/user that sends the x-token header from local storage." loading="lazy">
+            <span class="pin" style="--x: 0%; --y: 40.7%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 0%; --y: 58.3%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 0%; --y: 82.8%" aria-hidden="true">3</span>
+          </div>
+        </figure>
+        <div>
+          <h2>Every tool is readable.</h2>
+          <ol class="notes">
+            <li><span>What it needs and what it returns</span></li>
+            <li><span>The only fields ChatGPT gets</span></li>
+            <li><span>The exact request it sends, with no secret saved</span></li>
+          </ol>
+        </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: sign in once" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>The “Sign in to website” window with the Browser Use live view on the website’s sign-in page.</span></figure>
-        <div><h2>Sign in once, yourself.</h2><p class="lede">A live view of your Browser Use browser. MCParrot never sees the password you type here.</p></div>
-      </div>
-    </section>
-
-    <section class="slide" aria-roledescription="slide" aria-label="Tour: view image" data-part="tour" data-section="Product tour">
-      <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>The View image box with a picture from the website and Claude’s reading of it.</span></figure>
-        <div><h2>Read a picture.</h2><p class="lede">ChatGPT can’t see pictures from a connection, so Claude reads them and sends back text.</p></div>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-sign-in.jpg" width="2048" height="1250" alt="A Browser Use live preview window showing the Ed dashboard, signed in, with current and archived courses." loading="lazy">
+            <span class="pin" style="--x: 22.5%; --y: 2.4%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 17%; --y: 34.1%" aria-hidden="true">2</span>
+          </div>
+          <figcaption>The live view address is blurred.</figcaption>
+        </figure>
+        <div>
+          <h2>Sign in once, yourself.</h2>
+          <ol class="notes">
+            <li><span>A live view of your <strong>Browser Use</strong> browser</span></li>
+            <li><span>Signed in to Ed, as you</span></li>
+          </ol>
+        </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: ChatGPT link" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
-        <figure class="placeholder"><strong>Screenshot needed</strong><span>The ChatGPT connection panel with its link. Blur the secret part of the link.</span></figure>
-        <div><h2>One private link per website.</h2><p class="lede">Paste it into ChatGPT once. Make a new one any time to shut the old one off.</p></div>
+        <figure class="shot">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-chatgpt-link.jpg" width="882" height="1056" alt="The Use in ChatGPT card: Create a private link that gives ChatGPT this app's tools, a Create link button, and six steps for adding the link to ChatGPT as a custom MCP server." loading="lazy">
+            <span class="pin" style="--x: 2.5%; --y: 28.2%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 2.5%; --y: 38.9%" aria-hidden="true">2</span>
+          </div>
+        </figure>
+        <div>
+          <h2>One private link per website.</h2>
+          <ol class="notes">
+            <li><span>Create the link</span></li>
+            <li><span>Paste it into ChatGPT once</span></li>
+          </ol>
+        </div>
       </div>
     </section>
 
     <section class="slide" aria-roledescription="slide" aria-label="Tour: marketplace" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
         <figure class="shot">
-          <div class="shot-frame"><img src="images/pitch-app-marketplace.jpg" width="2410" height="1000" alt="The MCParrot Marketplace page, listing a published Canvas app with 21 tools, published by Nathan Dai, with a Sign in to add button." loading="lazy"></div>
-          <figcaption>The live Marketplace page.</figcaption>
+          <div class="shot-frame">
+            <img src="images/pitch-tour-marketplace.jpg" width="1590" height="980" alt="The MCParrot Marketplace: three published apps, Chess with 23 tools, Edstem with 5, and Canvas with 21, each published by Nathan Dai and marked In your apps, with a note that logins and sign-ins are never shared." loading="lazy">
+            <span class="pin" style="--x: 2.9%; --y: 37.1%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 79%; --y: 20.8%" aria-hidden="true">2</span>
+            <span class="pin" style="--x: 89.5%; --y: 34.1%" aria-hidden="true">3</span>
+          </div>
         </figure>
         <div>
           <h2>Community tools for the websites everyone uses.</h2>
-          <ul class="plain-list">
-            <li>Share the recipe, never your login.</li>
-            <li>One click adds it to your apps.</li>
-            <li>Everyone signs in with their own account.</li>
-          </ul>
+          <ol class="notes">
+            <li><span>Apps others published, with their tools</span></li>
+            <li><span>Logins are never shared</span></li>
+            <li><span>Add one, then sign in yourself</span></li>
+          </ol>
         </div>
       </div>
     </section>
@@ -593,13 +696,13 @@
       <div class="slide-inner">
         <h2>Appendix: questions judges may ask</h2>
         <div class="jump" style="margin-top:2rem">
-          <a href="#19">How the pieces connect</a>
-          <a href="#20">Why tools hold no secrets</a>
-          <a href="#21">How answers get smaller</a>
-          <a href="#22">What Sentry led us to fix</a>
-          <a href="#23">Recording safely</a>
-          <a href="#24">Running a tool</a>
-          <a href="#25">Paying safely</a>
+          <a href="#20">How the pieces connect</a>
+          <a href="#21">Why tools hold no secrets</a>
+          <a href="#22">How answers get smaller</a>
+          <a href="#23">What Sentry led us to fix</a>
+          <a href="#24">Recording safely</a>
+          <a href="#25">Running a tool</a>
+          <a href="#26">Paying safely</a>
         </div>
       </div>
     </section>
@@ -738,6 +841,7 @@
           <ul class="plain-list">
             <li><strong>Passes the anti-forgery check.</strong> Many sites need a fresh one-time code from their own page on each change (a CSRF token). The tool reads it from the page first.</li>
             <li><strong>Chains steps.</strong> One request can use a value from an earlier answer, such as a cart ID.</li>
+            <li><strong>Reads pictures.</strong> ChatGPT can’t see images from a connection, so the View image tool has Claude read a chart and send back text.</li>
           </ul>
         </div>
       </div>
