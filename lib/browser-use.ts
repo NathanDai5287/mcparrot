@@ -17,6 +17,6 @@ export async function withPage<T>(cdpUrl: string, work: (page: Page) => Promise<
     const context = browser.contexts()[0];
     return await work(context.pages()[0] ?? await context.newPage());
   } finally {
-    await browser.close();
+    await browser.close().catch((error: Error) => Sentry.logger.warn("Browser disconnect failed", { reason: error.message.split("\n")[0] }));
   }
 }
