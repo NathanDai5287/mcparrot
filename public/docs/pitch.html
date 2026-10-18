@@ -205,6 +205,8 @@
     .tour h2 { font-size: clamp(1.8rem, 1rem + 2.2vw, 2.9rem); }
     .shot-pair { display: grid; gap: 1rem; justify-items: center; }
     .shot-pair img { max-height: calc((100dvh - var(--bar) - 12rem) / 2); }
+    .shot-pair--row { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .shot-pair--row img { max-height: calc(100dvh - var(--bar) - 10rem); }
     .rule-head { font-size: clamp(2.6rem, 1rem + 5vw, 5.4rem); max-width: 14ch; }
     .rule-head + .lede { font-size: 1.35em; }
     .lanes { margin-top: clamp(1.25rem, 3vw, 2rem); }
@@ -259,7 +261,7 @@
       .slide-inner { padding-bottom: 1.5rem; }
       .pin { width: 1.15rem; height: 1.15rem; margin: -.575rem 0 0 -.575rem; font-size: .6rem; box-shadow: 0 0 0 2px var(--teal), 0 .2rem .4rem rgba(0, 0, 0, .35); }
       .title, .shot-layout, .shot-layout.square, .split, .two-col, .hard, .flow, .insight, .tour { grid-template-columns: 1fr; }
-      .chores { grid-template-columns: 1fr; gap: .6rem; }
+      .chores, .shot-pair--row { grid-template-columns: 1fr; gap: .6rem; }
       .chores-head { display: none; }
       .chores .ask-bubble { justify-self: end; margin-bottom: 1rem; }
       .lane { flex-direction: column; }
@@ -530,7 +532,7 @@
           <p class="learned" style="margin-top:1.6rem">Thank you. Questions?</p>
           <div class="jump">
             <a href="#11">Product tour →</a>
-            <a href="#19">Appendix: questions judges may ask →</a>
+            <a href="#20">Appendix: questions judges may ask →</a>
           </div>
         </div>
       </div>
@@ -652,6 +654,31 @@
       </div>
     </section>
 
+    <section class="slide" aria-roledescription="slide" aria-label="Tour: view image" data-part="tour" data-section="Product tour">
+      <div class="slide-inner tour">
+        <figure class="shot shot-pair shot-pair--row">
+          <div class="shot-frame">
+            <img src="images/pitch-tour-view-image-chart.jpg" width="692" height="856" alt="The View image box on the Edstem app page: an image address on static.us.edusercontent.com, a View image button, and a preview of the Review Grades for Midterm 1 histogram with minimum 0.0, median 52.5, maximum 101.0, mean 52.14, and standard deviation 27.1." loading="lazy">
+            <span class="pin" style="--x: 1.5%; --y: 49.6%" aria-hidden="true">1</span>
+            <span class="pin" style="--x: 1.5%; --y: 80.6%" aria-hidden="true">2</span>
+          </div>
+          <div class="shot-frame">
+            <img src="images/pitch-tour-view-image-text.jpg" width="692" height="628" alt="Claude's copy of the chart as text: the title, the bar labels 8, 19, 15, 21, 18, 24, 19, 18, 15, 16, the x-axis values 0 to 100, and the minimum, median, maximum, mean, and standard deviation." loading="lazy">
+            <span class="pin" style="--x: 1.5%; --y: 50.3%" aria-hidden="true">3</span>
+          </div>
+        </figure>
+        <div>
+          <h2>Claude reads the chart, so ChatGPT can.</h2>
+          <p class="lede">ChatGPT drops pictures that tools send, so MCParrot has Claude turn the picture into text.</p>
+          <ol class="notes">
+            <li><span>The picture’s address on Ed</span></li>
+            <li><span>The chart</span></li>
+            <li><span>Every number, copied as text</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
     <section class="slide" aria-roledescription="slide" aria-label="Tour: ChatGPT link" data-part="tour" data-section="Product tour">
       <div class="slide-inner tour">
         <figure class="shot">
@@ -696,13 +723,13 @@
       <div class="slide-inner">
         <h2>Appendix: questions judges may ask</h2>
         <div class="jump" style="margin-top:2rem">
-          <a href="#20">How the pieces connect</a>
-          <a href="#21">Why tools hold no secrets</a>
-          <a href="#22">How answers get smaller</a>
-          <a href="#23">What Sentry led us to fix</a>
-          <a href="#24">Recording safely</a>
-          <a href="#25">Running a tool</a>
-          <a href="#26">Paying safely</a>
+          <a href="#21">How the pieces connect</a>
+          <a href="#22">Why tools hold no secrets</a>
+          <a href="#23">How answers get smaller</a>
+          <a href="#24">What Sentry led us to fix</a>
+          <a href="#25">Recording safely</a>
+          <a href="#26">Running a tool</a>
+          <a href="#27">Paying safely</a>
         </div>
       </div>
     </section>
@@ -841,7 +868,7 @@
           <ul class="plain-list">
             <li><strong>Passes the anti-forgery check.</strong> Many sites need a fresh one-time code from their own page on each change (a CSRF token). The tool reads it from the page first.</li>
             <li><strong>Chains steps.</strong> One request can use a value from an earlier answer, such as a cart ID.</li>
-            <li><strong>Reads pictures.</strong> ChatGPT can’t see images from a connection, so the View image tool has Claude read a chart and send back text.</li>
+            <li><strong>Reads pictures.</strong> Claude copies a picture’s text and numbers for ChatGPT.</li>
           </ul>
         </div>
       </div>
