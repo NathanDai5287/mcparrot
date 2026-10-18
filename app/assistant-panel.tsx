@@ -104,8 +104,8 @@ function SignInSection({ app, onChange, onAutomaticSignIn }: { app: Website; onC
 
   const status = app.signedInAt ? `Signed in on ${new Date(app.signedInAt).toLocaleString()}.` : "Not signed in yet.";
   return <SetupCard title="Website sign-in" status={browser ? "Signing in" : app.signedInAt ? "Signed in" : "Not signed in"} className="sentry-block">
-    {browser ? <p>Sign in to {app.name} in the sign-in window, including any verification such as Duo. Then select Done signing in. If the window did not open, select Open the sign-in window.</p>
-      : <p>{status} Your assistant runs tools in a hidden Browser Use browser that keeps this sign-in.</p>}
+    {browser ? <p>Sign in to {app.name} in the sign-in window, then select Done signing in.</p>
+      : <p>{status}</p>}
     {error && <p className="pilot-error" role="alert">{error}</p>}
     {browser ? <div className="login-actions"><button className="button primary" disabled={busy} onClick={() => stopSignIn(browser, true)}>{busy ? "Saving sign-in…" : "Done signing in"}</button><button className="button" disabled={busy} onClick={() => { popupRef.current = openSignInWindow(browser.liveUrl) ?? popupRef.current; }}>Open the sign-in window</button><button className="button" disabled={busy} onClick={() => stopSignIn(browser, false)}>Cancel</button></div>
       : <div className="login-actions"><button className="button primary" disabled={busy} onClick={startSignIn}>{busy ? "Opening browser…" : "Sign in to website"}</button></div>}
@@ -147,11 +147,11 @@ function LoginForm({ app, onChange }: { app: Website; onChange: (changes: AppCha
   }
 
   return app.loginSavedAt && !replacing ? <>
-    <p>Login saved. When the website signs out, MCParrot signs in again with it and asks you in ChatGPT for any text-message code.</p>
+    <p>Login saved. MCParrot uses it to sign back in.</p>
     {error && <p className="pilot-error" role="alert">{error}</p>}
     <div className="login-actions"><button className="button" disabled={busy} onClick={() => { setError(""); setReplacing(true); }}>Replace</button><button className="button danger" disabled={busy} onClick={deleteLogin}>Delete</button></div>
   </> : <form className="editor" onSubmit={saveLogin}>
-    <p>Save your username and password for {app.name}. MCParrot encrypts them and never shows the password again.</p>
+    <p>Saved encrypted. The password is never shown again.</p>
     <label htmlFor={`login-username-${app.id}`}>Username</label>
     <input id={`login-username-${app.id}`} name="username" autoComplete="off" required />
     <label htmlFor={`login-password-${app.id}`}>Password</label>
@@ -177,10 +177,10 @@ function GoogleAccountForm({ app, onSave }: { app: Website; onSave: SaveAutomati
   }
 
   return <form className="editor" onSubmit={save}>
-    <p>When the website signs out, MCParrot selects Continue with Google in its browser and chooses your Google account. It never types a Google password or code. If Google asks you to verify, select Sign in to website again.</p>
+    <p>MCParrot signs back in with Continue with Google.</p>
     <label htmlFor={`google-email-${app.id}`}>Google account email (optional)</label>
     <input id={`google-email-${app.id}`} name="googleEmail" type="email" maxLength={320} autoComplete="off" defaultValue={current.method === "google" ? current.googleEmail : ""} aria-describedby={`google-email-help-${app.id}`} />
-    <p className="field-help" id={`google-email-help-${app.id}`}>Add it when Google shows more than one account.</p>
+    <p className="field-help" id={`google-email-help-${app.id}`}>Only needed for several Google accounts.</p>
     {error && <p className="pilot-error" role="alert">{error}</p>}
     <div className="form-actions"><button className="button" type="submit" disabled={busy}>{busy ? "Saving…" : "Save Google account"}</button></div>
   </form>;
@@ -212,10 +212,10 @@ function AutomaticSignInChoice({ app, onChange, onSave }: { app: Website; onChan
       {automaticSignInChoices.map((choice) => <label className="automatic-sign-in-choice" key={choice.method}><input type="radio" name={`automatic-sign-in-${app.id}`} checked={method === choice.method} onChange={() => choose(choice.method)} />{choice.label}</label>)}
     </fieldset>
     {error && <p className="pilot-error" role="alert">{error}</p>}
-    {method === "off" && <p>When the website signs out, select Sign in to website again.</p>}
+    {method === "off" && <p>Sign in again yourself when the site signs out.</p>}
     {method === "google" && <GoogleAccountForm app={app} onSave={onSave} />}
     {method === "password" && <LoginForm app={app} onChange={onChange} />}
-    <p className="field-help">Email and password works only on a normal sign-in form, not on Continue with Google.</p>
+    <p className="field-help">Email and password needs a normal sign-in form.</p>
   </div>;
 }
 
@@ -270,11 +270,11 @@ function ConnectionSection({ app, onApps }: { app: Website; onApps: (apps: Websi
   const linkButton = <button className="button" disabled={busy} onClick={createLink}>{busy ? "Creating link…" : app.connectionTokenHash ? "Regenerate link" : "Create link"}</button>;
   return <SetupCard title="Use in ChatGPT" status={app.connectionTokenHash ? "Link created" : "No link"}>
     {link ? <>
-      <p>Copy this link now, because MCParrot shows it only once. Anyone with the link can use this app’s tools in ChatGPT, so keep it private.</p>
+      <p>Copy it now; it is shown only once. Keep it private.</p>
       <div className="login-actions"><button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>{linkButton}</div>
       {copyFailed && <><p className="pilot-error" role="alert">MCParrot could not copy the link. Copy it from this box instead.</p><input className="connection-link" aria-label="Connection link" readOnly value={link} autoFocus onFocus={(event) => event.currentTarget.select()} /></>}
     </> : <>
-      <p>{app.connectionTokenHash ? "This app has a private ChatGPT link. MCParrot shows a link only once, when you create it. Regenerate the link to get a new one, and the old link stops working." : "Create a private link that gives ChatGPT this app’s tools."}</p>
+      <p>{app.connectionTokenHash ? "Link created. Regenerating replaces it." : "Create a private link for your agent."}</p>
       <div className="login-actions">{linkButton}</div>
     </>}
     {error && <p className="pilot-error" role="alert">{error}</p>}

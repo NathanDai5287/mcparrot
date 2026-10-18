@@ -1,14 +1,15 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useAuth } from "@clerk/nextjs";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension, type SaveResult } from "./exploration-panel";
 import { AssistantPanel, stopStoredSignIn } from "./assistant-panel";
-import { ImagePanel } from "./image-panel";
 import { OrderingPanel } from "./ordering-panel";
 import { PublishPanel } from "./publish-panel";
 import type { Capability, DiscoveredCapability, Task, TaskRequest, TokenHeader, Website } from "../lib/capabilities";
 import type { WorkspaceOperation } from "../lib/workspace";
+import { cachedJson, discoveryUrl, forgetCachedJson, orderUrl, whenIdle } from "./json-cache";
 
 type Screen =
   | { view: "apps" }
@@ -136,8 +137,8 @@ function DeleteAppButton({ app, busy, error, onDelete, onClose }: { app: Website
   </>;
 }
 
-function ScreenLink({ screen, onNavigate, className, current, children }: { screen: Screen; onNavigate: (screen: Screen) => void; className?: string; current?: boolean; children: ReactNode }) {
-  return <a className={className} href={screenPath(screen)} aria-current={current ? "page" : undefined} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onNavigate(screen); }}>{children}</a>;
+function ScreenLink({ screen, onNavigate, onPrefetch, className, current, children }: { screen: Screen; onNavigate: (screen: Screen) => void; onPrefetch?: () => void; className?: string; current?: boolean; children: ReactNode }) {
+  return <a className={className} href={screenPath(screen)} aria-current={current ? "page" : undefined} onPointerEnter={onPrefetch} onFocus={onPrefetch} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onNavigate(screen); }}>{children}</a>;
 }
 
 function Breadcrumb({ trail, current, onNavigate }: { trail: { label: string; screen: Screen }[]; current: string; onNavigate: (screen: Screen) => void }) {
@@ -178,14 +179,28 @@ function AppForm({ onSave, onCancel }: { onSave: (name: string, url: string) => 
   );
 }
 
+const previewKey = (userId: string) => `mcparrot-workspace-preview:${userId}`;
+const previewOf = (apps: Website[]): Website[] => apps.map(({ id, name, url, tasks, signedInAt, loginSavedAt }) => ({ id, name, url, tasks, signedInAt, loginSavedAt }));
+
+function readPreview(userId: string): Website[] | null {
+  try {
+    return JSON.parse(localStorage.getItem(previewKey(userId)) ?? "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function Workspace() {
+  const { userId } = useAuth();
   const [apps, setApps] = useState<Website[]>([]);
   const [screen, setScreen] = useState<Screen>({ view: "apps" });
   const [loaded, setLoaded] = useState(false);
+  const [previewed, setPreviewed] = useState(false);
   const [warning, setWarning] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const focusHeading = useRef(false);
+  const serverLoaded = useRef(false);
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
@@ -196,12 +211,33 @@ export default function Workspace() {
         return;
       }
       const savedApps = workspace.apps ?? [];
+      serverLoaded.current = true;
       setIsOwner(workspace.isOwner === true);
       setApps(savedApps);
       setScreen(screenAtPath(savedApps));
       setLoaded(true);
+      whenIdle(() => savedApps.forEach((app) => void cachedJson(discoveryUrl(app.id)).catch(() => undefined)));
     }).catch(() => setWarning(storageWarning));
   }, []);
+
+  useEffect(() => {
+    if (!userId || serverLoaded.current) return;
+    const preview = readPreview(userId);
+    if (!preview) return;
+    const previewScreen = screenAtPath(preview);
+    setApps(preview);
+    if (previewScreen.view === "missing") return;
+    setScreen(previewScreen);
+    setPreviewed(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (loaded && userId) localStorage.setItem(previewKey(userId), JSON.stringify(previewOf(apps)));
+  }, [loaded, userId, apps]);
+
+  function prefetchApp(app: Website) {
+    if (loaded && isOwner) void cachedJson(orderUrl(app.id)).catch(() => undefined);
+  }
 
   useEffect(() => {
     const restoreScreen = () => {
@@ -255,6 +291,7 @@ export default function Workspace() {
     const response = await fetch("/api/workspace", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
     const result: { apps?: unknown; error?: unknown } | null = await response?.json().catch(() => null) ?? null;
     if (response?.ok && Array.isArray(result?.apps)) {
+      forgetCachedJson();
       setWarning("");
       showApps(result.apps);
       return { apps: result.apps };
@@ -328,16 +365,16 @@ export default function Workspace() {
         </button>
         <button className="sidebar-apps-link" onClick={() => navigate({ view: "apps" })}>Apps</button>
         <div className="sidebar-apps">
-          <div className="sidebar-apps-heading"><h2>Apps {loaded && <span>{apps.length}</span>}</h2><button className="sidebar-icon-button" aria-label="Create app" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" /></button></div>
-          {loaded && apps.length === 0 && <p className="sidebar-empty">No apps yet</p>}
-          <nav aria-label="Apps" className="sidebar-app-list">{apps.map((app) => <ScreenLink className="sidebar-app" key={app.id} current={currentApp?.id === app.id} screen={{ view: "app", app }} onNavigate={navigate}>
+          <div className="sidebar-apps-heading"><h2>Apps {(loaded || previewed) && <span>{apps.length}</span>}</h2><button className="sidebar-icon-button" aria-label="Create app" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" /></button></div>
+          {(loaded || previewed) && apps.length === 0 && <p className="sidebar-empty">No apps yet</p>}
+          <nav aria-label="Apps" className="sidebar-app-list">{apps.map((app) => <ScreenLink className="sidebar-app" key={app.id} current={currentApp?.id === app.id} screen={{ view: "app", app }} onNavigate={navigate} onPrefetch={() => prefetchApp(app)}>
             <span className="sidebar-app-mark" aria-hidden="true">{app.name.charAt(0).toUpperCase()}</span>
             <span className="sidebar-app-name">{app.name}</span>
             <span className={app.signedInAt ? "status-dot signed-in" : "status-dot"}><span className="visually-hidden">{app.signedInAt ? "Signed in" : "Not signed in"}</span></span>
           </ScreenLink>)}</nav>
         </div>
         <div className="sidebar-footer">
-          <a className="sidebar-link" href="/marketplace">Marketplace</a>
+          <Link className="sidebar-link" href="/marketplace">Marketplace</Link>
           <UserButton />
         </div>
       </aside>
@@ -346,10 +383,11 @@ export default function Workspace() {
           {warning && <p className="workspace-warning" role="status">{warning}</p>}
           {loaded && screen.view === "missing" && <><PageHeader title="App not found" description="It may have been deleted." /><button className="button" onClick={() => navigate({ view: "apps" }, true)}>All apps</button></>}
 
-          {loaded && screen.view === "apps" && <>
+          {!loaded && !previewed && !warning && <p className="field-help" role="status">Loading your apps…</p>}
+          {(loaded || previewed) && screen.view === "apps" && <>
             <PageHeader title="Your apps" description="One website. Many tools for your assistant." action={<button className="button primary" onClick={() => navigate({ view: "create-app" })}><Icon name="plus" />Create app</button>} />
             <div className="section-heading"><h2>Websites <span>{apps.length}</span></h2><span>Choose a website to explore</span></div>
-            <div className="app-list">{apps.map((app) => <ScreenLink className="app-row" key={app.id} screen={{ view: "app", app }} onNavigate={navigate}>
+            <div className="app-list">{apps.map((app) => <ScreenLink className="app-row" key={app.id} screen={{ view: "app", app }} onNavigate={navigate} onPrefetch={() => prefetchApp(app)}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
               <span className="app-main"><span className="app-name">{app.name}</span><span className="website-address">{app.url}</span></span>
               <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tools yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "tool" : "tools"}`}</small></span><Icon name="arrow" />
@@ -363,18 +401,17 @@ export default function Workspace() {
           </>}
           {screen.view === "app" && <>
             <Breadcrumb trail={[{ label: "Apps", screen: { view: "apps" } }]} current={screen.app.name} onNavigate={navigate} />
-            <PageHeader title={screen.app.name} description={screen.app.url} action={<div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><ScreenLink className="button primary" screen={{ view: "explore", app: screen.app }} onNavigate={navigate}><Icon name="browser" />Explore website</ScreenLink></div>}><AppStatus app={screen.app} /></PageHeader>
+            <PageHeader title={screen.app.name} description={screen.app.url} action={loaded && <div className="page-actions"><DeleteAppButton key={screen.app.id} app={screen.app} busy={deleteBusy} error={deleteError} onDelete={() => deleteApp(screen.app)} onClose={() => setDeleteError("")} /><ScreenLink className="button primary" screen={{ view: "explore", app: screen.app }} onNavigate={navigate}><Icon name="browser" />Explore website</ScreenLink></div>}><AppStatus app={screen.app} /></PageHeader>
             <div className="app-layout">
               <section className="app-tools" aria-labelledby="app-tools-heading">
                 <div className="section-heading"><h2 id="app-tools-heading">What ChatGPT can do on {screen.app.name} <span>{screen.app.tasks.length} {screen.app.tasks.length === 1 ? "tool" : "tools"}</span></h2><span>Explore, find what the site can do, then choose</span></div>
                 <ToolList key={screen.app.id} app={screen.app} onDelete={async (toolId) => { const saved = await changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: toolId }); return saved.apps ? "" : saved.error || "MCParrot could not delete this tool. Try again."; }} />
               </section>
-              <aside className="setup-rail" aria-label="Setup">
+              {loaded && <aside className="setup-rail" aria-label="Setup">
                 <AssistantPanel key={screen.app.id} app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} onAutomaticSignIn={(automaticSignIn) => changeWorkspace({ operation: "setAutomaticSignIn", appId: screen.app.id, automaticSignIn })} onApps={showApps} />
                 <PublishPanel key={`publish-${screen.app.id}`} app={screen.app} onApps={showApps} />
-                <ImagePanel key={`image-${screen.app.id}`} app={screen.app} />
                 {isOwner && <OrderingPanel key={`ordering-${screen.app.id}`} app={screen.app} onSave={async (ordering) => (await changeWorkspace({ operation: "setOrdering", appId: screen.app.id, ordering })).apps} />}
-              </aside>
+              </aside>}
             </div>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>

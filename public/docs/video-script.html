@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The script, shot list, and recording plan for the MCParrot demo video for LA Hacks 2026.">
+  <title>Demo video script · MCParrot</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">MCParrot</a>
+      <p>A guide for Nathan</p>
+      <nav aria-label="Guide pages">
+        <p class="nav-label">The guide</p>
+        <ul>
+          <li><a href="index.html">The product</a></li>
+          <li><a href="status.html">What works today</a></li>
+          <li><a href="hackathon.html">LA Hacks 2026</a></li>
+          <li><a href="working-together.html">How we work together</a></li>
+          <li><a href="devpost.html">Devpost submission</a></li>
+          <li><a href="pitch.html">Pitch slideshow</a></li>
+          <li><a href="video-script.html" aria-current="page">Demo video script</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="On this page">
+        <p class="nav-label">On this page</p>
+        <ul>
+          <li><a href="#narration">Full Narration</a></li>
+          <li><a href="#rules">Video Rules From LA Hacks</a></li>
+          <li><a href="#format">Slides Cut With Clips</a></li>
+          <li><a href="#shot-list">Timed Shot List</a></li>
+          <li><a href="#clips">Clips to Record</a></li>
+          <li><a href="#storyboard">Storyboard Frames</a></li>
+          <li><a href="#honest">Keeping Every Claim Honest</a></li>
+          <li><a href="#tips">Recording and Editing Tips</a></li>
+          <li><a href="#timeline">Timeline for Today</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main id="content" class="wide">
+      <header>
+        <h1>Demo Video Script</h1>
+        <p class="lead">This page is the complete plan for the MCParrot demo video: what to say, what to show, which clips to record, and when to finish each step today.</p>
+        <span class="status">Target length 2:30 · YouTube link due on Devpost by 12:00pm PDT, Sunday, October 18</span>
+      </header>
+
+      <p>The video is Nathan clicking through the <a href="pitch.html">pitch slideshow</a> with a voiceover, cut with short screen recordings of him really using MCParrot and ChatGPT. The slides carry the story, and the recordings, called B-roll here, prove that each claim is real. Every voiceover line below is written to be read aloud word for word. Every clip says exactly what to do and what must be visible. The <a href="devpost.html">Devpost submission page</a> holds the written description that goes beside the video.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Section</th><th scope="col">What it covers</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><a href="#narration">Full Narration</a></th><td>The whole voiceover, in order, to read aloud</td></tr>
+            <tr><th scope="row"><a href="#rules">Video Rules From LA Hacks</a></th><td>Length, format, and deadline</td></tr>
+            <tr><th scope="row"><a href="#format">Slides Cut With Clips</a></th><td>How the slides and the clips fit together</td></tr>
+            <tr><th scope="row"><a href="#shot-list">Timed Shot List</a></th><td>Every moment with its time, picture, and exact words</td></tr>
+            <tr><th scope="row"><a href="#clips">Clips to Record</a></th><td>The seven B-roll clips, with steps and what must show</td></tr>
+            <tr><th scope="row"><a href="#storyboard">Storyboard Frames</a></th><td>Real screenshots to plan each clip, and fallbacks if a take fails</td></tr>
+            <tr><th scope="row"><a href="#honest">Keeping Every Claim Honest</a></th><td>What the video may say, and what to blur</td></tr>
+            <tr><th scope="row"><a href="#tips">Recording and Editing Tips</a></th><td>Screen size, waits, voice, and captions</td></tr>
+            <tr><th scope="row"><a href="#timeline">Timeline for Today</a></th><td>The order of work from now to the Devpost link</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section id="narration">
+        <h2>Full Narration</h2>
+        <p>Read this straight through as one voiceover, at a calm pace. It runs about two and a half minutes at a calm pace. Each bracket names what is on screen, and is not read aloud.</p>
+        <p><em>[Slide 1: the hook]</em><br>So many websites I use every day make me click through a slow interface just to do something simple. To check one deadline on Canvas, I sign in, wait for a two-factor code, find the course, open assignments, and wait for every page to load. Ordering on DoorDash and topping up my DeepSeek credits are just as slow.</p>
+        <p><em>[Slide 2: the rule]</em><br>So I built MCParrot around one rule: anything you can do by clicking through a website, you should be able to do by asking your agent.</p>
+        <p><em>[Slide 3: the insight]</em><br>In the age of AI, the front end matters less and less. Anyone can vibe-code an interface. What really drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly.</p>
+        <p><em>[Slide 4, then clip 1: exploring and finding tools]</em><br>It works in two phases. First, you browse the website in a monitored browser, and MCParrot records every API request the site makes. Then an LLM reads those requests and turns them into tools for the MCP server. After that, you create one link and connect it to the agent of your choice.</p>
+        <p><em>[Clip 2: the Browser Use sign-in window]</em><br>It even works on sites that need you to sign in. Browser Use keeps a cloud browser signed in as you, across sessions.</p>
+        <p><em>[Slide 5, then clip 3: Chess.com]</em><br>Here are a few MCP servers I made with it. For Chess.com, I asked for my last ten games and the rating of each opponent: seven wins, two losses, and one draw.</p>
+        <p><em>[Slide 6, then clip 4: Gradescope and Ed]</em><br>Here, my agent used two servers at once: Gradescope for my midterm score, and Ed for the class mean and standard deviation, which it read from a chart image. I'm point eight one standard deviations above the mean.</p>
+        <p><em>[Slide 7, then clip 5: Canvas signs back in]</em><br>In this one, Canvas had signed me out. A Browser Use agent signed back in, asked me for my two-factor code, and once I sent it, it finished and listed my assignments.</p>
+        <p><em>[Slide 8, then clip 6: DoorDash]</em><br>And here, it added a pizza to my DoorDash cart without placing the order. When I say yes, it checks out with Stripe Pay with Link, within my spending limit.</p>
+        <p><em>[Slide 9: the stack]</em><br>The stack: a Next.js app on Vercel, a Chrome extension that records API requests, an LLM that turns them into tools, an MCP server any agent can use, Redis for storage, and Browser Use to stay signed in.</p>
+        <p><em>[Slide 10: the close]</em><br>Next: tools that test themselves, adding websites just by asking, and running MCParrot from your agent. Try it at mcparrot dot vercel dot app.</p>
+      </section>
+
+      <section id="rules">
+        <h2>Video Rules From LA Hacks</h2>
+        <p>The <a href="hackathon.html#submit">submission rules in the LA Hacks guide</a> are the home for these facts. The video must run <strong>two to three minutes</strong> and must be a <strong>YouTube link</strong>, set to Public or Unlisted. Submissions close at <strong>12:00pm PDT on Sunday, October 18, 2026</strong>, with no late entries, and a fresh upload plays in low quality until YouTube finishes processing it. The organizers advise showing features instead of describing them, so every proof slide is followed by the real recording of that moment.</p>
+      </section>
+
+      <section id="format">
+        <h2>Slides Cut With Clips</h2>
+        <p>Record the screen while clicking through the ten main slides of the pitch slideshow, holding each slide for as long as its line in the shot list. Open the slideshow full screen at <a href="pitch.html">mcparrot.vercel.app/docs/pitch.html</a> and use the right arrow key to move on. The first four slides set up the problem and the idea, and they stay on screen with no clips except the setup clips after slide 4. Slides 5 to 8 each show a real ChatGPT screenshot; show each one for about three seconds, then cut to the matching clip of the live run. Slides 9 and 10 close the video. The product tour and appendix slides after slide 10 are not in the video.</p>
+      </section>
+
+      <section id="shot-list">
+        <h2>Timed Shot List</h2>
+        <p>The cut runs about 2 minutes 30 seconds, with about 340 words of voiceover at a calm 140 words a minute. "Cut to" means the picture changes to that clip while the voice keeps going. A "speed ramp" speeds up a slow part of a recording and then returns to normal speed; always add a small "sped up" label while it plays.</p>
+        <div class="table-wrap">
+          <table class="shot-list">
+            <caption>Main cut, about 2:30</caption>
+            <thead>
+              <tr><th scope="col">Time</th><th scope="col">On screen</th><th scope="col">Voiceover, word for word</th><th scope="col">Cut points and overlays</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">0:00–0:14</th>
+                <td>Slide 1, the hook: Canvas, DoorDash, and DeepSeek click trails.</td>
+                <td>"So many websites I use every day make me click through a slow interface just to do something simple. To check one deadline on Canvas, I sign in, wait for a two-factor code, find the course, open assignments, and wait for every page to load. Ordering on DoorDash and topping up my DeepSeek credits are just as slow."</td>
+                <td>Zoom on each row as it is named. Optional: open on two seconds of clip 7, the face cam intro.</td>
+              </tr>
+              <tr>
+                <th scope="row">0:14–0:23</th>
+                <td>Slide 2: "Anything you can click, you can ask."</td>
+                <td>"So I built MCParrot around one rule: anything you can do by clicking through a website, you should be able to do by asking your agent."</td>
+                <td>No overlay; let the big heading speak.</td>
+              </tr>
+              <tr>
+                <th scope="row">0:23–0:34</th>
+                <td>Slide 3: "The interface is cheap. The data is what matters."</td>
+                <td>"In the age of AI, the front end matters less and less. Anyone can vibe-code an interface. What really drives an app is the data behind it. MCParrot turns any website into an MCP server, so your agent can reach that data directly."</td>
+                <td>Zoom on the assignment data box.</td>
+              </tr>
+              <tr>
+                <th scope="row">0:34–0:38</th>
+                <td>Slide 4: "Browse once. Ask forever."</td>
+                <td>"It works in two phases."</td>
+                <td>Cut to clip 1 on the last word.</td>
+              </tr>
+              <tr>
+                <th scope="row">0:38–0:52</th>
+                <td>Clip 1: the Explore page, <strong>Find what this site can do</strong>, and the tools list.</td>
+                <td>"First, you browse the website in a monitored browser, and MCParrot records every API request the site makes. Then an LLM reads those requests and turns them into tools for the MCP server. After that, you create one link and connect it to the agent of your choice."</td>
+                <td>Speed-ramp the wait while tools are found. Lower third: "An LLM finds the tools".</td>
+              </tr>
+              <tr>
+                <th scope="row">0:52–1:02</th>
+                <td>Clip 2: the Browser Use sign-in window with the live view.</td>
+                <td>"It even works on sites that need you to sign in. Browser Use keeps a cloud browser signed in as you, across sessions."</td>
+                <td>Lower third: "Browser Use cloud browser · live view". Blur the username and password.</td>
+              </tr>
+              <tr>
+                <th scope="row">1:02–1:16</th>
+                <td>Slide 5 (Chess.com) for 3 seconds, then cut to clip 3.</td>
+                <td>"Here are a few MCP servers I made with it. For Chess.com, I asked for my last ten games and the rating of each opponent: seven wins, two losses, and one draw."</td>
+                <td>Cut to clip 3 after "made with it". Callouts on the record and the average rating. Read the real numbers from the new take if they changed.</td>
+              </tr>
+              <tr>
+                <th scope="row">1:16–1:38</th>
+                <td>Slide 6 (Gradescope and Ed) for 3 seconds, then cut to clip 4.</td>
+                <td>"Here, my agent used two servers at once: Gradescope for my midterm score, and Ed for the class mean and standard deviation, which it read from a chart image. I'm point eight one standard deviations above the mean."</td>
+                <td>Cut to clip 4 after "two servers at once". Show the expanded "Worked for" list while "read from a chart image" plays, with a callout on <code>view_image</code>. Callouts: "Gradescope → 74/101", "Ed chart → mean 52.14", "z = 0.81".</td>
+              </tr>
+              <tr>
+                <th scope="row">1:38–1:57</th>
+                <td>Slide 7 (Canvas sign-in) for 3 seconds, then cut to clip 5, or hold the slide if clip 5 has no take.</td>
+                <td>"In this one, Canvas had signed me out. A Browser Use agent signed back in, asked me for my two-factor code, and once I sent it, it finished and listed my assignments."</td>
+                <td>Cut to clip 5 after "signs back in". Without clip 5, zoom slowly across the slide's screenshot instead. Blur the code.</td>
+              </tr>
+              <tr>
+                <th scope="row">1:57–2:14</th>
+                <td>Slide 8 (DoorDash) for 3 seconds, then cut to clip 6.</td>
+                <td>"And here, it added a pizza to my DoorDash cart without placing the order. When I say yes, it checks out with Stripe Pay with Link, within my spending limit."</td>
+                <td>Cut to clip 6 after "DoorDash cart". Callouts on the $19.00 total and on "No order placed or payment made". Blur the delivery address.</td>
+              </tr>
+              <tr>
+                <th scope="row">2:14–2:21</th>
+                <td>Slide 9: "Not a browser bot. A full stack from clicks to API."</td>
+                <td>"The stack: a Next.js app on Vercel, a Chrome extension that records API requests, an LLM that turns them into tools, an MCP server any agent can use, Redis for storage, and Browser Use to stay signed in."</td>
+                <td>Hold slide 9 for about 12 seconds.</td>
+              </tr>
+              <tr>
+                <th scope="row">2:21–2:32</th>
+                <td>Slide 10, the close, held for 2 seconds after the last word.</td>
+                <td>"Next: tools that test themselves, adding websites just by asking, and running MCParrot from your agent. Try it at mcparrot dot vercel dot app."</td>
+                <td>Optional: end on clip 7, the face cam outro, instead of holding the slide.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>If the cut runs past 2:50, shorten clip 1 to its last five seconds and drop the Chess.com clip, keeping only slide 5 for three seconds. If it runs under 2:05, hold each proof clip a little longer on its final answer.</p>
+      </section>
+
+      <section id="clips">
+        <h2>Clips to Record</h2>
+        <p>Record each clip as its own file, starting two seconds before the first action and stopping two seconds after the result. Start every ChatGPT clip in a fresh chat with only the needed connectors on, and close the chat history sidebar. Keep at least one full good take of clips 3, 4, and 6 before moving on.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Clip</th><th scope="col">Steps</th><th scope="col">Must be visible</th></tr></thead>
+            <tbody>
+              <tr>
+                <th scope="row">1. Explore and find tools</th>
+                <td>Open the Chess app page in MCParrot. Select <strong>Explore</strong> and browse Chess.com for a few seconds while the extension counts requests. Return to the app page and select <strong>Find what this site can do</strong>. Wait for the suggested tools, tick two, and save. Scroll the tools list.</td>
+                <td>The recorded request count, the <strong>Find what this site can do</strong> button, the suggested tools checklist, and the saved tools list.</td>
+              </tr>
+              <tr>
+                <th scope="row">2. Browser Use sign-in</th>
+                <td>On an app page, select <strong>Sign in to website</strong>. In the window that opens, sign in to the website in the live view. Select <strong>Done signing in</strong>.</td>
+                <td>The live view of the cloud browser at full size and the website loading inside it. Blur the username and password in the edit.</td>
+              </tr>
+              <tr>
+                <th scope="row">3. Chess.com question</th>
+                <td>In ChatGPT with only the Chess.com connector on, ask: "use chess.com mcp to get the win rate of my last 10 games and the ratings of my opponents". Wait for the answer and scroll to the table.</td>
+                <td>The typed question, the wins, losses, and draws, the opponents table, and the average opponent rating.</td>
+              </tr>
+              <tr>
+                <th scope="row">4. Gradescope and Ed midterm</th>
+                <td>In ChatGPT with the Gradescope and Ed connectors on, ask: "use gradescope mcp to get my eecs 126 midterm score and ed mcp to find the class statistics, then tell me my z-score". Start this one first, because it takes about two minutes. When the answer appears, expand <strong>Worked for</strong> and scroll the tool calls.</td>
+                <td>The score of 74/101, the mean, the standard deviation, the z-score, and in the expanded <strong>Worked for</strong> list, the MCParrot tool calls, including <code>view_image</code>.</td>
+              </tr>
+              <tr>
+                <th scope="row">5. Canvas with a phone code</th>
+                <td>Only if Canvas has signed out by itself: in ChatGPT with the Canvas connector on, ask "use canvas mcp to check which assignments are due for engin125". If ChatGPT asks for a code, type the texted code within two minutes. Do not sign Canvas out on purpose; if no code request comes, use slide 7's screenshot instead.</td>
+                <td>ChatGPT asking for the code, the reply with the code, and the assignment table. Blur the code.</td>
+              </tr>
+              <tr>
+                <th scope="row">6. DoorDash cart</th>
+                <td>Empty the DoorDash cart first. In ChatGPT with only the DoorDash connector on, ask: "use doordash mcp to order a pepperoni pizza from mountain mike's. just add it to cart for now. dont order it yet". Start this run early, because it takes about four minutes. Stop recording at the answer, and do not ask about cards. Empty the cart afterwards.</td>
+                <td>The typed question, the cart items, the total, and "No order placed or payment made". Blur the delivery address.</td>
+              </tr>
+              <tr>
+                <th scope="row">7. Face cam, optional</th>
+                <td>Record one take saying "Hi, I'm Nathan, and this is MCParrot" and one saying "Thanks for watching." Look at the camera, with a window in front of you for light.</td>
+                <td>Face and shoulders, a plain background, and no other people or screens with private data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="storyboard">
+        <h2>Storyboard Frames</h2>
+        <p>These screenshots are real results from Nathan's own MCParrot apps, and the same images appear on the pitch slides. Use them to plan zooms and callouts, and to check that a new take shows the same parts. If a clip has no good take by the end of recording, hold or zoom across its slide instead; the slide already shows the real result, so the claim stays true. The first three frames match clips 1, 2, and the image part of clip 4.</p>
+        <figure>
+          <img src="images/pitch-tour-explore.jpg" alt="The Explore Chess page: 150 data requests recorded while browsing, a note that cookies, sign-in pages, and secret values are not recorded, and a Find what this site can do button." width="1400" height="660" loading="lazy">
+          <figcaption>Clip 1: the Explore page with the recorded request count and the <strong>Find what this site can do</strong> button.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-tour-sign-in.jpg" alt="A Browser Use live preview window showing the Ed dashboard, signed in, with current and archived courses." width="2048" height="1250" loading="lazy">
+          <figcaption>Clip 2: the Browser Use live view inside the sign-in window.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-tour-view-image-chart.jpg" alt="The View image box on the Edstem app page: an image address, a View image button, and a preview of the Review Grades for Midterm 1 histogram with minimum 0.0, median 52.5, maximum 101.0, mean 52.14, and standard deviation 27.1." width="692" height="856" loading="lazy">
+          <figcaption>Clip 4: the Ed chart that Claude reads; the class statistics in the answer come from this image.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-chess-winrate.jpg" alt="ChatGPT answer: 7 wins, 2 losses, 1 draw over the last 10 Chess.com games, a 70% win rate, all 1+1 bullet, with a table of 10 opponents and an average opponent rating of 1,079." width="1830" height="1940" loading="lazy">
+          <figcaption>Clip 3: the Chess.com answer with the record and the average opponent rating.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-midterm-multi-mcp.jpg" alt="ChatGPT answer that reports a Gradescope midterm score of 74 out of 101, the Ed class mean of 52.14, a standard deviation of 27.1, a median of 52.5, and a z-score of about 0.81." width="2048" height="1529" loading="lazy">
+          <figcaption>Clip 4: Gradescope gives the score, and the Ed chart gives the class statistics.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-canvas-verification.jpg" alt="ChatGPT says Canvas sent a verification code to the user's phone and asks for it, the user replies with a blurred code, and ChatGPT then lists the ENGIN 125 assignments with due dates and statuses." width="1940" height="1884" loading="lazy">
+          <figcaption>Clip 5, or its fallback: ChatGPT asks for the phone code, then lists the ENGIN 125 assignments.</figcaption>
+        </figure>
+        <figure>
+          <img src="images/pitch-doordash-add-to-cart.jpg" alt="ChatGPT reports that it added one mini pepperoni pizza from Mountain Mike's to the DoorDash cart, with the pizza at $12.64, fees of $4.36, a $2.00 tip, a $19.00 total, a hidden delivery address, and no order placed or payment made, and then lists the saved cards on the account." width="2008" height="1884" loading="lazy">
+          <figcaption>Clip 6: the cart answer; the video uses only the part above the saved cards.</figcaption>
+        </figure>
+      </section>
+
+      <section id="honest">
+        <h2>Keeping Every Claim Honest</h2>
+        <p>Judges penalize polish that hides parts that do not work, so the video shows only real runs and says nothing the <a href="status.html">status guide</a> does not support. DeepSeek appears only on the hook slide as an example of a slow website; never say or show that MCParrot works with DeepSeek. Ordering is a <span class="badge badge--gap">gap</span>: a Browser Use agent has filled a real DoorDash cart, but payment with Pay with Link runs only in test mode, so it has never paid for a real order. The DoorDash line says this plainly, and the video must never imply that MCParrot placed or paid for an order. In clip 4, check that the expanded <strong>Worked for</strong> list shows <code>view_image</code>; if it does not, say "the class stats from an Ed post" and drop the sentence about Claude reading the chart.</p>
+        <p>Blur every private value before export: passwords, the connection link, verification codes, the DoorDash delivery address, saved cards, email addresses, and other students' names. Never show the Browser Use, Clerk, or Sentry dashboards. Every sped-up wait carries a "sped up" label, so no viewer thinks the answers are instant.</p>
+      </section>
+
+      <section id="tips">
+        <h2>Recording and Editing Tips</h2>
+        <ul>
+          <li>Record at 1920 × 1080, with the browser zoom at 125 percent so text stays readable on a phone.</li>
+          <li>Hide the bookmarks bar and desktop icons, and turn on Do Not Disturb so no notification appears.</li>
+          <li>Start the long ChatGPT runs first, clip 4 and clip 6, in separate tabs, and record the other clips while they work.</li>
+          <li>Keep the cursor still during waits, then speed-ramp them in the edit with a "sped up" label.</li>
+          <li>Record the voice separately with a headset or USB microphone in a quiet room, reading each line twice and keeping the better take.</li>
+          <li>Burn in captions, because many judges watch with the sound off.</li>
+          <li>Export as MP4 at 1080p, and watch it once on a phone before uploading.</li>
+        </ul>
+      </section>
+
+      <section id="timeline">
+        <h2>Timeline for Today</h2>
+        <p>Nathan records and edits the video, and the work is complete when the YouTube link plays in high quality from the Devpost page. The upload must start by 11:00am, because YouTube needs time to process it. If a clip fails twice, use its slide fallback and move on. Follow these steps in order.</p>
+        <ol>
+          <li>By 9:15am, start clip 4 and clip 6 in separate ChatGPT tabs, recording each.</li>
+          <li>By 9:45am, record clips 1, 2, and 3, and clip 5 only if Canvas asks for a code.</li>
+          <li>By 10:00am, record the slideshow click-through and the optional face cam clips.</li>
+          <li>By 10:30am, record the voiceover from the shot list.</li>
+          <li>By 10:55am, edit the cut: slides, clips, speed ramps, blurs, callouts, and captions; then export.</li>
+          <li>By 11:00am, upload to YouTube as Public or Unlisted with the title "MCParrot: Your Personal Web Agent, Built on Browser Use".</li>
+          <li>When YouTube offers 1080p, paste the link into Devpost, well before 12:00pm PDT.</li>
+          <li>Open the Devpost page in a private browser window and check that the video plays.</li>
+        </ol>
+      </section>
+
+      <footer>
+        <p><a href="devpost.html">← Back to the Devpost submission</a></p>
+        <p>Demo video script · Updated October 18, 2026</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

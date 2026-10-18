@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabilities";
+import { cachedJson, discoveryUrl, forgetCachedJson } from "./json-cache";
 
 type Exploration = { recording: boolean; requests: CapturedRequest[]; activeAppId?: string | null; saveError?: string };
 type Choice = DiscoveredCapability & { selected: boolean };
@@ -121,17 +122,17 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
     const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId, requests: newestThatFit(state.requests) }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "Discovery failed. Try again.");
+    forgetCachedJson(discoveryUrl(appId));
     showDiscovery(result);
   });
 
   async function showLastDiscovery() {
     const started = generation.current;
-    const response = await fetch(`/api/discover?appId=${encodeURIComponent(appId)}`).catch(() => null);
-    const result = await response?.json().catch(() => ({})) ?? {};
+    const reply = await cachedJson(discoveryUrl(appId)).catch(() => null);
     if (working.current || generation.current !== started) return;
     try {
-      if (!response?.ok) throw new Error(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
-      if (result.discovery) showDiscovery(result.discovery);
+      if (!reply?.ok) throw new Error(isText(reply?.body.error) ? reply.body.error : "MCParrot could not load the last search. Reload the page to try again.");
+      if (isObject(reply.body.discovery)) showDiscovery(reply.body.discovery);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "MCParrot could not load the last search. Reload the page to try again.");
     }
