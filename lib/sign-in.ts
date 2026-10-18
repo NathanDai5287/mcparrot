@@ -57,6 +57,7 @@ const loginHash = (app: Website, login: Login) =>
   createHmac("sha256", Buffer.from(process.env.MCPARROT_CREDENTIAL_KEY!, "base64")).update(JSON.stringify([login.username, login.password, app.loginSavedAt ?? ""])).digest("base64");
 
 const errorReason = (error: unknown) => error instanceof BrowserUseError ? `BrowserUseError ${error.statusCode}` : (error as Error)?.name ?? "unknown";
+const isGone = (error: unknown) => error instanceof BrowserUseError && error.statusCode === 404;
 const ignoreErrors = async (work: () => Promise<unknown>) => { try { await work(); } catch {} };
 
 const secret = (alias: string, value: string, allowedDomains: string[]): SecretBinding => ({ alias, source: { type: "inline", value }, allowedDomains });
@@ -86,6 +87,14 @@ function runSignInAgent(spanName: string, body: RunCreateBody, waitMilliseconds:
     span.setAttribute("sign_in.outcome", outcome);
     return { sessionId: run?.sessionId, outcome, timedOut };
   });
+}
+
+async function stopSavingProfile(browserId: string) {
+  try {
+    await stopBrowser(browserId);
+  } catch (error) {
+    if (!isGone(error)) throw error;
+  }
 }
 
 async function sessionBrowser(sessionId: string) {
@@ -126,7 +135,7 @@ async function signIn(app: Website & { browserProfileId: string }, login: Login,
   const browserId = browser?.id;
   if (outcome === "signed_in") {
     if (lookupFailed) throw new Error(signInFailedMessage);
-    if (browserId) await stopBrowser(browserId);
+    if (browserId) await stopSavingProfile(browserId);
     await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
     return;
   }
@@ -145,7 +154,7 @@ async function waitingForCode(appId: string) {
   try {
     if ((await browserUse().browsers.get(pending.browserId)).status === "active") return true;
   } catch (error) {
-    if (!(error instanceof BrowserUseError && error.statusCode === 404)) return true;
+    if (!isGone(error)) return true;
   }
   await Redis.fromEnv().del(pendingKey(appId));
   return false;
@@ -218,7 +227,7 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
   }
   let stopped = true;
   try {
-    await stopBrowser(pending.browserId);
+    await stopSavingProfile(pending.browserId);
   } catch (error) {
     stopped = false;
     Sentry.logger.warn("Sign-in browser stop failed", { appId: app.id, reason: errorReason(error) });
