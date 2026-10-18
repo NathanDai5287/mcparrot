@@ -6,9 +6,9 @@ import type { Page } from "playwright-core";
 import { z } from "zod";
 import { browserUse, errorReason, ignoreErrors, isGone, sessionBrowser, stopBrowser, stopWarmBrowser, withPage } from "./browser-use";
 import { automaticSignInOf, type Website } from "./capabilities";
-import { pendingSignInKey, readLogin, rejectedLoginKey, signInCooldownKey, type Login } from "./login";
+import { pendingSignInKey, readLogin, rejectedLoginKey, signInCooldownKey, unreadableLoginMessage, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
-import { changeApp, updateStoredApp } from "./workspace";
+import { appOwner, changeApp, updateStoredApp } from "./workspace";
 
 const pendingSignInSeconds = 900;
 const agentWaitMilliseconds = 150_000;
@@ -29,11 +29,12 @@ const noPendingSignInMessage = "No sign-in is waiting for a code. Run the origin
 const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original tool again.";
 const signInTimedOutMessage = "Signing in to the website took too long. Wait a few minutes, then try again, or open MCParrot and select Sign in to website on this app.";
 const browserUseUnreachableMessage = "Browser Use could not be reached, so MCParrot could not sign in. Try again in a few minutes.";
-const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, signInInProgressMessage, signInTimedOutMessage, browserUseUnreachableMessage]);
+const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, noPendingSignInMessage, signInInProgressMessage, signInTimedOutMessage, browserUseUnreachableMessage, unreadableLoginMessage]);
+export const isSignInMessage = (error: unknown) => error instanceof Error && userMessages.has(error.message);
 
 const passwordOutcomes = ["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"] as const;
 const googleOutcomes = ["signed_in", "needs_user", "failed"] as const;
-type PendingSignIn = { sessionId: string; browserId: string; cdpUrl: string };
+const PendingSignIn = z.object({ sessionId: z.string(), browserId: z.string(), cdpUrl: z.string() });
 type SigningInApp = Website & { browserProfileId: string };
 
 const trustDeviceStep = `If the website asks whether to trust this browser or device, choose no, for example "No, other people use this device".`;
@@ -65,7 +66,7 @@ Never type anything on a Google page. If Google asks for an email, a password, a
 ${finishSteps(website)}`;
 
 const pendingKey = pendingSignInKey;
-const readPendingSignIn = (appId: string) => Redis.fromEnv().get<PendingSignIn>(pendingKey(appId));
+const readPendingSignIn = async (appId: string) => PendingSignIn.safeParse(await Redis.fromEnv().get(pendingKey(appId))).data;
 export const signInLockKey = (appId: string) => `sign-in-lock:${appId}`;
 const lockKey = signInLockKey;
 const rejectedKey = rejectedLoginKey;
@@ -161,7 +162,10 @@ async function signIn(app: SigningInApp, login: Login, hash: string, waitMillise
   const { browser, lookupFailed } = await agentBrowser(app.id, sessionId);
   if (outcome === "code_sent" && browser) {
     await Redis.fromEnv().set(pendingKey(app.id), { sessionId, browserId: browser.id, cdpUrl: browser.cdpUrl }, { ex: pendingSignInSeconds });
-    return codeSentMessage;
+    if (await appOwner(app.id)) return codeSentMessage;
+    await ignoreErrors(() => stopBrowser(browser.id));
+    await Redis.fromEnv().del(pendingKey(app.id));
+    throw new Error(signInFailedMessage);
   }
   const browserId = browser?.id;
   if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed, hash);
@@ -265,17 +269,17 @@ async function signInAgain(app: Website, deadline: number) {
   return signInOnce(app, login, deadline);
 }
 
-export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>): Promise<T | string> {
+export async function readSigningIn<T>(app: Website, read: (app: Website, deadline: number) => Promise<T>, reserveMilliseconds = rereadMilliseconds): Promise<T | string> {
   const deadline = Date.now() + callBudgetMilliseconds;
   if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
   try {
-    return await read(app);
+    return await read(app, deadline);
   } catch (error) {
     if ((error as Error).message !== signedOutMessage) throw error;
   }
   const signedIn = await signInAgain(app, deadline);
   if (typeof signedIn === "string") return signedIn;
-  return deadline - Date.now() < rereadMilliseconds ? signInFinishedMessage : read(signedIn);
+  return deadline - Date.now() < reserveMilliseconds ? signInFinishedMessage : read(signedIn, deadline);
 }
 
 export const submitVerificationCode = (app: Website, code: string) => withSignInLock(app.id, async () => {

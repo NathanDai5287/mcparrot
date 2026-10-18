@@ -1,9 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
+import { Redis } from "@upstash/redis";
 import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
-import { browserUse, isGone, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
+import { browserUse, ignoreErrors, isGone, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
 import { appIdSchema } from "../../../lib/capabilities";
-import { stopPendingSignIn } from "../../../lib/login";
+import { pendingSignInKey, stopPendingSignIn } from "../../../lib/login";
 import { ensureProfile, signInLockKey, withLock } from "../../../lib/sign-in";
 import { ownedApp, StorageUnavailable, updateStoredApp } from "../../../lib/workspace";
 
@@ -41,6 +42,15 @@ async function openSignInBrowser(userId: string, appId: string) {
     await stopPendingSignIn(appId);
     await stopWarmBrowser(appId);
     browser = await startBrowser(profileId, signInMinutes);
+    await Redis.fromEnv().set(pendingSignInKey(appId), { browserId: browser.id }, { ex: signInMinutes * 60 }).catch(async (error) => {
+      await ignoreErrors(() => stopBrowser(browser.id));
+      throw error;
+    });
+    if (!await ownedApp(userId, appId)) {
+      await ignoreErrors(() => stopBrowser(browser.id));
+      await Redis.fromEnv().del(pendingSignInKey(appId));
+      return Response.json({ error: "App not found." }, { status: 404 });
+    }
     try {
       await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded", timeout: openPageTimeout }), openPageTimeout);
     } catch (error) {
@@ -79,6 +89,10 @@ export async function DELETE(request: Request) {
     await stopWarmBrowser(appId);
     await stopBrowser(browserId).catch(async (error) => {
       if (!isGone(error) && (await browserUse().browsers.get(browserId)).status !== "stopped") throw error;
+    });
+    await ignoreErrors(async () => {
+      const pending = await Redis.fromEnv().get<{ browserId?: string }>(pendingSignInKey(appId));
+      if (pending?.browserId === browserId) await Redis.fromEnv().del(pendingSignInKey(appId));
     });
     if (finished) await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
   } catch (error) {
