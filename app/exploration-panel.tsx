@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CapturedRequest, DiscoveredCapability, Task } from "../lib/capabilities";
+import { cachedJson, discoveryUrl, forgetCachedJson } from "./json-cache";
 
 type Exploration = { recording: boolean; requests: CapturedRequest[] };
 type Choice = DiscoveredCapability & { selected: boolean };
@@ -108,14 +109,14 @@ export function ExplorationPanel({ appId, websiteUrl, tasks, active, onSave }: {
     const response = await fetch("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId, requests: newestThatFit(state.requests) }) });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "Discovery failed. Try again.");
+    forgetCachedJson(discoveryUrl(appId));
     showDiscovery(result);
   });
 
   async function showLastDiscovery() {
-    const response = await fetch(`/api/discover?appId=${encodeURIComponent(appId)}`).catch(() => null);
-    const result = await response?.json().catch(() => ({})) ?? {};
-    if (!response?.ok) setError(result.error ?? "MCParrot could not load the last search. Reload the page to try again.");
-    else if (result.discovery) showDiscovery(result.discovery);
+    const reply = await cachedJson(discoveryUrl(appId)).catch(() => null);
+    if (!reply?.ok) setError(isText(reply?.body.error) ? reply.body.error : "MCParrot could not load the last search. Reload the page to try again.");
+    else if (isObject(reply.body.discovery)) showDiscovery(reply.body.discovery);
   }
 
   const clearRequests = () => run("exploration", async () => {
