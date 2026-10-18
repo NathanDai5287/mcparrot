@@ -1,11 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
-import { startBrowser, stopBrowser, withPage } from "./browser-use";
+import { timed, withWarmPage, type RunSteps } from "./browser-use";
 import { compactAnswer } from "./compact-answer";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
 import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
 
-const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
 const networkQuietTimeout = 5_000;
@@ -178,7 +177,7 @@ async function unfollowedRedirect(page: Page, website: string, method: string, u
   return new TaskError("fetch_failed", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
 }
 
-async function readRequest(page: Page, website: string, request: FilledRequest) {
+async function readRequest(page: Page, website: string, request: FilledRequest, steps: RunSteps, step: string) {
   const { method, url } = request;
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
@@ -189,20 +188,21 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body)}` };
-  const { status, text } = await readPageText(page, website, url);
+  const { status, text } = await timed(steps, `${step}PageReadMs`, () => readPageText(page, website, url));
   if (status >= 400) throw httpError(method, url, status);
   return { body: text, summary: `${method} ${url} returned ${status}\n${compactAnswer(text)}` };
 }
 
-async function readRequests(page: Page, website: string, requests: RequestFiller[]) {
-  await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+async function readRequests(page: Page, website: string, requests: RequestFiller[], steps: RunSteps) {
+  await timed(steps, "websiteOpenMs", () => Sentry.startSpan({ name: "page.open_website" }, () => page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout })));
   requireOnWebsite(page, website);
   const responses: string[] = [];
   const results = [];
-  for (const fill of requests) {
+  for (const [index, fill] of requests.entries()) {
     const request = fill(responses);
     if (new URL(page.url()).origin !== website) await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
-    const { body, summary } = await readRequest(page, website, request);
+    const step = `request${index + 1}`;
+    const { body, summary } = await timed(steps, `${step}Ms`, () => readRequest(page, website, request, steps, step));
     responses.push(body);
     results.push(summary);
   }
@@ -237,17 +237,12 @@ function readImage(page: Page, website: string, url: string) {
   });
 }
 
-async function inSignedInBrowser(app: Website, read: (page: Page) => Promise<string>) {
+async function inSignedInBrowser(app: Website, steps: RunSteps, read: (page: Page) => Promise<string>) {
   if (!app.browserProfileId) throw signedOut();
-  const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
-  try {
-    return await withPage(browser.cdpUrl!, read);
-  } finally {
-    await stopBrowser(browser.id).catch((error: Error) => Sentry.logger.warn("Browser stop failed", { appId: app.id, reason: sanitized(error.message) }));
-  }
+  return withWarmPage(app.id, app.browserProfileId, steps, read);
 }
 
-const runRequests = (app: Website, requests: RequestFiller[]) => inSignedInBrowser(app, (page) => readRequests(page, new URL(app.url).origin, requests));
+const runRequests = (app: Website, requests: RequestFiller[], steps: RunSteps) => inSignedInBrowser(app, steps, (page) => readRequests(page, new URL(app.url).origin, requests, steps));
 
 function failureReason(error: Error): Reason {
   if (error instanceof TaskError) return error.reason;
@@ -258,23 +253,26 @@ function failureReason(error: Error): Reason {
   return "failed";
 }
 
-async function logOutcome(name: string, attributes: Record<string, string | number>, read: () => Promise<string>) {
-  try {
-    const result = await read();
-    Sentry.logger.info(`${name} finished`, { ...attributes, resultSize: result.length });
-    return result;
-  } catch (error) {
-    const reason = failureReason(error as Error);
-    Sentry.logger.warn(`${name} failed`, { ...attributes, signedOut: reason === "signed_out", reason });
-    if (error instanceof TaskError) throw error;
-    throw new TaskError(reason, sanitized((error as Error).message));
-  }
+function logOutcome(name: string, attributes: Record<string, string | number>, read: (steps: RunSteps) => Promise<string>) {
+  return Sentry.startSpan({ name: "task.run", attributes: { "task.kind": name } }, async () => {
+    const steps: RunSteps = {};
+    try {
+      const result = await timed(steps, "totalMs", () => read(steps));
+      Sentry.logger.info(`${name} finished`, { ...attributes, ...steps, resultSize: result.length });
+      return result;
+    } catch (error) {
+      const reason = failureReason(error as Error);
+      Sentry.logger.warn(`${name} failed`, { ...attributes, ...steps, signedOut: reason === "signed_out", reason });
+      if (error instanceof TaskError) throw error;
+      throw new TaskError(reason, sanitized((error as Error).message));
+    }
+  });
 }
 
 export function runTask(app: Website, task: Task, inputs: TaskInputs) {
-  return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, () => {
+  return logOutcome("Task", { appId: app.id, task: task.name, requestCount: task.requests.length }, (steps) => {
     const values: TaskInputs = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
-    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)));
+    return runRequests(app, task.requests.map((request) => (responses) => filledRequest(app, request, values, responses)), steps);
   });
 }
 
@@ -287,10 +285,10 @@ export function addressOnWebsite(app: Website, url: string) {
 
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Page read", { appId: app.id }, () => runRequests(app, [() => ({ method: "GET", url: address.href })]));
+  return logOutcome("Page read", { appId: app.id }, (steps) => runRequests(app, [() => ({ method: "GET", url: address.href })], steps));
 }
 
 export function readImageDataUrl(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
-  return logOutcome("Image read", { appId: app.id }, () => inSignedInBrowser(app, (page) => readImage(page, new URL(app.url).origin, address.href)));
+  return logOutcome("Image read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => readImage(page, new URL(app.url).origin, address.href)));
 }

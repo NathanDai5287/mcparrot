@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { signedInUserId } from "../../../lib/account";
-import { browserUse, startBrowser, stopBrowser, withPage } from "../../../lib/browser-use";
+import { browserUse, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
 import { changeApp, ownedApp, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       const apps = await changeApp(appId, (storedApp) => storedApp.browserProfileId ? storedApp : { ...storedApp, browserProfileId: createdProfileId });
       profileId = apps.find((storedApp) => storedApp.id === appId)?.browserProfileId ?? profileId;
     }
+    await stopWarmBrowser(appId);
     browser = await startBrowser(profileId, signInMinutes);
     try {
       await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded" }));
@@ -50,6 +51,7 @@ export async function DELETE(request: Request) {
   const browser = profileId && await browserUse().browsers.get(browserId).catch(() => undefined);
   if (!browser || browser.metadata.profileId !== profileId) return Response.json({ error: "Sign-in browser not found." }, { status: 404 });
   try {
+    await stopWarmBrowser(appId);
     await stopBrowser(browserId).catch(async (error) => {
       if ((await browserUse().browsers.get(browserId)).status !== "stopped") throw error;
     });
