@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { maxOrderLimitUsd, type Ordering, type Website } from "../lib/capabilities";
 import type { Cart, OrderView } from "../lib/order";
 import { SetupCard } from "./setup-card";
+import { cachedJson, forgetCachedJson, orderUrl } from "./json-cache";
 
 type LinkView = { connected: boolean; mode: "test" | "live" | null } | null;
 type OrderAction = { action: "prepare"; request: string } | { action: "place" | "cancel"; orderId: string };
@@ -95,15 +96,20 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const refresh = useCallback(async () => {
-    const response = await fetch(`/api/order?appId=${encodeURIComponent(app.id)}`).catch(() => null);
-    if (!response?.ok) return;
-    const result: { link: LinkView; order: OrderView | null } = await response.json();
+  const show = useCallback(async () => {
+    const reply = await cachedJson(orderUrl(app.id)).catch(() => null);
+    if (!reply?.ok) return;
+    const result = reply.body as { link: LinkView; order: OrderView | null };
     setLink(result.link);
     setOrder(result.order);
   }, [app.id]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const refresh = useCallback(() => {
+    forgetCachedJson(orderUrl(app.id));
+    return show();
+  }, [app.id, show]);
+
+  useEffect(() => { show(); }, [show]);
 
   const waiting = order?.status === "preparing" || order?.status === "placing";
   useEffect(() => {
@@ -118,6 +124,7 @@ export function OrderingPanel({ app, onSave }: { app: Website; onSave: (ordering
     const response = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: app.id, ...action }) }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
     setBusy(false);
+    forgetCachedJson(orderUrl(app.id));
     if (response?.ok) return setOrder(result.order);
     setError(result.error ?? "MCParrot could not reach Browser Use. Try again.");
     await refresh();
