@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
 import { startBrowser, stopBrowser, withPage } from "./browser-use";
 import type { Task, TaskRequest, Website } from "./capabilities";
-import { bodyPlaceholderPattern, isAllowedRequest, paymentRefusal, replayedHeaders, urlPlaceholderPattern } from "./task-request";
+import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, urlPlaceholderPattern } from "./task-request";
 
 const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
@@ -73,7 +73,7 @@ function shortened(text: string) {
 
 function requireOnWebsite(page: Page, website: string) {
   if (looksSignedOut(page.url())) throw signedOut();
-  if (new URL(page.url()).origin !== website) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
+  if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
 }
 
 function fetchInPage(page: Page, request: FilledRequest) {
@@ -127,7 +127,7 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
   if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
-  if (response.redirected && new URL(response.url).origin !== website) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
+  if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return `${method} ${url} returned ${response.status}\n${shortened(response.body)}`;
@@ -189,7 +189,7 @@ export function runTask(app: Website, task: Task, inputs: TaskInputs) {
 export function addressOnWebsite(app: Website, url: string) {
   const website = new URL(app.url).origin;
   const address = new URL(url, website);
-  if (address.origin !== website) throw new TaskError("off_site", `MCParrot only uses pages on ${website}. Give an address on that website or a path such as /courses.`);
+  if (!isOnWebsite(address, website)) throw new TaskError("off_site", `MCParrot only uses pages on ${website}. Give an address on that website or a path such as /courses.`);
   return address;
 }
 

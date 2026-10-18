@@ -124,14 +124,14 @@ When the app's **Ordering** switch is on, the connection also lists `prepare_ord
 
 Each connection also has a read-only `read_page` tool, titled "Read a page on <app name>", whose one input `url` is a full address or a path on the app's website.
 It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a tool does, as [using saved tools](#using-saved-tools) describes, with the same length limit, signed-out check, and automatic sign-in.
-It rejects any address on another origin with an error that names the allowed website, before it starts a browser.
+It rejects any address that is not on the app's website or one of its subdomains with an error that names the allowed website, before it starts a browser.
 Nathan chose this tool so that ChatGPT can answer from pages that no saved tool covers, such as a syllabus link he pastes.
 He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tools he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
 
 Each connection also has a `save_task` tool, titled "Save a tool for <app name>", so the connection grows while Nathan uses ChatGPT.
 Its description tells ChatGPT to call it after `read_page` returns useful content for a kind of request the user may repeat, replacing values that change with `{placeholders}`, and that MCParrot refuses checkout and payment requests.
 Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` that defaults to `GET`, `urlPattern`, an optional `bodyPattern` and `contentType` for POST, `inputs` as a list of name, description, and example, and `returns`, which become one request in the same tool shape as a chosen tool.
-It rejects a URL pattern on another origin, a body on a GET request, a request that the checkout and payment guard refuses, placeholders in the URL pattern and body that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request, ignoring placeholder names, matches an existing tool.
+It rejects a URL pattern that is not on the app's website or one of its subdomains, a body on a GET request, a request that the checkout and payment guard refuses, placeholders in the URL pattern and body that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
 Nathan chose that ChatGPT saves tools without asking him first, and he accepted that unwanted tools can appear until he deletes them on the app page.
 
@@ -240,8 +240,8 @@ The instruction tells Claude to copy each body exactly, with the whole GraphQL q
 After Claude replies, the server copies the recorded `requestHeaders` of the recorded request with the same method and path into each POST request as `headers`; Claude never sees them.
 It asks Claude to skip anything a saved tool already does and to suggest a change to a saved tool only when it clearly improves that tool, with the tool's ID as `updatesTaskId`.
 It marks the recorded data, including the saved tools, as untrusted website content that Claude must never follow as instructions.
-The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's own origin and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
-It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's own origin, have no body on a GET, pass the checkout and payment guard, and whose placeholders in URL patterns and bodies match their inputs one to one.
+The route accepts at most 2 MB and 150 requests, cuts each request body to 30,000 characters and each request content type to 200, sends a request body to Claude only for requests on the app's website or its subdomains and only until the bodies reach 300,000 characters in total, and before it builds the prompt it redacts URL credentials, fragments, secret-looking query values, values under secret-looking keys in samples and request bodies, JWTs, long random-looking strings, and values after labels such as `password:` again.
+It keeps at most 50 replied capabilities, and only those whose requests all use GET or POST on the app's website or its subdomains, have no body on a GET, pass the checkout and payment guard, and whose placeholders in URL patterns and bodies match their inputs one to one.
 It treats a capability whose `updatesTaskId` is not a saved tool of that app as new, and it drops new capabilities whose tool name or URL pattern matches a saved tool, and updates that equal their tool.
 After a successful run, it saves the result and its time under `discovery:<app-id>`, and `GET /api/discover?appId=<app-id>` returns that result with the same filtering against the current tools.
 When nothing is new or better, the result is an empty list, unless the app has no saved tools, which stays an error.
@@ -296,7 +296,10 @@ A POST request never follows a redirect, so its body cannot reach another origin
 Inputs that ChatGPT leaves out use the example value that discovery found.
 When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.
-Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's origin returns an error instead of its text.
+Each request and page load has a 30-second limit, a status of 400 or more other than 401 and 403 returns an error with the address and status, and a redirect or page that leaves the app's website and its subdomains returns an error instead of its text.
+An address counts as on the app's website when it uses the same protocol and port and its host is the website's host or a subdomain of it, such as `us.edstem.org` for `https://edstem.org`.
+A request to a subdomain runs from the website's page as a cross-origin `fetch` with cookies included, so it works only when that subdomain allows it.
+Tools do not send headers that carry sign-in tokens, so a website whose data requests need such a header, such as Ed's `x-token`, returns 401 and the tool reports the website as signed out; this is a [known gap](STATUS.md).
 Nathan chose the 100,000-character limit so that long lists, such as all of a user's Canvas courses, arrive whole.
 The whole call must finish within the route's 300-second Vercel function limit.
 

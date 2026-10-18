@@ -7,7 +7,7 @@ import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
 import { appIdSchema, maximumBodyLength, type Capability, type Discovery, type Task, type TaskRequest, type Website } from "../../../lib/capabilities";
 import { unsavedCapabilities } from "../../../lib/save-task";
-import { isAllowedRequest, requestPlaceholders } from "../../../lib/task-request";
+import { isAllowedRequest, isOnWebsite, requestPlaceholders } from "../../../lib/task-request";
 import { discoveryKey, ownedApp, storage, StorageUnavailable } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
@@ -116,19 +116,17 @@ function redactUrl(href: string) {
   }
 }
 
-const originOf = (href: string) => URL.canParse(href) ? new URL(href).origin : "";
-
-function sameOriginBodies(requests: CapturedRequest[], origin: string) {
+function websiteBodies(requests: CapturedRequest[], origin: string) {
   let budget = maximumPromptBodyCharacters;
   return requests.map(({ body, url, ...request }) => {
-    const kept = body !== undefined && body.length <= budget && originOf(url) === origin;
+    const kept = body !== undefined && body.length <= budget && URL.canParse(url) && isOnWebsite(url, origin);
     if (kept) budget -= body.length;
     return { ...request, url, ...(kept ? { body } : {}) };
   });
 }
 
 function scrubbed(requests: CapturedRequest[], origin: string) {
-  return sameOriginBodies(requests, origin).map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
+  return websiteBodies(requests, origin).map(({ kind, method, url, pattern, status, contentType, sample, body, requestContentType }) => ({ ...(kind ? { kind } : {}), method, url: redactUrl(url), pattern: withoutTokens(pattern), status, contentType, sample: redactSample(sample), ...(body ? { body: redactSample(body) } : {}), ...(requestContentType ? { requestContentType } : {}) }));
 }
 
 function scrubbedTasks(tasks: Task[]) {
@@ -138,13 +136,13 @@ function scrubbedTasks(tasks: Task[]) {
 function discoveryPrompt(app: Website, requests: CapturedRequest[]) {
   const data = JSON.stringify({ websiteUrl: redactUrl(app.url), savedTasks: scrubbedTasks(app.tasks), requests: scrubbed(requests, new URL(app.url).origin) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(app.url).origin} while we recorded the pages they opened and the data requests those pages made.
-Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}". Only requests on the website itself keep their request body.
+Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; requests other than GET can also have their request body and its content type. Secret-looking values are replaced with "${redacted}". Only requests on the website itself or its subdomains keep their request body.
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
 List the distinct, useful things an assistant could do for this person with these requests, such as listing, searching, or reading information.
 Suggest page-reading tasks for pages whose text is useful, such as "Read course syllabus" with a {courseId} input, especially when no data request returns the same information.
 Ignore analytics, tracking, advertising, configuration, feature flags, and authentication requests, such as third-party pixels.
 Tasks can use GET and POST requests. Many websites read data through POST GraphQL requests with JSON bodies; prefer GraphQL queries for reading. Other POST requests and GraphQL mutations are allowed, but never suggest a request for checkout, payment, purchase, or placing or creating an order; MCParrot rejects those.
-For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method GET or POST and URL pattern on the same website, with {placeholders} for values that change; for POST, also bodyPattern, the request body as a string with {placeholders} inside JSON string values, and contentType, the request body's content type), the inputs a person could change (name, description, and an example taken from the requests; one input for each placeholder in the URL patterns and bodies), and what it returns.
+For each capability, give a short plain-language task name such as "List assignments", a plain-language description, the requests it uses (method GET or POST and full URL pattern on the same website or one of its subdomains, with {placeholders} for values that change; for POST, also bodyPattern, the request body as a string with {placeholders} inside JSON string values, and contentType, the request body's content type), the inputs a person could change (name, description, and an example taken from the requests; one input for each placeholder in the URL patterns and bodies), and what it returns.
 Copy each bodyPattern exactly from a recorded request body, including the whole GraphQL query text, and only replace values that change with {placeholders}. Never shorten, rewrite, or invent query text, and never suggest a POST request whose body is not in the recorded data.
 The savedTasks inside the recorded data are the tasks the person already saved, each with its id.
 Do not suggest a capability that a saved task already does, even under another name.
@@ -186,7 +184,7 @@ function isUsable(capability: Capability, origin: string) {
   return capability.requests.every((request) => {
     if (!isAllowedRequest(request)) return false;
     try {
-      return new URL(request.urlPattern.replace(/\{[^}]+\}/g, "x"), origin).origin === origin;
+      return isOnWebsite(new URL(request.urlPattern.replace(/\{[^}]+\}/g, "x"), origin), origin);
     } catch {
       return false;
     }
