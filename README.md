@@ -327,8 +327,10 @@ Discovery, `save_task`, the connection's tool list, and every tool run apply the
 The guard exists so that a tool cannot place a real order with a card saved on a website, and ordering stays only in the [Pay with Link flow](#ordering-with-pay-with-link).
 The guard matches words, so an order request under other names, such as `finalizeCart`, can still pass it, and a harmless request whose address or body contains one of the words, such as a query for a payment history, is refused.
 `read_page` only opens pages with GET, so the guard does not apply to it.
-A POST tool sends its saved `headers`, filtered again to the same short list of header names, and when the page has a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`, it sends that cookie's value as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many GraphQL websites refuse a request without that header.
-The value never leaves the website's page.
+A POST tool sends its saved `headers`, filtered again to the same short list of header names, and it adds a fresh anti-forgery (CSRF) token as `x-csrftoken`, `x-csrf-token`, and `x-xsrf-token`, because many websites refuse a request without that header.
+Before the requests, the run opens the website's home page in the signed-in browser and reads the token from the first of `meta[name=csrf-token]`, `meta[name=csrf_token]`, `meta[name=_csrf]`, `input[name=csrfmiddlewaretoken]`, and `input[name=authenticity_token]`, or else from a readable cookie named `csrf_token`, `csrftoken`, `XSRF-TOKEN`, `_csrf`, or `csrf-token`.
+When the page has `meta[name=_csrf_header]`, the run also sends the token under the header name in that tag.
+The value never leaves the website's page, and MCParrot never logs it.
 
 ## Reconnecting expired sessions
 

@@ -8,6 +8,7 @@ const taskBrowserMinutes = 3;
 const maximumResponseCharacters = 100_000;
 const requestTimeout = 30_000;
 const csrfCookieNames = ["csrf_token", "csrftoken", "xsrf-token", "_csrf", "csrf-token"];
+const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
 export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
 
@@ -78,16 +79,19 @@ function requireOnWebsite(page: Page, website: string) {
 
 function fetchInPage(page: Page, request: FilledRequest) {
   return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": request.method } }, async (span) => {
-    const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType, headers: savedHeaders, tokenHeaders = [] }, csrfCookieNames, limit, timeout }) => {
+    const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType, headers: savedHeaders, tokenHeaders = [] }, csrfCookieNames, csrfPageSelectors, limit, timeout }) => {
       try {
-        const csrfCookie = method === "GET" ? undefined : document.cookie.split("; ").find((cookie) => csrfCookieNames.includes(cookie.split("=")[0].toLowerCase()));
-        const csrfToken = csrfCookie && decodeURIComponent(csrfCookie.slice(csrfCookie.indexOf("=") + 1));
+        const pageValue = (selector: string) => document.querySelector(selector)?.getAttribute(selector.startsWith("meta") ? "content" : "value") || undefined;
+        const csrfCookie = document.cookie.split("; ").find((cookie) => csrfCookieNames.includes(cookie.split("=")[0].toLowerCase()));
+        const csrfToken = method === "GET" ? undefined : csrfPageSelectors.map(pageValue).find(Boolean) ?? (csrfCookie && decodeURIComponent(csrfCookie.slice(csrfCookie.indexOf("=") + 1)));
+        const csrfHeaderName = pageValue("meta[name=_csrf_header]")?.toLowerCase();
+        const csrfHeaders = csrfToken ? { "x-csrftoken": csrfToken, "x-csrf-token": csrfToken, "x-xsrf-token": csrfToken, ...(csrfHeaderName ? { [csrfHeaderName]: csrfToken } : {}) } : {};
         const tokens = Object.fromEntries(tokenHeaders.flatMap(({ header, fromLocalStorage }) => {
           const value = localStorage.getItem(fromLocalStorage);
           return value ? [[header, value]] : [];
         }));
         const credentials = Object.keys(tokens).length && new URL(address).origin !== location.origin ? "omit" : "include";
-        const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...(csrfToken ? { "x-csrftoken": csrfToken, "x-csrf-token": csrfToken, "x-xsrf-token": csrfToken } : {}) };
+        const headers = { ...savedHeaders, ...tokens, ...(requestContentType ? { "content-type": requestContentType } : {}), ...csrfHeaders };
         const reply = await fetch(address, { method, body: requestBody, headers, redirect: method === "GET" ? "follow" : "manual", credentials, signal: AbortSignal.timeout(timeout) });
         if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, contentType: "", body: "" };
         const contentType = reply.headers.get("content-type") ?? "";
@@ -98,7 +102,7 @@ function fetchInPage(page: Page, request: FilledRequest) {
       } catch (error) {
         return { failed: (error as Error).name === "TimeoutError" ? "timeout" : "fetch_failed", status: 0, url: address, redirected: false, contentType: "", body: "" };
       }
-    }, { request, csrfCookieNames, limit: maximumResponseCharacters, timeout: requestTimeout });
+    }, { request, csrfCookieNames, csrfPageSelectors, limit: maximumResponseCharacters, timeout: requestTimeout });
     span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
     return response;
   });
