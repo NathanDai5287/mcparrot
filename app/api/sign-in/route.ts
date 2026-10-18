@@ -1,34 +1,39 @@
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
 import { signedInUserId } from "../../../lib/account";
-import { browserUse, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
-import { changeApp, ownedApp, updateStoredApp } from "../../../lib/workspace";
+import { browserUse, isGone, startBrowser, stopBrowser, stopWarmBrowser, withPage } from "../../../lib/browser-use";
+import { appIdSchema } from "../../../lib/capabilities";
+import { stopPendingSignIn } from "../../../lib/login";
+import { ensureProfile } from "../../../lib/sign-in";
+import { ownedApp, StorageUnavailable, updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const signInMinutes = 15;
+const openPageTimeout = 10_000;
+
+const SignInBody = z.object({ appId: appIdSchema });
+const StopQuery = z.object({ appId: appIdSchema, browserId: z.string().min(1) });
 
 export async function POST(request: Request) {
   const userId = await signedInUserId();
   if (!process.env.BROWSER_USE_API_KEY) return Response.json({ error: "Sign-in is not set up. Add BROWSER_USE_API_KEY to the server environment." }, { status: 500 });
-  const { appId } = await request.json().catch(() => ({})) as { appId?: string };
-  if (!appId) return Response.json({ error: "Missing appId." }, { status: 400 });
+  const body = SignInBody.safeParse(await request.json().catch(() => null));
+  if (!body.success) return Response.json({ error: "Missing appId." }, { status: 400 });
+  const { appId } = body.data;
   let browser: Awaited<ReturnType<typeof startBrowser>>;
   let profileId: string;
   try {
     const app = await ownedApp(userId, appId);
     if (!app) return Response.json({ error: "App not found." }, { status: 404 });
     Sentry.logger.info("Sign-in started", { app: app.name, newProfile: !app.browserProfileId });
-    profileId = app.browserProfileId ?? (await browserUse().profiles.create({ name: `MCParrot ${app.name}` })).id;
-    if (!app.browserProfileId) {
-      const createdProfileId = profileId;
-      const apps = await changeApp(appId, (storedApp) => storedApp.browserProfileId ? storedApp : { ...storedApp, browserProfileId: createdProfileId });
-      profileId = apps.find((storedApp) => storedApp.id === appId)?.browserProfileId ?? profileId;
-    }
+    profileId = await ensureProfile(app);
+    await stopPendingSignIn(appId);
     await stopWarmBrowser(appId);
     browser = await startBrowser(profileId, signInMinutes);
     try {
-      await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded" }));
+      await withPage(browser.cdpUrl!, (page) => page.goto(app.url, { waitUntil: "domcontentloaded", timeout: openPageTimeout }), openPageTimeout);
     } catch (error) {
       Sentry.logger.warn("Sign-in browser could not open the website", { app: app.name });
       Sentry.captureException(error);
@@ -43,17 +48,28 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const userId = await signedInUserId();
   const { searchParams } = new URL(request.url);
-  const browserId = searchParams.get("browserId");
-  const appId = searchParams.get("appId");
+  const query = StopQuery.safeParse({ browserId: searchParams.get("browserId"), appId: searchParams.get("appId") });
   const finished = searchParams.get("finished") !== "false";
-  if (!browserId || !appId) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
-  const profileId = (await ownedApp(userId, appId))?.browserProfileId;
-  const browser = profileId && await browserUse().browsers.get(browserId).catch(() => undefined);
+  if (!query.success) return Response.json({ error: "Missing browserId or appId." }, { status: 400 });
+  const { browserId, appId } = query.data;
+  let browser;
+  let profileId;
+  try {
+    profileId = (await ownedApp(userId, appId))?.browserProfileId;
+    browser = profileId && await browserUse().browsers.get(browserId).catch((error) => {
+      if (isGone(error)) return undefined;
+      throw error;
+    });
+  } catch (error) {
+    Sentry.captureException(error);
+    if (error instanceof StorageUnavailable) return Response.json({ error: error.message }, { status: 503 });
+    return Response.json({ error: finished ? "Browser Use could not be reached. Select Done signing in again." : "Browser Use could not be reached. Select Cancel again." }, { status: 502 });
+  }
   if (!browser || browser.metadata.profileId !== profileId) return Response.json({ error: "Sign-in browser not found." }, { status: 404 });
   try {
     await stopWarmBrowser(appId);
     await stopBrowser(browserId).catch(async (error) => {
-      if ((await browserUse().browsers.get(browserId)).status !== "stopped") throw error;
+      if (!isGone(error) && (await browserUse().browsers.get(browserId)).status !== "stopped") throw error;
     });
     if (finished) await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
   } catch (error) {

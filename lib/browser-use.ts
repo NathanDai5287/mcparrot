@@ -13,6 +13,7 @@ export const browserUse = () => new BrowserUse();
 
 export const errorReason = (error: unknown) => error instanceof BrowserUseError ? `BrowserUseError ${error.statusCode}` : (error as Error)?.name ?? "unknown";
 export const ignoreErrors = async (work: () => Promise<unknown>) => { try { await work(); } catch {} };
+export const isGone = (error: unknown) => error instanceof BrowserUseError && error.statusCode === 404;
 
 export const startBrowser = (profileId: string, timeoutMinutes: number) =>
   Sentry.startSpan({ name: "browser_use.start", attributes: { "browser_use.timeout_minutes": timeoutMinutes } }, () =>
@@ -28,8 +29,8 @@ export async function sessionBrowser(sessionId: string) {
 
 const connectBrowser = (cdpUrl: string, timeout?: number) => Sentry.startSpan({ name: "browser_use.cdp_connect" }, () => chromium.connectOverCDP(cdpUrl, { timeout }));
 
-export async function withPage<T>(cdpUrl: string, work: (page: Page) => Promise<T>) {
-  const browser = await connectBrowser(cdpUrl);
+export async function withPage<T>(cdpUrl: string, work: (page: Page) => Promise<T>, connectTimeout?: number) {
+  const browser = await connectBrowser(cdpUrl, connectTimeout);
   try {
     const context = browser.contexts()[0];
     return await work(context.pages()[0] ?? await context.newPage());
