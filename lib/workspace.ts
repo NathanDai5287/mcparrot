@@ -7,6 +7,7 @@ const legacyWorkspaceKey = "workspace";
 const workspaceKey = (userId: string) => `workspace:${userId}`;
 const appOwnerKey = (appId: string) => `app-owner:${appId}`;
 const changeAttempts = 20;
+const maxWorkspaceCharacters = 4_000_000;
 const retryPause = () => new Promise((resolve) => setTimeout(resolve, 20 + Math.random() * 80));
 
 const compareAndSet = `local current = redis.call("GET", KEYS[1]) or ""
@@ -107,9 +108,20 @@ export async function ownedApp(userId: string, appId: string) {
 
 type KeyChanges = { deleteKeys?: string[]; newAppIds?: string[]; keepMalformed?: (app: unknown) => boolean };
 
+async function legacyAppIds() {
+  const raw = await readStoredWorkspace(legacyWorkspaceKey);
+  try {
+    const apps: unknown = raw === null ? [] : JSON.parse(raw);
+    return Array.isArray(apps) ? apps.map((app) => (app as { id?: unknown } | null)?.id) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function changeApps(userId: string, change: (apps: Website[]) => Website[], { deleteKeys = [], newAppIds = [], keepMalformed = () => true }: KeyChanges = {}) {
   const key = workspaceKey(userId);
   const claimKeys = newAppIds.map(appOwnerKey);
+  if (newAppIds.length && (await legacyAppIds()).some((id) => newAppIds.includes(id as string))) throw new WorkspaceLimit("An app with this id already exists.");
   for (let attempt = 0; attempt < changeAttempts; attempt++) {
     if (attempt) await retryPause();
     const raw = await readStoredWorkspace(key);
@@ -119,6 +131,7 @@ export async function changeApps(userId: string, change: (apps: Website[]) => We
     checkLimits(valid, apps);
     const unchanged = raw === null && !apps.length;
     const next = unchanged ? "" : JSON.stringify([...apps, ...current.filter((app) => !isWellFormed(app) && keepMalformed(app))]);
+    if (next.length > maxWorkspaceCharacters && next.length > (raw?.length ?? 0)) throw new WorkspaceLimit("Your workspace is too large to save more. Delete some tools or apps first.");
     const result = await stored((redis) => redis.eval(compareAndSet, [key, ...claimKeys, ...deleteKeys], [raw ?? "", next, String(claimKeys.length), userId]));
     if (result === -1) throw new WorkspaceLimit("An app with this id already exists.");
     if (result === 1) return wellFormed(apps);
