@@ -113,7 +113,7 @@ function DeleteAppButton({ app, busy, error, onDelete, onClose }: { app: Website
 
 function Breadcrumb({ trail, current, onNavigate }: { trail: { label: string; screen: Screen }[]; current: string; onNavigate: (screen: Screen) => void }) {
   return <nav className="breadcrumb" aria-label="Breadcrumb"><ol>
-    {trail.map(({ label, screen }) => <li key={screenPath(screen)}><a href={screenPath(screen)} onClick={(event) => { event.preventDefault(); onNavigate(screen); }}>{label}</a></li>)}
+    {trail.map(({ label, screen }) => <li key={screenPath(screen)}><a href={screenPath(screen)} onClick={(event) => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onNavigate(screen); }}>{label}</a></li>)}
     <li aria-current="page">{current}</li>
   </ol></nav>;
 }
