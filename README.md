@@ -288,7 +288,7 @@ When ChatGPT calls a tool, the server starts a Browser Use cloud browser with th
 It opens the origin of the app's website address, such as `https://bcourses.berkeley.edu`, fills each `{placeholder}` in the tool's URL patterns and body patterns from the tool inputs, and runs each request with `fetch` inside the page with its method, its body, and the website's own cookies.
 URL values are URL-encoded, and body values are escaped as JSON string content, or URL-encoded when the content type is `application/x-www-form-urlencoded`, so a quote or `&` in an input cannot change the body's structure.
 A request with a body sends its recorded content type, or `application/json` when none was recorded.
-A POST request never follows a redirect, so its body cannot reach another origin; a redirected POST returns an error.
+A POST request never follows a redirect, so its body cannot reach another origin; after a redirected POST, the browser opens the website's origin again and treats the website as signed out when that lands on a sign-in page, and otherwise returns an error.
 Inputs that ChatGPT leaves out use the example value that discovery found.
 When a GET response's content type is HTML, the browser opens that address as a page, waits for it to load, and uses the page's visible text instead of the raw HTML; other responses, such as JSON or any POST response, stay as they are.
 The tool returns each request's address, status, and response text, shortened to 100,000 characters, and the server then stops the browser.

@@ -44,7 +44,7 @@ function fillPattern(pattern: string, placeholder: RegExp, values: TaskInputs, e
 
 function filledRequest(app: Website, request: TaskRequest, values: TaskInputs): FilledRequest {
   const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, encodeURIComponent)).href;
-  const bodyEncoding = request.contentType?.includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
+  const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
   const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, bodyEncoding);
   if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json" };
@@ -79,7 +79,8 @@ function fetchInPage(page: Page, request: FilledRequest) {
   return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": request.method } }, async (span) => {
     const response = await page.evaluate(async ({ request: { method, url: address, body: requestBody, contentType: requestContentType }, limit, timeout }) => {
       try {
-        const reply = await fetch(address, { method, body: requestBody, headers: requestContentType ? { "content-type": requestContentType } : undefined, redirect: method === "GET" ? "follow" : "error", credentials: "include", signal: AbortSignal.timeout(timeout) });
+        const reply = await fetch(address, { method, body: requestBody, headers: requestContentType ? { "content-type": requestContentType } : undefined, redirect: method === "GET" ? "follow" : "manual", credentials: "include", signal: AbortSignal.timeout(timeout) });
+        if (reply.type === "opaqueredirect") return { failed: "redirected", status: 0, url: address, redirected: false, contentType: "", body: "" };
         const contentType = reply.headers.get("content-type") ?? "";
         const html = method === "GET" && contentType.includes("html") && reply.status < 400;
         if (html) await reply.body?.cancel();
@@ -110,14 +111,21 @@ function httpError(method: string, url: string, status: number) {
   return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`);
 }
 
+async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
+  await page.goto(website, { waitUntil: "domcontentloaded", timeout: requestTimeout });
+  if (looksSignedOut(page.url())) return signedOut();
+  return new TaskError("off_site", `${method} ${withoutQuery(url)} redirected, so MCParrot did not follow it.`);
+}
+
 async function readRequest(page: Page, website: string, request: FilledRequest) {
   const { method, url } = request;
   const response = await fetchInPage(page, request);
+  if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
   if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw signedOut();
   if (response.redirected && new URL(response.url).origin !== website) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
-  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent, or the website redirected it.`);
+  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return `${method} ${url} returned ${response.status}\n${shortened(response.body)}`;
   const { status, text } = await readPageText(page, website, url);
   if (status >= 400) throw httpError(method, url, status);
