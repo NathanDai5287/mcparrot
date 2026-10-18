@@ -16,6 +16,7 @@ const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", 
 const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|session|verifier|signature/i;
 const jwtLike = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
+const labelledSecret = /\b(password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code)(\s*[:=]\s*)(\S+)/gi;
 
 const capturedRequestSchema = z.object({
   kind: z.literal("page").optional(),
@@ -40,6 +41,7 @@ const capabilitySchema = z.object({
   returns: z.string().max(1000),
 });
 const replySchema = z.object({ capabilities: z.array(z.unknown()) });
+const maximumCandidates = 200;
 const maximumCapabilities = 50;
 
 class DiscoveryError extends Error {
@@ -65,8 +67,12 @@ function withoutTokens(text: string) {
   return text.replace(jwtLike, redacted).replace(tokenLike, (match) => looksRandom(match) ? redacted : match);
 }
 
+function withoutLabelledSecrets(text: string) {
+  return text.replace(labelledSecret, `$1$2${redacted}`);
+}
+
 function redactValue(value: unknown): unknown {
-  if (typeof value === "string") return withoutTokens(value);
+  if (typeof value === "string") return withoutTokens(withoutLabelledSecrets(value));
   if (Array.isArray(value)) return value.map(redactValue);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, item !== null && isSecretKey(key) ? redacted : redactValue(item)]));
   return value;
@@ -77,7 +83,7 @@ function redactSample(sample: string) {
     return JSON.stringify(redactValue(JSON.parse(sample)));
   } catch {
     const withoutSecretFields = sample.replace(/("([^"\\]{1,100})"\s*:\s*)("(?:[^"\\]|\\.)*"?|[^\s,}\]]+)/g, (field, prefix: string, key: string) => isSecretKey(key) ? `${prefix}"${redacted}"` : field);
-    return withoutTokens(withoutSecretFields);
+    return withoutTokens(withoutLabelledSecrets(withoutSecretFields));
   }
 }
 
@@ -99,7 +105,7 @@ function scrubbed(requests: CapturedRequest[]) {
 }
 
 function discoveryPrompt(websiteUrl: string, requests: CapturedRequest[]) {
-  const data = JSON.stringify({ websiteUrl, requests: scrubbed(requests) }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ websiteUrl: redactUrl(websiteUrl), requests: scrubbed(requests) }).replace(/</g, "\\u003c");
   return `A person browsed ${new URL(websiteUrl).origin} while we recorded the pages they opened and the data requests those pages made.
 Each request inside the recorded data has its method, URL, URL pattern, status, response content type, and a short, truncated sample of the response; secret-looking values are replaced with "${redacted}".
 Requests with "kind":"page" are whole pages the person opened, and their sample is the start of the page's visible text; a task that uses a page request returns that page's full text.
@@ -164,10 +170,10 @@ function capabilitiesFrom(reply: string, websiteUrl: string) {
   const result = replySchema.safeParse(parsed);
   if (!result.success) throw new DiscoveryError("invalid_reply", 502, "Composer did not reply with capabilities. Try again.");
   const origin = new URL(websiteUrl).origin;
-  const capabilities = result.data.capabilities.slice(0, maximumCapabilities).flatMap((item) => {
+  const capabilities = result.data.capabilities.slice(0, maximumCandidates).flatMap((item) => {
     const capability = capabilitySchema.safeParse(item);
     return capability.success && isUsable(capability.data, origin) ? [{ ...capability.data, requests: capability.data.requests.map((request) => ({ ...request, method: "GET" })) }] : [];
-  });
+  }).slice(0, maximumCapabilities);
   if (!capabilities.length) throw new DiscoveryError("no_capabilities", 502, `Composer found no reading tasks on ${origin}. Explore more pages, then try again.`);
   return capabilities;
 }
@@ -188,20 +194,20 @@ async function createAgent(apiKey: string, cwd: string, storeDir: string) {
 }
 
 async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
-  const cwd = await mkdtemp(join(tmpdir(), "discover-"));
-  const storeDir = await mkdtemp(join(tmpdir(), "discover-store-"));
+  const dirs: string[] = [];
   let agent: SDKAgent | undefined;
   let run: Run | undefined;
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let cleanup: Promise<void> | undefined;
-  const cleanUp = () => cleanup ??= (async () => {
-    await agent?.[Symbol.asyncDispose]().catch(() => {});
-    await Promise.all([rm(cwd, { recursive: true, force: true }), rm(storeDir, { recursive: true, force: true })]);
-  })();
+  const timeout = () => new DiscoveryError("timeout", 504, "Composer took too long. Try again, or explore fewer pages.");
+  const removeDirs = () => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))).then(() => {}, () => {});
+  const dispose = async () => { await agent?.[Symbol.asyncDispose]().catch(() => {}); };
   const work = (async () => {
-    agent = await createAgent(apiKey, cwd, storeDir);
-    if (timedOut) throw new DiscoveryError("timeout", 504, "Composer took too long.");
+    dirs.push(await mkdtemp(join(tmpdir(), "discover-")));
+    dirs.push(await mkdtemp(join(tmpdir(), "discover-store-")));
+    if (timedOut) throw timeout();
+    agent = await createAgent(apiKey, dirs[0], dirs[1]);
+    if (timedOut) throw timeout();
     run = await agent.send(prompt);
     if (timedOut) await run.cancel();
     return run.wait();
@@ -209,7 +215,7 @@ async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       timedOut = true;
-      reject(new DiscoveryError("timeout", 504, "Composer took too long. Try again, or explore fewer pages."));
+      reject(timeout());
     }, composerDeadlineMs);
   });
   try {
@@ -218,8 +224,12 @@ async function runComposer(prompt: string, apiKey: string): Promise<RunResult> {
     clearTimeout(timer);
     if (timedOut) {
       await run?.cancel().catch(() => {});
-      void work.catch(() => {}).finally(cleanUp);
-    } else await cleanUp();
+      await removeDirs();
+      void work.catch(() => {}).finally(async () => { await dispose(); await removeDirs(); });
+    } else {
+      await dispose();
+      await removeDirs();
+    }
   }
 }
 
@@ -278,7 +288,11 @@ export async function POST(request: Request) {
       Sentry.logger.warn("Discovery failed", { reason: error.reason });
       return Response.json({ error: error.message }, { status: error.status });
     }
-    if (!(error instanceof CursorAgentError)) throw error;
+    if (!(error instanceof CursorAgentError)) {
+      Sentry.logger.warn("Discovery failed", { reason: "unexpected" });
+      Sentry.captureException(error);
+      return Response.json({ error: "Discovery failed. Try again." }, { status: 500 });
+    }
     Sentry.logger.warn("Discovery failed", { reason: "composer_error" });
     Sentry.captureException(error);
     return Response.json({ error: `Composer could not read the requests (${error.message}). Try again.` }, { status: 502 });
