@@ -10,7 +10,8 @@ Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authenti
 Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in Upstash Redis.
 Each app page offers **Sign in to website** through a Browser Use cloud browser and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks.
 The MCP route passed a direct Node check, but Browser Use sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
-Task testing, the management connection, automatic sign-in recovery, and Sentry remain aspirational.
+Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring are wired in, but they need events from Nathan's use of the deployed app.
+Task testing, the management connection, and automatic sign-in recovery remain aspirational.
 
 ## Status word meanings
 
@@ -51,7 +52,13 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it; today the tool returns a signed-out error instead |
 | Saved credentials | aspirational | Optional per-website username/password entry, replacement, and deletion require durable encrypted storage, a separate managed key, and product owner authorization |
 | Long task status | aspirational | Store operation status for tasks that take longer than one 60-second request |
-| Sentry monitoring | aspirational | Add error monitoring, Tracing, and Logs across the complete path |
+| Sentry connection and source maps | shipped | `@sentry/nextjs` starts in the browser and on the server; on October 17, 2026, the production build uploaded source maps, and a direct Node event sent with the project's DSN reached `nathan-s4/mcparrot`, where the Sentry API returned it |
+| Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
+| Sentry Tracing | gap | Spans cover Composer discovery, Browser Use start and stop, the CDP connection, and each task request; traces from the deployed app need Nathan's use |
+| Sentry Logs | gap | Discovery, sign-in, and task outcomes go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
+| Sentry Session Replay | gap | Every dashboard session is recorded with text and inputs masked; replays need Nathan's use |
+| Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
+| Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
 | Second website support | aspirational | Teach and run a task on a second website with the same product flow |
 
 A syntax check does not prove that a live browser task works, so it never counts as evidence that a browser capability is shipped.
@@ -70,6 +77,11 @@ On October 17, 2026, a direct Node check saved a test app with one GET task and 
 The route answered initialize with the server name, listed only the GET task as a read-only tool with its input, returned the signed-out tool error because the app had no sign-in, and returned 404 for an unknown app.
 That check does not prove the production store, Browser Use sign-in, task execution, or a live ChatGPT connector.
 
+On October 17, 2026, the production build uploaded source maps to the Sentry project `nathan-s4/mcparrot`.
+A direct Node script then sent one test error and one test log with the project's DSN, and the Sentry API returned the test error by its event ID.
+The available auth token cannot read organization data, so the API could not confirm the log.
+That check proves the project receives events, not that the deployed app sends them.
+
 ## Known gaps
 
 These gaps exist inside shipped work and stay open until a change closes them:
@@ -81,6 +93,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Anyone with an app's connection link can use the whole site until the bypass secret is regenerated.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
+- Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
 
 ## Aspirational work order
 
@@ -95,7 +108,7 @@ For how the demo must present Browser Use and Sentry to judges, see [hackathon j
 | --- | --- | --- |
 | 1. Prove discovery and API execution | Explore a reading page, find capabilities, choose one task, and sign in through Browser Use | Run the saved request in the signed-in Browser Use browser and check the result |
 | 2. Prove MCP use | Add the app's connection link to ChatGPT | Request the task from ChatGPT with changed inputs |
-| 3. Add Sentry | Add error monitoring, Tracing, and Logs across the complete path | Diagnose and fix a real problem using captured evidence |
+| 3. Use Sentry evidence | Collect errors, traces, logs, and replays from Nathan's testing | Diagnose and fix a real problem using captured evidence |
 | 4. Build task management | Add changed-input tests and publication for chosen tasks | Discover several tasks in one session and reuse each enabled task |
 | 5. Prove reconnection | Preserve an operation through session expiry and user verification | Reconnect and finish the pending task without duplicate effects |
 | 6. Prove general use | Teach a task on a second website | Reuse the same product flow without a website-specific architecture |

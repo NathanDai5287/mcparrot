@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Agent, CursorAgentError } from "@cursor/sdk";
+import * as Sentry from "@sentry/nextjs";
 import type { CapturedRequest } from "../../../lib/capabilities";
 
 export const runtime = "nodejs";
@@ -24,22 +25,46 @@ function parseJsonReply(reply: string) {
   return JSON.parse(reply.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, ""));
 }
 
+function askComposer(prompt: string, apiKey: string, requestCount: number) {
+  return Sentry.startSpan({
+    name: "discover.composer",
+    op: "gen_ai.invoke_agent",
+    attributes: {
+      "gen_ai.operation.name": "invoke_agent",
+      "gen_ai.agent.name": "MCParrot discovery",
+      "gen_ai.request.model": "composer-2.5-fast",
+      "discover.request_count": requestCount,
+    },
+  }, async (span) => {
+    const result = await Agent.prompt(prompt, {
+      apiKey,
+      model: { id: "composer-2.5", params: [{ id: "fast", value: "true" }] },
+      local: { cwd: await mkdtemp(join(tmpdir(), "discover-")) },
+    });
+    span.setAttributes({ "discover.status": result.status, "gen_ai.response.size": result.result?.length ?? 0 });
+    return result;
+  });
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.CURSOR_API_KEY;
   if (!apiKey) return Response.json({ error: "Discovery is not set up. Add CURSOR_API_KEY to the server environment." }, { status: 500 });
   const { websiteUrl, requests } = await request.json() as { websiteUrl: string; requests: CapturedRequest[] };
   if (!requests?.length) return Response.json({ error: "Explore the website first so there are requests to read." }, { status: 400 });
 
+  Sentry.logger.info("Discovery started", { requestCount: requests.length });
   try {
-    const result = await Agent.prompt(discoveryPrompt(websiteUrl, requests), {
-      apiKey,
-      model: { id: "composer-2.5", params: [{ id: "fast", value: "true" }] },
-      local: { cwd: await mkdtemp(join(tmpdir(), "discover-")) },
-    });
-    if (result.status !== "finished" || !result.result) return Response.json({ error: "Composer returned no capabilities. Explore more pages, then try again." }, { status: 502 });
-    return Response.json(parseJsonReply(result.result));
+    const result = await askComposer(discoveryPrompt(websiteUrl, requests), apiKey, requests.length);
+    if (result.status !== "finished" || !result.result) {
+      Sentry.logger.warn("Discovery returned no capabilities", { status: result.status });
+      return Response.json({ error: "Composer returned no capabilities. Explore more pages, then try again." }, { status: 502 });
+    }
+    const discovery = parseJsonReply(result.result);
+    Sentry.logger.info("Discovery finished", { capabilityCount: discovery.capabilities?.length ?? 0 });
+    return Response.json(discovery);
   } catch (error) {
     if (!(error instanceof CursorAgentError)) throw error;
+    Sentry.captureException(error);
     return Response.json({ error: `Composer could not read the requests (${error.message}). Try again.` }, { status: 502 });
   }
 }

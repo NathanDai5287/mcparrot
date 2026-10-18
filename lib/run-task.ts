@@ -1,5 +1,6 @@
+import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
-import { browserUse, withPage } from "./browser-use";
+import { startBrowser, stopBrowser, withPage } from "./browser-use";
 import type { Task, Website } from "./capabilities";
 
 const taskBrowserMinutes = 3;
@@ -18,11 +19,19 @@ function looksSignedOut(address: string) {
   return signInAddress.test(hostname + pathname);
 }
 
+function fetchInPage(page: Page, url: string) {
+  return Sentry.startSpan({ name: "task.request", attributes: { "http.request.method": "GET" } }, async (span) => {
+    const response = await page.evaluate(async (address) => {
+      const reply = await fetch(address, { credentials: "include" });
+      return { status: reply.status, url: reply.url, redirected: reply.redirected, body: await reply.text() };
+    }, url);
+    span.setAttributes({ "http.response.status_code": response.status, "http.response.body.size": response.body.length });
+    return response;
+  });
+}
+
 async function readRequest(page: Page, url: string) {
-  const response = await page.evaluate(async (address) => {
-    const reply = await fetch(address, { credentials: "include" });
-    return { status: reply.status, url: reply.url, redirected: reply.redirected, body: await reply.text() };
-  }, url);
+  const response = await fetchInPage(page, url);
   if (response.status === 401 || response.status === 403 || (response.redirected && looksSignedOut(response.url))) throw new Error(signedOutMessage);
   const body = response.body.length > maximumResponseCharacters ? `${response.body.slice(0, maximumResponseCharacters)}\n[Response shortened to ${maximumResponseCharacters} characters]` : response.body;
   return `GET ${url} returned ${response.status}\n${body}`;
@@ -36,15 +45,27 @@ async function readRequests(page: Page, website: string, urls: string[]) {
   return results.join("\n\n");
 }
 
-export async function runTask(app: Website, task: Task, inputs: Record<string, string | undefined>) {
+async function readTask(app: Website, task: Task, inputs: Record<string, string | undefined>) {
   if (!app.browserProfileId) throw new Error(signedOutMessage);
   const values = Object.fromEntries(task.inputs.map((input) => [input.name, inputs[input.name] ?? input.example]));
   const urls = task.requests.map((request) => new URL(fillPattern(request.urlPattern, values), app.url).href);
-  const client = browserUse();
-  const browser = await client.browsers.create({ profileId: app.browserProfileId, timeout: taskBrowserMinutes });
+  const browser = await startBrowser(app.browserProfileId, taskBrowserMinutes);
   try {
     return await withPage(browser.cdpUrl!, (page) => readRequests(page, app.url, urls));
   } finally {
-    await client.browsers.stop(browser.id);
+    await stopBrowser(browser.id);
+  }
+}
+
+export async function runTask(app: Website, task: Task, inputs: Record<string, string | undefined>) {
+  const taskAttributes = { appId: app.id, task: task.name, requestCount: task.requests.length };
+  try {
+    const result = await readTask(app, task, inputs);
+    Sentry.logger.info("Task finished", { ...taskAttributes, resultSize: result.length });
+    return result;
+  } catch (error) {
+    const reason = (error as Error).message;
+    Sentry.logger.warn("Task failed", { ...taskAttributes, signedOut: reason === signedOutMessage, reason });
+    throw error;
   }
 }

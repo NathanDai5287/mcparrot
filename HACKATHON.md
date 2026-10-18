@@ -63,7 +63,7 @@ For example, the Commit Fellowship requires a supplemental form.
 | Sponsor | Challenge | Why it matches |
 | --- | --- | --- |
 | Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved task in a hidden Browser Use browser with that profile; this use is a gap until Nathan's live demonstration passes |
-| Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; the demo must show how that evidence changed what we built |
+| Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; MCParrot sends error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring, and the demo must show how that evidence changed what we built, which is a gap |
 | Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents |
 
 ### Secondary sponsor challenges
@@ -98,5 +98,8 @@ Match every demo claim to [the status page](STATUS.md), and label each part as s
 Judges penalize polish that hides parts that do not work, so never present an aspirational part in the present tense.
 Plan the Devpost text, a clean public repository, and a video that shows the same flow that judges see live.
 To claim the Sentry prize, show evidence from Tracing, Logs, Replay, or another allowed product, not only caught errors.
+The [Sentry diagnostics section](README.md#diagnostics-with-sentry) lists what each product records.
+In the demo, open one ChatGPT tool call in Sentry Traces to show its Browser Use and task request spans, filter Sentry Logs for its task outcome, and play the dashboard replay of the same session.
+Then show the Sentry issue or slow span that led to a change in MCParrot, and the change itself.
 To claim the Browser Use prize, show a working web agent and the people it serves.
 Show Browser Use in two places: the live view where the user signs in once, including Duo, and the hidden browser that runs each task when ChatGPT calls it.
