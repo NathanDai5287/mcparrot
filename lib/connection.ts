@@ -4,7 +4,7 @@ import { isOwner } from "./account";
 
 const sha256 = (secret: string) => createHash("sha256").update(secret).digest();
 
-const matchesHash = (secret: string, hash: Buffer) => timingSafeEqual(sha256(secret), hash);
+const matchesHash = (secret: string, hash: Buffer) => hash.length === 32 && timingSafeEqual(sha256(secret), hash);
 
 export function newConnectionToken() {
   const token = randomBytes(32).toString("base64url");
