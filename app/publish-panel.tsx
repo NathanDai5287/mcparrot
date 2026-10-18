@@ -58,7 +58,7 @@ export function PublishPanel({ app, onApps }: { app: Website; onApps: (apps: Web
   const errorMessage = error && <p className="pilot-error" role="alert">{error}</p>;
   return <SetupCard title="Marketplace" status={app.listing ? "Published" : "Not published"}>
     {reviewing ? <>
-      <p>The name, address, description, and tool names become public. Anyone who adds the app gets everything below. Your logins and link stay private.</p>
+      <p>The name, address, description, publisher, and tool names become public. Anyone who adds the app gets everything below. Your logins and link stay private.</p>
       <form className="editor" onSubmit={publish}>
         <label htmlFor={`listing-description-${app.id}`}>Short description</label>
         <textarea id={`listing-description-${app.id}`} name="description" maxLength={500} required defaultValue={app.listing?.description} placeholder="For example, read your courses, assignments, and syllabus on Canvas" />
