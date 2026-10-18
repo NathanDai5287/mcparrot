@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "browser": "node --env-file-if-exists=.env browser.mjs",
-    "check": "node --check browser.mjs && node --check public/extension/background.js && node --check public/extension/bridge.js && next typegen && tsc --noEmit"
+    "check": "node --check browser.mjs && node --check public/extension/background.js && node --check public/extension/bridge.js && node scripts/check-extension-zip.mjs && next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.38",
