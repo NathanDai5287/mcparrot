@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import { Redis } from "@upstash/redis";
-import { stopBrowser } from "./browser-use";
+import { isGone, stopBrowser } from "./browser-use";
 
 export type Login = { username: string; password: string; hosts: string[] };
 type SealedLogin = { v?: 1; kid?: string; iv: string; tag: string; data: string };
@@ -11,7 +11,9 @@ export const unreadableLoginMessage = "MCParrot cannot read the saved login for 
 export class CredentialKeyError extends Error {}
 
 const loginKey = (appId: string) => `login:${appId}`;
-const pendingSignInKey = (appId: string) => `pending-sign-in:${appId}`;
+export const pendingSignInKey = (appId: string) => `pending-sign-in:${appId}`;
+export const rejectedLoginKey = (appId: string) => `login-rejected:${appId}`;
+export const signInCooldownKey = (appId: string) => `sign-in-failed:${appId}`;
 
 export function credentialKey() {
   const text = process.env.MCPARROT_CREDENTIAL_KEY?.trim() ?? "";
@@ -54,15 +56,19 @@ export async function readLogin(appId: string) {
   }
 }
 
-export async function deleteLogin(appId: string) {
+export async function stopPendingSignIn(appId: string) {
   const redis = Redis.fromEnv();
   const pending = await redis.get<{ browserId: string }>(pendingSignInKey(appId));
-  if (pending) {
-    try {
-      await stopBrowser(pending.browserId);
-    } catch {
-      Sentry.logger.warn("Pending sign-in browser stop failed", { appId });
-    }
+  if (!pending) return;
+  try {
+    await stopBrowser(pending.browserId);
+  } catch (error) {
+    if (!isGone(error)) throw error;
   }
-  await redis.del(loginKey(appId), pendingSignInKey(appId));
+  await redis.del(pendingSignInKey(appId));
+}
+
+export async function deleteLogin(appId: string) {
+  await stopPendingSignIn(appId).catch(() => Sentry.logger.warn("Pending sign-in browser stop failed", { appId }));
+  await Redis.fromEnv().del(loginKey(appId), pendingSignInKey(appId), rejectedLoginKey(appId), signInCooldownKey(appId));
 }

@@ -4,17 +4,18 @@ import { Redis } from "@upstash/redis";
 import { BrowserUseError, type RunCreateBody, type SecretBinding } from "browser-use-sdk/v4";
 import type { Page } from "playwright-core";
 import { z } from "zod";
-import { browserUse, errorReason, ignoreErrors, sessionBrowser, stopBrowser, stopWarmBrowser, withPage } from "./browser-use";
+import { browserUse, errorReason, ignoreErrors, isGone, sessionBrowser, stopBrowser, stopWarmBrowser, withPage } from "./browser-use";
 import { automaticSignInOf, type Website } from "./capabilities";
-import { readLogin, type Login } from "./login";
+import { pendingSignInKey, readLogin, rejectedLoginKey, signInCooldownKey, type Login } from "./login";
 import { signedOutMessage } from "./run-task";
-import { findApp, updateStoredApp } from "./workspace";
+import { changeApp, updateStoredApp } from "./workspace";
 
 const pendingSignInSeconds = 900;
 const agentWaitMilliseconds = 150_000;
 const callBudgetMilliseconds = 280_000;
 const afterAgentMilliseconds = 20_000;
 const rereadMilliseconds = 60_000;
+const agentTimeoutPattern = /did not complete within/;
 const lockSeconds = 300;
 const failedCooldownSeconds = 600;
 const agentRunMaxCostUsd = 2;
@@ -27,7 +28,8 @@ const googleNeedsUserMessage = "Open MCParrot and select Sign in to website on t
 const noPendingSignInMessage = "No sign-in is waiting for a code. Run the original tool again to start signing in.";
 const signInInProgressMessage = "MCParrot is already signing in to the website. Wait a minute, then run the original tool again.";
 const signInTimedOutMessage = "Signing in to the website took too long. Wait a few minutes, then try again, or open MCParrot and select Sign in to website on this app.";
-const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, signInInProgressMessage, signInTimedOutMessage]);
+const browserUseUnreachableMessage = "Browser Use could not be reached, so MCParrot could not sign in. Try again in a few minutes.";
+const userMessages = new Set([signedOutMessage, codeSentMessage, passwordRejectedMessage, signInFailedMessage, googleNeedsUserMessage, signInInProgressMessage, signInTimedOutMessage, browserUseUnreachableMessage]);
 
 const passwordOutcomes = ["signed_in", "code_sent", "password_rejected", "code_rejected", "failed"] as const;
 const googleOutcomes = ["signed_in", "needs_user", "failed"] as const;
@@ -62,16 +64,16 @@ If Google asks you to confirm or continue to ${website}, select Continue.
 Never type anything on a Google page. If Google asks for an email, a password, a code, a phone number, or to verify that it's you, finish with outcome needs_user at once.
 ${finishSteps(website)}`;
 
-const pendingKey = (appId: string) => `pending-sign-in:${appId}`;
+const pendingKey = pendingSignInKey;
 const readPendingSignIn = (appId: string) => Redis.fromEnv().get<PendingSignIn>(pendingKey(appId));
-const lockKey = (appId: string) => `sign-in-lock:${appId}`;
-const rejectedKey = (appId: string) => `login-rejected:${appId}`;
-const cooldownKey = (appId: string) => `sign-in-failed:${appId}`;
+export const signInLockKey = (appId: string) => `sign-in-lock:${appId}`;
+const lockKey = signInLockKey;
+const rejectedKey = rejectedLoginKey;
+const cooldownKey = signInCooldownKey;
+const releaseLockScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) end return 0`;
 
 const loginHash = (app: Website, login: Login) =>
   createHmac("sha256", Buffer.from(process.env.MCPARROT_CREDENTIAL_KEY!, "base64")).update(JSON.stringify([login.username, login.password, app.loginSavedAt ?? ""])).digest("base64");
-
-const isGone = (error: unknown) => error instanceof BrowserUseError && error.statusCode === 404;
 
 const secret = (alias: string, value: string, allowedDomains: string[]): SecretBinding => ({ alias, source: { type: "inline", value }, allowedDomains });
 
@@ -94,7 +96,11 @@ function runSignInAgent(appId: string, spanName: string, body: RunCreateBody, wa
       if (finished.status === "completed" && result.success) outcome = result.data.outcome;
       else Sentry.logger.warn("Sign-in agent run gave no outcome", { status: finished.status });
     } catch (error) {
-      timedOut = !!run && !(error instanceof BrowserUseError);
+      if (!run) {
+        Sentry.captureException(error);
+        throw new Error(browserUseUnreachableMessage, { cause: error });
+      }
+      timedOut = error instanceof Error && !(error instanceof BrowserUseError) && agentTimeoutPattern.test(error.message);
       Sentry.logger.warn("Sign-in agent run did not finish", { reason: errorReason(error), timedOut });
       const runId = run?.id;
       if (runId) await ignoreErrors(() => browserUse().runs.cancel(runId));
@@ -113,12 +119,16 @@ async function stopSavingProfile(appId: string, browserId: string) {
   }
 }
 
-async function profileId(app: Website) {
-  const stored = (await findApp(app.id))?.app;
-  if (stored?.browserProfileId) return stored.browserProfileId;
+export async function ensureProfile(app: Website) {
+  if (app.browserProfileId) return app.browserProfileId;
   const { id } = await browserUse().profiles.create({ name: `MCParrot ${app.name}` });
-  await updateStoredApp(app.id, { browserProfileId: id });
-  return id;
+  const apps = await changeApp(app.id, (storedApp) => storedApp.browserProfileId ? storedApp : { ...storedApp, browserProfileId: id }).catch(async (error) => {
+    await ignoreErrors(() => browserUse().profiles.delete(id));
+    throw error;
+  });
+  const kept = apps.find((storedApp) => storedApp.id === app.id)?.browserProfileId ?? id;
+  if (kept !== id) await ignoreErrors(() => browserUse().profiles.delete(id));
+  return kept;
 }
 
 async function agentBrowser(appId: string, sessionId?: string) {
@@ -131,8 +141,11 @@ async function agentBrowser(appId: string, sessionId?: string) {
   }
 }
 
-async function finishSignedIn(appId: string, browserId: string | undefined, lookupFailed: boolean) {
-  if (lookupFailed) throw new Error(signInFailedMessage);
+async function finishSignedIn(appId: string, browserId: string | undefined, lookupFailed: boolean, attempt: string) {
+  if (lookupFailed) {
+    await Redis.fromEnv().set(cooldownKey(appId), attempt, { ex: failedCooldownSeconds });
+    throw new Error(signInFailedMessage);
+  }
   if (browserId) await stopSavingProfile(appId, browserId);
   await updateStoredApp(appId, { signedInAt: new Date().toISOString() });
 }
@@ -151,7 +164,7 @@ async function signIn(app: SigningInApp, login: Login, hash: string, waitMillise
     return codeSentMessage;
   }
   const browserId = browser?.id;
-  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed);
+  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed, hash);
   if (browserId) await ignoreErrors(() => stopBrowser(browserId));
   if (outcome === "password_rejected") {
     await Redis.fromEnv().set(rejectedKey(app.id), hash);
@@ -170,7 +183,7 @@ async function googleSignIn(app: SigningInApp, googleEmail: string | undefined, 
   Sentry.logger.info("Automatic Google sign-in finished", { appId: app.id, outcome });
   const { browser, lookupFailed } = await agentBrowser(app.id, sessionId);
   const browserId = browser?.id;
-  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed);
+  if (outcome === "signed_in") return finishSignedIn(app.id, browserId, lookupFailed, attempt);
   if (browserId) await ignoreErrors(() => stopBrowser(browserId));
   await Redis.fromEnv().set(cooldownKey(app.id), attempt, { ex: failedCooldownSeconds });
   if (outcome === "needs_user") throw new Error(googleNeedsUserMessage);
@@ -185,7 +198,10 @@ async function waitingForCode(appId: string) {
   try {
     if ((await browserUse().browsers.get(pending.browserId)).status === "active") return true;
   } catch (error) {
-    if (!isGone(error)) return true;
+    if (!isGone(error)) {
+      Sentry.captureException(error);
+      throw new Error(browserUseUnreachableMessage, { cause: error });
+    }
   }
   await Redis.fromEnv().del(pendingKey(appId));
   return false;
@@ -198,9 +214,7 @@ export async function withLock<T>(key: string, busyMessage: string, work: () => 
   try {
     return await work();
   } finally {
-    await ignoreErrors(async () => {
-      if (await redis.get(key) === nonce) await redis.del(key);
-    });
+    await ignoreErrors(() => redis.eval(releaseLockScript, [key], [nonce]));
   }
 }
 
@@ -212,6 +226,7 @@ const guardedSignIn = <T>(app: Website, work: () => Promise<T>) => withSignInLoc
   } catch (error) {
     if (userMessages.has((error as Error).message)) throw error;
     Sentry.logger.warn("Automatic sign-in failed", { appId: app.id, reason: errorReason(error) });
+    Sentry.captureException(error);
     throw new Error(signInFailedMessage);
   }
 });
@@ -228,7 +243,7 @@ const signInOnce = (app: Website, login: Login, deadline: number) => guardedSign
   const hash = loginHash(app, login);
   if (await Redis.fromEnv().get(rejectedKey(app.id)) === hash) throw new Error(passwordRejectedMessage);
   const waitMilliseconds = await agentWaitWithin(app.id, hash, deadline);
-  const signingInApp = { ...app, browserProfileId: await profileId(app) };
+  const signingInApp = { ...app, browserProfileId: await ensureProfile(app) };
   return await signIn(signingInApp, login, hash, waitMilliseconds) ?? signingInApp;
 });
 
@@ -275,6 +290,7 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
       secretBindings: [secret("verification_code", code, hosts)],
     }, agentWaitMilliseconds));
   } catch (error) {
+    if ((error as Error).message === browserUseUnreachableMessage) throw error;
     Sentry.logger.warn("Verification code failed", { appId: app.id, reason: errorReason(error) });
   }
   Sentry.logger.info("Verification code finished", { appId: app.id, outcome });
@@ -290,7 +306,13 @@ export const submitVerificationCode = (app: Website, code: string) => withSignIn
     Sentry.logger.warn("Sign-in browser stop failed", { appId: app.id, reason: errorReason(error) });
   }
   await Redis.fromEnv().del(pendingKey(app.id));
-  if (outcome !== "signed_in" || !stopped) throw new Error(signInFailedMessage);
+  if (outcome !== "signed_in" || !stopped) {
+    await ignoreErrors(async () => {
+      const login = await readLogin(app.id);
+      if (login) await Redis.fromEnv().set(cooldownKey(app.id), loginHash(app, login), { ex: failedCooldownSeconds });
+    });
+    throw new Error(signInFailedMessage);
+  }
   await updateStoredApp(app.id, { signedInAt: new Date().toISOString() });
   return signInFinishedMessage;
 });
