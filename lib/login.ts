@@ -46,15 +46,12 @@ export const saveLogin = (appId: string, login: Login) => Redis.fromEnv().set(lo
 export async function readLogin(appId: string) {
   const sealed = await Redis.fromEnv().get<SealedLogin>(loginKey(appId));
   if (!sealed) return null;
-  let login: Login;
   try {
-    login = unsealLogin(appId, sealed);
+    return unsealLogin(appId, sealed);
   } catch {
     Sentry.captureException(new Error("Saved login could not be decrypted"), { tags: { appId } });
     throw new Error(unreadableLoginMessage);
   }
-  if (sealed.v !== 1) await saveLogin(appId, login).catch(() => Sentry.logger.warn("Saved login upgrade failed", { appId }));
-  return login;
 }
 
 export async function deleteLogin(appId: string) {
