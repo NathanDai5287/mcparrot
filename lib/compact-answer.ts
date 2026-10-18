@@ -35,9 +35,6 @@ class LargeInteger {
   constructor(source: string) {
     this.source = source;
   }
-  toJSON() {
-    return this.source;
-  }
 }
 
 const keptLargeIntegers = (_key: string, value: unknown, context?: { source: string }) => typeof value === "number" && !Number.isSafeInteger(value) && context && /^-?\d+$/.test(context.source) ? new LargeInteger(context.source) : value;
@@ -73,7 +70,14 @@ function picked(value: unknown, paths: string[][]): unknown {
 
 const flattened = (item: Record<string, unknown>, prefix = ""): [string, unknown][] => Object.entries(item).flatMap(([key, value]) => isRecord(value) && !prefix ? flattened(value, `${key}.`) : [[`${prefix}${key}`, value]]);
 
-const cell = (value: unknown) => (typeof value === "string" ? value : value === undefined ? "" : value instanceof LargeInteger ? value.source : JSON.stringify(value)).replace(/\|/g, "\\|").replace(/\n/g, "\\n");
+function json(value: unknown): string {
+  if (value instanceof LargeInteger) return value.source;
+  if (Array.isArray(value)) return `[${value.map(json).join(",")}]`;
+  if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${json(item)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+const cell = (value: unknown) => (typeof value === "string" ? value : value === undefined ? "" : json(value)).replace(/\|/g, "\\|").replace(/\n/g, "\\n");
 
 function table(items: unknown[]) {
   if (items.length < tableRows || !items.every(isRecord)) return undefined;
@@ -87,8 +91,7 @@ function table(items: unknown[]) {
 
 function rendered(value: unknown): string {
   if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${rendered(item)}`).join(",")}}`;
-  if (value instanceof LargeInteger) return value.source;
-  if (!Array.isArray(value)) return JSON.stringify(value);
+  if (!Array.isArray(value)) return json(value);
   const rows = table(value);
   return rows === undefined ? `[${value.map(rendered).join(",")}]` : `[\n${rows}\n]`;
 }
