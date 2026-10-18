@@ -16,6 +16,7 @@ const callBudgetMilliseconds = 280_000;
 const afterAgentMilliseconds = 20_000;
 const rereadMilliseconds = 60_000;
 const lockSeconds = 300;
+const lockPollMilliseconds = 2_000;
 const failedCooldownSeconds = 600;
 const agentRunMaxCostUsd = 2;
 const codeSentMessage = "MCParrot is signing in to the website, and the website sent a text-message code to the user's phone. Ask the user for that code, then call submit_verification_code with it.";
@@ -178,6 +179,7 @@ async function googleSignIn(app: SigningInApp, googleEmail: string | undefined, 
 }
 
 const usesPassword = (app: Website) => automaticSignInOf(app).method === "password";
+const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function waitingForCode(appId: string) {
   const pending = await readPendingSignIn(appId);
@@ -250,6 +252,24 @@ async function signInAgain(app: Website, deadline: number) {
   return signInOnce(app, login, deadline);
 }
 
+async function signInReleased(appId: string, until: number) {
+  for (;;) {
+    if (!await Redis.fromEnv().exists(lockKey(appId))) return true;
+    if (Date.now() + lockPollMilliseconds > until) return false;
+    await pause(lockPollMilliseconds);
+  }
+}
+
+async function readAfterOtherSignIn<T>(app: Website, read: (app: Website) => Promise<T>, deadline: number): Promise<T | string> {
+  const started = Date.now();
+  const released = await signInReleased(app.id, deadline - rereadMilliseconds);
+  Sentry.logger.info("Waited for another sign-in", { appId: app.id, released, waitedMs: Date.now() - started });
+  if (!released) return signInInProgressMessage;
+  const storedApp = (await findApp(app.id))?.app ?? app;
+  if (usesPassword(storedApp) && await waitingForCode(storedApp.id)) return codeSentMessage;
+  return read(storedApp);
+}
+
 export async function readSigningIn<T>(app: Website, read: (app: Website) => Promise<T>): Promise<T | string> {
   const deadline = Date.now() + callBudgetMilliseconds;
   if (usesPassword(app) && await waitingForCode(app.id)) return codeSentMessage;
@@ -259,6 +279,7 @@ export async function readSigningIn<T>(app: Website, read: (app: Website) => Pro
     if ((error as Error).message !== signedOutMessage) throw error;
   }
   const signedIn = await signInAgain(app, deadline);
+  if (signedIn === signInInProgressMessage) return readAfterOtherSignIn(app, read, deadline);
   if (typeof signedIn === "string") return signedIn;
   return deadline - Date.now() < rereadMilliseconds ? signInFinishedMessage : read(signedIn);
 }

@@ -445,7 +445,7 @@ When the website signs in without verification, the tool continues in the same t
 When the website rejects the code, the tool asks ChatGPT to request a new code from the user and keeps the browser waiting.
 When a tool runs while a sign-in waits for a code, it repeats the request for the code instead of starting another sign-in.
 After the user changes the choice away from **With email and password**, tools and `submit_verification_code` ignore a sign-in that waits for a code, and it expires with its browser.
-Only one sign-in runs at a time for each app; another call during it tells ChatGPT to wait a minute and try again.
+Only one sign-in runs at a time for each app; a tool call that finds the website signed out during it checks the sign-in lock every 2 seconds, and when that sign-in ends it reads the stored app again and runs once, or repeats the request for the code when that sign-in now waits for one; when the sign-in still runs once less than 60 seconds of the call's budget remain, it tells ChatGPT to wait a minute and try again.
 Any other outcome stops the browser and tells the user to select **Sign in to website** in MCParrot, and MCParrot does not try the same login again for 10 minutes.
 MCParrot does not keep the code after the call, and Sentry never receives it.
 
