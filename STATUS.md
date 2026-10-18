@@ -7,7 +7,7 @@ Nathan reads the same facts in plain language in the [status guide](public/docs/
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard; local teaching and sign-in diagnostics are dormant.
-The dashboard runs on Vercel and lets users create website apps and draft tasks, and keeps their metadata in this browser’s local storage. Its task screen offers a private Browser Use Cloud teaching connection; production sign-in, capture, and replay still need Nathan’s demonstration.
+The dashboard runs on Vercel and lets users create website apps and explore them without naming tasks first, and keeps app metadata in this browser’s local storage. Its exploration and older task screens offer a private Browser Use Cloud teaching connection; production sign-in, capture, and replay still need Nathan’s demonstration.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
 The local pilot captured two reading requests from Nathan’s browsing, including a syllabus visit. Hosted recording and replay have a production proof gap; broader task discovery, remote MCP access, persistent storage, and Sentry remain aspirational.
 
@@ -26,7 +26,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 
 | Capability | Status | Evidence or next step |
 | --- | --- | --- |
-| Workspace dashboard | shipped | `app/page.tsx` creates website apps and draft tasks; automatic type and production build checks pass |
+| Workspace dashboard | shipped | `app/page.tsx` creates website apps and opens exploration; older task drafts remain accessible; automatic type and production build checks pass |
 | App and task addresses | shipped | Stable app and task addresses use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
 | Local app deletion | shipped | Inline confirmation removes an app and its drafts from browser storage; automatic type and production build checks pass; management MCP parity remains a gap |
 | Browser draft metadata | shipped | App and task metadata uses local storage after refresh; automatic type and production build checks pass; captures and sign-in data are excluded |
@@ -41,11 +41,14 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Local teaching connection controls | dormant | Earlier local pairing code remains outside the product UI; the production-only workflow must not launch a local helper |
 | Local reading request capture | dormant | Nathan reported browsing; the worker status check showed two captures, one JSON candidate and one syllabus candidate, with a selection |
 | Hosted teaching controls | gap | The hosted browser opens in a separate popup; reopening uses the same session and captures. Automatic checks pass; Nathan’s sign-in, capture, and replay demonstration must pass |
+| Explore-first workspace | shipped | Each website offers Explore website without a task form; review displays all observed reading requests. Hosted type and build checks validate the interface; the live Canvas proof remains a gap |
+| Explore more in one session | gap | Continue exploring appends requests without clearing candidates; Nathan must prove capture and replay in production |
+| Desired-action notes | shipped | Optional notes stay in this browser and do not create tools or imply support |
 | Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; hosted teaching still needs a live demonstration |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
 | Hosted browser sessions | gap | Production Vercel Authentication and secrets are configured; the first cloud browser launch and Berkeley sign-in need a live demonstration |
 | Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
-| Suggested task discovery | aspirational | Group observed requests into task cards for user review; do not enable untested suggestions |
+| Suggested task discovery | aspirational | Group observed requests into meaningful task cards; the current list labels captured reading requests only; do not enable untested suggestions |
 | Task review and publication | aspirational | Let the user confirm names, descriptions, inputs, and results, then test changed inputs before publication |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic |
 | Recorded request replay | aspirational | Run the recorded API request with valid authentication and check the result |

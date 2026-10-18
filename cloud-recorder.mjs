@@ -116,6 +116,7 @@ async function operate(name, input = {}) {
   if (name === "get_teaching_status") return status();
   if (!connected) throw new Error("The browser connection ended. Start a new session.");
   if (name === "start_recording") { candidates.clear(); lastTest = undefined; recording = true; return status(); }
+  if (name === "resume_recording") { recording = true; return status(); }
   if (name === "stop_recording") { recording = false; return status(); }
   if (name === "test_saved_request") return testRequest(input);
   throw new Error("Unknown teaching operation.");
