@@ -1,5 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
-import { signedInUserId } from "../../../lib/account";
 import { appIdSchema } from "../../../lib/capabilities";
 import { AlreadyInstalled, installListing, ListingRejected, listingDescriptionSchema, publishApp, readListings, unpublishApp } from "../../../lib/marketplace";
 import { AppNotFound, ownedApp, StorageUnavailable, WorkspaceLimit } from "../../../lib/workspace";
@@ -35,7 +35,8 @@ async function apply(userId: string, action: MarketplaceAction) {
 }
 
 export async function POST(request: Request) {
-  const userId = await signedInUserId();
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in again to use MCParrot." }, { status: 401 });
   const action = MarketplaceAction.safeParse(await request.json().catch(() => null));
   if (!action.success) return Response.json({ error: requestProblem(action.error.issues) }, { status: 400 });
   try {
