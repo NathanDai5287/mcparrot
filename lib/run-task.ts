@@ -25,10 +25,13 @@ const botChallenge = /just a moment|cf-chl|challenge-platform|captcha|prove your
 const csrfRefusal = /forgery|invalid authenticity token|csrf[^<\n]{0,40}(fail|invalid|missing|mismatch|expired)|(invalid|missing|bad)[^<\n]{0,20}csrf/i;
 const csrfPageSelectors = ["meta[name=csrf-token]", "meta[name=csrf_token]", "meta[name=_csrf]", "input[name=csrfmiddlewaretoken]", "input[name=authenticity_token]"];
 const signInPart = /^(log[-_]?in|sign[-_]?in|sso|saml\d?)(\.\w+)?$/i;
-export const signedOutMessage = "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
+const doNotRetry = "Do not retry; tell the user: ";
+const retryOnce = "Retry once now. ";
 
-export const blockedMessage = "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
-export const csrfRefusedMessage = "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
+export const signedOutMessage = doNotRetry + "The website is signed out. Open MCParrot, then select Sign in to website on this app, or choose how it signs in again automatically, then try again.";
+
+export const blockedMessage = doNotRetry + "The website blocked the automated browser with a bot check, so MCParrot could not read this address. Try again later.";
+export const csrfRefusedMessage = doNotRetry + "The website refused the request because its protection code was missing or wrong. Record this page again with MCParrot Explorer, then select Find what this site can do.";
 
 export type TaskInputs = Record<string, string | undefined>;
 
@@ -93,7 +96,7 @@ function filledRequest(app: Website, request: TaskRequest, values: TaskInputs, r
   const url = addressOnWebsite(app, fillPattern(request.urlPattern, urlPlaceholderPattern, values, responses, encodeURIComponent)).href;
   const bodyEncoding = request.contentType?.toLowerCase().includes("x-www-form-urlencoded") ? encodeURIComponent : jsonEscaped;
   const body = request.bodyPattern === undefined ? undefined : fillPattern(request.bodyPattern, bodyPlaceholderPattern, values, responses, bodyEncoding);
-  if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", paymentRefusal);
+  if (!isAllowedRequest({ method: request.method, urlPattern: url, bodyPattern: body })) throw new TaskError("refused", doNotRetry + paymentRefusal);
   return { method: request.method.toUpperCase(), url, body, contentType: body === undefined ? undefined : request.contentType ?? "application/json", headers: replayedHeaders(request.headers), tokenHeaders: request.tokenHeaders };
 }
 
@@ -115,7 +118,7 @@ const sanitized = (message: string) => (message.split("\n")[0] ?? "").replace(/\
 
 function requireOnWebsite(page: Page, website: string) {
   if (looksSignedOut(page.url())) throw signedOut();
-  if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
+  if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `${doNotRetry}This address left the website ${website}, so MCParrot did not read it.`);
 }
 
 function fetchInPage(page: Page, request: FilledRequest) {
@@ -188,7 +191,7 @@ function readPageText(page: Page, website: string, url: string, steps: RunSteps,
 }
 
 function httpError(method: string, url: string, status: number) {
-  return new TaskError("http_error", `${method} ${withoutQuery(url)} returned ${status}`);
+  return new TaskError("http_error", `${status >= 500 ? retryOnce : ""}${method} ${withoutQuery(url)} returned ${status}`);
 }
 
 async function unfollowedRedirect(page: Page, website: string, method: string, url: string) {
@@ -201,12 +204,12 @@ async function readRequest(page: Page, website: string, request: FilledRequest, 
   const { method, url } = request;
   const response = await fetchInPage(page, request);
   if (response.failed === "redirected") throw await unfollowedRedirect(page, website, method, url);
-  if (response.failed === "timeout") throw new TaskError("timeout", `${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
+  if (response.failed === "timeout") throw new TaskError("timeout", `${retryOnce}${method} ${withoutQuery(url)} took longer than ${requestTimeout / 1000} seconds.`);
   if (response.redirected && looksSignedOut(response.url)) throw signedOut();
   if (response.status === 401 || response.status === 403) throw refusal(response.body, response.mitigated);
-  if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
+  if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `${doNotRetry}This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
-  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
+  if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${retryOnce}${method} ${withoutQuery(url)} could not be sent.`);
   if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, status: response.status, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body, keepFields)}` };
   return readPageAt(page, website, url, steps, step);
 }
@@ -305,7 +308,7 @@ function logOutcome(name: string, attributes: Record<string, string | number | b
       const reason = failureReason(error as Error);
       Sentry.logger.warn(`${name} failed`, { ...attributes, ...steps, signedOut: reason === "signed_out", reason });
       if (error instanceof TaskError) throw error;
-      throw new TaskError(reason, sanitized((error as Error).message));
+      throw new TaskError(reason, (reason === "timeout" || reason === "fetch_failed" ? retryOnce : "") + sanitized((error as Error).message));
     }
   });
 }
