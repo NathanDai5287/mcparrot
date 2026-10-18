@@ -67,16 +67,21 @@ async function startedBrowser(appId: string, profileId: string, steps: RunSteps)
   return timed(steps, "cdpConnectMs", () => connectBrowser(cdpUrl!));
 }
 
-export async function withWarmPage<T>(appId: string, profileId: string, steps: RunSteps, work: (page: Page) => Promise<T>) {
+export async function withWarmPage<T>(appId: string, profileId: string, steps: RunSteps, work: (page: Page) => Promise<T>, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const reused = await reusedBrowser(appId, steps);
   steps.browserReused = !!reused;
   Sentry.getActiveSpan()?.setAttribute("browser.reused", !!reused);
   const browser = reused ?? await startedBrowser(appId, profileId, steps);
   const page = await browser.contexts()[0].newPage();
+  const closePage = () => page.close().catch(() => undefined);
+  signal?.addEventListener("abort", closePage, { once: true });
   try {
+    signal?.throwIfAborted();
     return await work(page);
   } finally {
-    await page.close().catch(() => undefined);
+    signal?.removeEventListener("abort", closePage);
+    await closePage();
     await browser.close().catch((error: Error) => Sentry.logger.warn("Browser disconnect failed", { reason: error.message.split("\n")[0] }));
   }
 }
