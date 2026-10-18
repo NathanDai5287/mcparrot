@@ -7,7 +7,7 @@ Nathan reads the same facts in plain language in the [status guide](public/docs/
 Update both pages in the same change whenever a capability's status changes.
 
 Today, MCParrot is a hosted dashboard; local teaching and sign-in diagnostics are dormant.
-The dashboard runs on Vercel and lets users create website apps and explore them without naming tasks first, and keeps app metadata in this browser’s local storage. Its exploration and older task screens offer a private Browser Use Cloud teaching connection; production sign-in, capture, and replay still need Nathan’s demonstration.
+The dashboard runs on Vercel and lets users create website apps and explore them without naming tasks first, and keeps app metadata in this browser’s local storage. Its exploration screen uses MCParrot Explorer in a normal browser tab; earlier cloud sessions remain accessible separately; production sign-in, capture, and replay still need Nathan’s demonstration.
 The local diagnostic signed in to Berkeley's Canvas with Duo verification on Nathan's computer and kept that session after a reload.
 The local pilot captured two reading requests from Nathan’s browsing, including a syllabus visit. Hosted recording and replay have a production proof gap; broader task discovery, remote MCP access, persistent storage, and Sentry remain aspirational.
 
@@ -47,7 +47,9 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Reopen task drafts | shipped | App and task metadata survives navigation and refresh in the same browser; automatic type and production build checks pass; hosted teaching still needs a live demonstration |
 | Local request replay tests | gap | Replay controls and shared local MCP operations exist, but the worker does not retain test evidence and a successful live replay is not established |
 | Hosted browser sessions | gap | Production Vercel Authentication and secrets are configured; the first cloud browser launch and Berkeley sign-in need a live demonstration |
-| Request recording | aspirational | Capture requests while the user browses selected pages in one visible session |
+| Normal browser exploration | gap | Production exploration offers an unpacked Chrome/Edge extension; hosted checks and Nathan’s selected-tab capture demonstration must pass. Only supported Canvas GET path metadata is observed; no secrets or website content are transferred |
+| Extension to cloud handoff | gap | Observations stay in extension storage; importing a candidate into separately authenticated Browser Use execution and replay is not available |
+| Request recording | aspirational | Broader request sequences and task derivation remain unavailable; the extension observes narrow reading route metadata only |
 | Suggested task discovery | aspirational | Group observed requests into meaningful task cards; the current list labels captured reading requests only; do not enable untested suggestions |
 | Task review and publication | aspirational | Let the user confirm names, descriptions, inputs, and results, then test changed inputs before publication |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic |
@@ -58,7 +60,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Owner authentication | aspirational | Product accounts, MCP authorization, and multi-user ownership remain unavailable |
 | Session reconnection and verification | aspirational | Keep a pending operation through session expiry and Duo, then resume it |
 | Private pilot credentials | gap | The single owner can configure Sensitive production credentials; encrypted cloud delivery and the live school flow need a production demonstration |
-| Saved credentials | aspirational | A multi-user credential vault and user-managed saved credentials remain unavailable |
+| Saved credentials | aspirational | Optional per-website username/password entry, replacement, and deletion require durable encrypted storage, a separate managed key, and product owner authorization; the fixed private Canvas environment pair is not a user-managed vault |
 | Secure session transfer | aspirational | Prove how session tokens move to request replay without exposing them |
 | Persistent storage | aspirational | Store apps, tasks, and operation status in managed PostgreSQL |
 | Sentry monitoring | aspirational | Add error monitoring, Tracing, and Logs across the complete path |
@@ -89,6 +91,8 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Production teaching has hosted connection and recorder source, but no live school proof, durable captures, or remote assistant connection. No local helper is used.
 - Capture passed its narrow live check; direct replay still needs a successful test and result review.
 - Hosted captures remain in a nonpersistent task session for at most 30 minutes. Worker failure or session deletion loses them; replacing a recording removes its earlier candidates.
+- The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
+- Extension observations do not include authentication and cannot yet be imported for cloud testing or publication.
 - Cloud saved-credential submission, SMS selection, and the in-app code handoff need Nathan’s live production test; school policies may require manual action.
 - The automatic Duo steps in the diagnostic have not had a full clean rerun.
 - The diagnostic works only for the Berkeley sign-in page and only on Nathan's computer.

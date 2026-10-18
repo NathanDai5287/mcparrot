@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { TeachingPanel } from "./teaching-panel";
+import { ExplorationPanel as TeachingPanel, requestExtension } from "./exploration-panel";
 
 type Task = { id: string; name: string; description: string };
 type Website = { id: string; name: string; url: string; sample?: boolean; explorationNotes?: string; tasks: Task[] };
@@ -136,8 +136,9 @@ export default function Workspace() {
     setDeletingAppId(null);
   }
 
-  function deleteApp(app: Website) {
-    setApps(apps.filter((savedApp) => savedApp.id !== app.id));
+  async function deleteApp(app: Website) {
+    await requestExtension("clear", app.id).catch(() => undefined);
+    setApps((savedApps) => savedApps.filter((savedApp) => savedApp.id !== app.id));
     navigate({ view: "apps" }, true);
   }
 
