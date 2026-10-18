@@ -10,7 +10,8 @@ const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
 const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
-const secretParameterWords = new Set(["token", "key", "apikey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "code", "state", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
+const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
+const exactSecretParameters = new Set(["code", "key"]);
 const secretKeyWords = new Set(["auth", "session", "refresh", "access"]);
 const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|bearer|cookie|credential|signature/i;
 const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
@@ -65,10 +66,10 @@ function redactText(text) {
 }
 
 function redact(value, key = "") {
+  if (Array.isArray(value)) return value.map((item) => redact(item, key));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, redact(item, name)]));
   if (key && isSecretKey(key) && value !== null && value !== "" && typeof value !== "boolean") return "redacted";
   if (typeof value === "string") return looksSecret(value) ? "redacted" : redactText(value);
-  if (Array.isArray(value)) return value.map((item) => redact(item));
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, redact(item, name)]));
   return value;
 }
 
@@ -91,7 +92,7 @@ function withoutSecrets(href) {
   const url = new URL(href);
   url.hash = "";
   url.pathname = url.pathname.split("/").map((segment) => isSecretSegment(segment) ? "redacted" : segment).join("/");
-  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || looksSecret(value)) url.searchParams.set(name, "redacted");
+  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || exactSecretParameters.has(name.toLowerCase()) || looksSecret(value)) url.searchParams.set(name, "redacted");
   return url.href.slice(0, maximumUrlLength);
 }
 
