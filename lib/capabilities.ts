@@ -14,7 +14,6 @@ export type Website = {
   id: string;
   name: string;
   url: string;
-  sample?: boolean;
   tasks: Task[];
   browserProfileId?: string;
   signedInAt?: string;

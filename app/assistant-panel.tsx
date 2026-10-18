@@ -15,7 +15,7 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
     const popup = window.open("", "mcparrot-sign-in", "popup,width=1280,height=860");
     setBusy(true);
     setError("");
-    const response = await fetch("/api/sign-in", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: app.name, websiteUrl: app.url, browserProfileId: app.browserProfileId }) }).catch(() => null);
+    const response = await fetch("/api/sign-in", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: app.id, name: app.name, websiteUrl: app.url, browserProfileId: app.browserProfileId }) }).catch(() => null);
     const result = await response?.json().catch(() => ({})) ?? {};
     setBusy(false);
     if (!response?.ok) {
@@ -30,7 +30,7 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
 
   async function finishSignIn(signInBrowser: SignInBrowser) {
     setBusy(true);
-    const response = await fetch(`/api/sign-in?browserId=${signInBrowser.browserId}`, { method: "DELETE" }).catch(() => null);
+    const response = await fetch(`/api/sign-in?browserId=${signInBrowser.browserId}&appId=${app.id}`, { method: "DELETE" }).catch(() => null);
     setBusy(false);
     if (!response?.ok) {
       setError("MCParrot could not save the sign-in. Select Done signing in again.");

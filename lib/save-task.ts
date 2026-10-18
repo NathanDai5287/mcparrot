@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
-import type { Capability, Website } from "./capabilities";
+import type { Capability, Task, Website } from "./capabilities";
 import { addressOnWebsite } from "./run-task";
-import { updateStoredApp } from "./workspace";
+import { changeApp } from "./workspace";
 
 export type PageTask = Omit<Capability, "requests"> & { urlPattern: string };
 
@@ -15,22 +15,36 @@ const placeholders = (urlPattern: string) => [...new Set([...urlPattern.matchAll
 
 const sameNames = (first: string[], second: string[]) => first.length === second.length && [...first].sort().join("\n") === [...second].sort().join("\n");
 
-const withoutPlaceholderNames = (urlPattern: string) => urlPattern.replace(/\{[^}]+\}/g, "{}");
+const patternAddress = (website: string, urlPattern: string) => new URL(urlPattern.replace(/\{[^}]+\}/g, "{}"), website).href;
 
-function rejectionReason(app: Website, { name, urlPattern, inputs }: PageTask) {
-  const address = addressOnWebsite(app, withoutPlaceholderNames(urlPattern)).href;
-  if (!toolName(name) || connectionToolNames.includes(toolName(name))) return "Give the task a short plain name, such as Read course syllabus.";
-  if (!sameNames(placeholders(urlPattern), inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern needs exactly one input with the same name, and every input needs a placeholder.";
-  if (app.tasks.some((task) => toolName(task.name) === toolName(name))) return `${app.name} already has a task named ${name}. Use that tool in a new chat, or choose another name.`;
-  if (app.tasks.some((task) => task.requests.some((request) => new URL(withoutPlaceholderNames(request.urlPattern), app.url).href === address))) return `${app.name} already has a task for ${urlPattern}. Use that tool in a new chat.`;
+function duplicateOf(website: string, tasks: Task[], capability: Capability) {
+  const addresses = capability.requests.map((request) => patternAddress(website, request.urlPattern));
+  return tasks.find((task) => toolName(task.name) === toolName(capability.name)
+    || task.requests.some((request) => addresses.includes(patternAddress(website, request.urlPattern))));
 }
 
-export function saveTask(app: Website, pageTask: PageTask) {
+const withNewTasks = (app: Website, capabilities: Capability[]) => ({
+  ...app,
+  tasks: capabilities.reduce((tasks, capability) => duplicateOf(app.url, tasks, capability) ? tasks : [...tasks, { ...capability, id: crypto.randomUUID() }], app.tasks),
+});
+
+export const addTasks = (appId: string, capabilities: Capability[]) => changeApp(appId, (app) => withNewTasks(app, capabilities));
+
+function rejectionReason(app: Website, capability: Capability) {
+  const { urlPattern } = capability.requests[0];
+  addressOnWebsite(app, urlPattern.replace(/\{[^}]+\}/g, "{}"));
+  if (!toolName(capability.name) || connectionToolNames.includes(toolName(capability.name))) return "Give the task a short plain name, such as Read course syllabus.";
+  if (!sameNames(placeholders(urlPattern), capability.inputs.map((input) => input.name))) return "Every {placeholder} in urlPattern needs exactly one input with the same name, and every input needs a placeholder.";
+  const duplicate = duplicateOf(app.url, app.tasks, capability);
+  if (duplicate) return `${app.name} already has a task with this name or page, ${duplicate.name}. Use that tool in a new chat, or choose another name and page.`;
+}
+
+export function saveTask(app: Website, { urlPattern, ...pageTask }: PageTask) {
   return Sentry.startSpan({ name: "task.save", attributes: { "task.name": pageTask.name } }, async () => {
-    const reason = rejectionReason(app, pageTask);
+    const capability = { ...pageTask, requests: [{ method: "GET", urlPattern }] };
+    const reason = rejectionReason(app, capability);
     if (reason) throw new Error(reason);
-    const { urlPattern, ...capability } = pageTask;
-    await updateStoredApp(app.id, { tasks: [...app.tasks, { ...capability, requests: [{ method: "GET", urlPattern }], id: crypto.randomUUID() }] });
+    await addTasks(app.id, [capability]);
     Sentry.logger.info("Task saved", { appId: app.id, task: pageTask.name });
     return `Saved ${pageTask.name} as a task for ${app.name}. It appears as its own tool, ${toolName(pageTask.name)}, in a new ChatGPT chat; in this chat, keep using read_page.`;
   });

@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ExplorationPanel, requestExtension } from "./exploration-panel";
 import { AssistantPanel } from "./assistant-panel";
-import type { Capability, Task, Website } from "../lib/capabilities";
+import type { Capability, Website } from "../lib/capabilities";
+import type { WorkspaceOperation } from "../lib/workspace";
 
 type Screen =
   | { view: "apps" }
@@ -11,12 +12,6 @@ type Screen =
   | { view: "missing" }
   | { view: "app"; app: Website }
   | { view: "explore"; app: Website };
-
-const sampleApps: Website[] = [
-  { id: "youtube", name: "YouTube", url: "https://www.youtube.com", sample: true, tasks: [] },
-];
-
-const browserWorkspaceKey = "mcparrot-workspace-v1";
 
 function screenPath(screen: Screen) {
   if (screen.view === "apps" || screen.view === "missing") return "/";
@@ -36,23 +31,6 @@ function screenAtPath(apps: Website[]): Screen {
   if (parts.length === 3) return { view: "app", app };
   if (parts[3] === "explore" && parts.length === 4) return { view: "explore", app };
   return { view: "missing" };
-}
-
-function isWorkspace(value: unknown): value is Website[] {
-  if (!Array.isArray(value)) return false;
-  return value.every((app) => typeof app.id === "string" && typeof app.name === "string"
-    && typeof app.url === "string" && Array.isArray(app.tasks));
-}
-
-function isTask(task: Task) {
-  return typeof task.id === "string" && typeof task.name === "string" && typeof task.description === "string"
-    && typeof task.returns === "string" && Array.isArray(task.requests) && Array.isArray(task.inputs);
-}
-
-function browserSavedApps() {
-  const saved: unknown = JSON.parse(localStorage.getItem(browserWorkspaceKey) ?? "null");
-  if (!isWorkspace(saved)) return null;
-  return saved.map((app) => ({ ...app, tasks: app.tasks.filter(isTask) }));
 }
 
 function Icon({ name }: { name: "apps" | "arrow" | "plus" | "back" | "browser" }) {
@@ -105,7 +83,7 @@ export default function Workspace() {
     fetch("/api/workspace").then(async (response) => {
       if (!response.ok) throw new Error("Storage is unavailable.");
       const workspace: { apps: Website[] | null; connectionSecret?: string } = await response.json();
-      const savedApps = workspace.apps ?? browserSavedApps() ?? sampleApps;
+      const savedApps = workspace.apps ?? [];
       setConnectionSecret(workspace.connectionSecret);
       setApps(savedApps);
       setScreen(screenAtPath(savedApps));
@@ -114,16 +92,13 @@ export default function Workspace() {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-    fetch("/api/workspace", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(apps) })
-      .then((response) => setStorageError(!response.ok), () => setStorageError(true));
     const restoreScreen = () => {
       setScreen(screenAtPath(apps));
       setDeletingAppId(null);
     };
     window.addEventListener("popstate", restoreScreen);
     return () => window.removeEventListener("popstate", restoreScreen);
-  }, [apps, loaded]);
+  }, [apps]);
 
   function navigate(nextScreen: Screen, replace = false) {
     const path = screenPath(nextScreen);
@@ -138,20 +113,29 @@ export default function Workspace() {
   async function deleteApp(app: Website) {
     await requestExtension("clear", app.id).catch(() => undefined);
     await fetch(`/api/login?appId=${app.id}`, { method: "DELETE" }).catch(() => undefined);
-    setApps((savedApps) => savedApps.filter((savedApp) => savedApp.id !== app.id));
+    await changeWorkspace({ operation: "deleteApp", appId: app.id });
     navigate({ view: "apps" }, true);
   }
 
-  function createApp(name: string, url: string) {
-    const app: Website = { id: crypto.randomUUID(), name, url, tasks: [] };
-    setApps([...apps, app]);
-    navigate({ view: "app", app });
+  async function changeWorkspace(change: WorkspaceOperation) {
+    const response = await fetch("/api/workspace", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) }).catch(() => null);
+    setStorageError(!response?.ok);
+    if (!response?.ok) return apps;
+    const { apps: savedApps }: { apps: Website[] } = await response.json();
+    setApps(savedApps);
+    setScreen((current) => "app" in current ? { ...current, app: savedApps.find((app) => app.id === current.app.id) ?? current.app } : current);
+    return savedApps;
   }
 
-  function saveTasks(app: Website, capabilities: Capability[]) {
-    const savedApp = { ...app, tasks: capabilities.map((capability) => ({ ...capability, id: crypto.randomUUID() })) };
-    setApps((savedApps) => savedApps.map((candidate) => candidate.id === app.id ? savedApp : candidate));
-    navigate({ view: "app", app: savedApp });
+  async function createApp(name: string, url: string) {
+    const app: Website = { id: crypto.randomUUID(), name, url, tasks: [] };
+    const savedApps = await changeWorkspace({ operation: "createApp", app });
+    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
+  }
+
+  async function saveTasks(app: Website, capabilities: Capability[]) {
+    const savedApps = await changeWorkspace({ operation: "addTasks", appId: app.id, capabilities });
+    navigate({ view: "app", app: savedApps.find((savedApp) => savedApp.id === app.id) ?? app });
   }
 
   function updateApp(appId: string, changes: Partial<Website>) {
@@ -183,7 +167,7 @@ export default function Workspace() {
             <div className="section-heading"><h2>Websites <span>{apps.length}</span></h2><span>Choose a website to explore</span></div>
             <div className="app-list">{apps.map((app) => <button className="app-row" key={app.id} onClick={() => navigate({ view: "app", app })}>
               <span className={`app-mark ${app.id}`}>{app.name.charAt(0).toUpperCase()}</span>
-              <span className="app-main"><span className="app-name">{app.name} {app.sample && <span className="badge">Sample</span>}</span><span className="website-address">{app.url}</span></span>
+              <span className="app-main"><span className="app-name">{app.name}</span><span className="website-address">{app.url}</span></span>
               <span className="app-status">{app.signedInAt ? "Signed in" : "Not signed in"}<small>{app.tasks.length === 0 ? "No tasks yet" : `${app.tasks.length} ${app.tasks.length === 1 ? "task" : "tasks"}`}</small></span><Icon name="arrow" />
             </button>)}</div>
             <p className="preview-note">MCParrot stores apps and chosen tasks so your assistant can use them. Recorded requests stay in MCParrot Explorer.</p>
@@ -197,7 +181,7 @@ export default function Workspace() {
             <BackButton onClick={() => navigate({ view: "apps" })}>All apps</BackButton>
             <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
             <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
-            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" onClick={() => updateApp(screen.app.id, { tasks: screen.app.tasks.filter((savedTask) => savedTask.id !== task.id) })}>Delete</button></div>)}</div>}
+            {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span><button className="delete-link" onClick={() => changeWorkspace({ operation: "deleteTask", appId: screen.app.id, taskId: task.id })}>Delete</button></div>)}</div>}
             <AssistantPanel app={screen.app} connectionSecret={connectionSecret} onChange={(changes) => updateApp(screen.app.id, changes)} />
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">

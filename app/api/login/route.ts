@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { deleteLogin, saveLogin } from "../../../lib/login";
+import { updateStoredApp } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export async function PUT(request: Request) {
   const { appId, websiteUrl, username, password } = await request.json() as { appId: string; websiteUrl: string; username: string; password: string };
   const hosts = await loginHosts(websiteUrl);
   await saveLogin(appId, { username, password, hosts });
+  await updateStoredApp(appId, { loginSavedAt: new Date().toISOString() });
   Sentry.logger.info("Login saved", { appId, hosts: hosts.join(", ") });
   return Response.json({ saved: true });
 }
@@ -20,6 +22,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const appId = new URL(request.url).searchParams.get("appId")!;
   await deleteLogin(appId);
+  await updateStoredApp(appId, { loginSavedAt: undefined });
   Sentry.logger.info("Login deleted", { appId });
   return Response.json({ deleted: true });
 }
