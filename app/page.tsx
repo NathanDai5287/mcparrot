@@ -99,12 +99,14 @@ export default function Workspace() {
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState(false);
   const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
+  const [connectionSecret, setConnectionSecret] = useState<string>();
 
   useEffect(() => {
     fetch("/api/workspace").then(async (response) => {
       if (!response.ok) throw new Error("Storage is unavailable.");
-      const workspace: { apps: Website[] | null } = await response.json();
+      const workspace: { apps: Website[] | null; connectionSecret?: string } = await response.json();
       const savedApps = workspace.apps ?? browserSavedApps() ?? sampleApps;
+      setConnectionSecret(workspace.connectionSecret);
       setApps(savedApps);
       setScreen(screenAtPath(savedApps));
       setLoaded(true);
@@ -195,7 +197,7 @@ export default function Workspace() {
             <PageHeader title={screen.app.name} description={screen.app.url} action={<button className="button primary" onClick={() => navigate({ view: "explore", app: screen.app })}><Icon name="browser" />Explore website</button>} />
             <div className="section-heading"><h2>Tasks <span>{screen.app.tasks.length}</span></h2><span>Explore, find what the site can do, then choose</span></div>
             {screen.app.tasks.length === 0 ? <section className="empty-state"><h3>Start by exploring</h3><p>Browse the pages you use, then let MCParrot find what this site can do. Choose the tasks to keep.</p></section> : <div className="app-list">{screen.app.tasks.map((task) => <div className="task-row" key={task.id}><span className="app-main"><span className="app-name">{task.name}</span><span className="website-address">{task.description}</span><span className="website-address">Inputs: {task.inputs.map((input) => input.name).join(", ") || "none"} · Returns: {task.returns}</span></span></div>)}</div>}
-            <AssistantPanel app={screen.app} onChange={(changes) => updateApp(screen.app.id, changes)} />
+            <AssistantPanel app={screen.app} connectionSecret={connectionSecret} onChange={(changes) => updateApp(screen.app.id, changes)} />
             <section className="app-settings">
               {deletingAppId !== screen.app.id ? <button className="delete-link" onClick={() => setDeletingAppId(screen.app.id)}>Delete app</button> : <div role="group" aria-label="Confirm app deletion">
                 <h2>Delete {screen.app.name}?</h2>
@@ -203,13 +205,12 @@ export default function Workspace() {
                 <div className="form-actions"><button className="button danger" onClick={() => deleteApp(screen.app)}>Delete app and tasks</button><button className="button" onClick={() => setDeletingAppId(null)}>Keep app</button></div>
               </div>}
             </section>
-            <section className="assistant-section"><div><h2>Use tasks in your assistant</h2><p>Assistant connections will be available after the MCP server is built.</p></div><button className="button" disabled>Connect assistant</button></section>
           </>}
           {apps.map((app) => <div key={`explore-${app.id}`} hidden={screen.view !== "explore" || screen.app.id !== app.id}>
             <BackButton onClick={() => navigate({ view: "app", app })}>{app.name}</BackButton>
             <PageHeader title={`Explore ${app.name}`} description="Browse the pages you use, find what this site can do, then choose the tasks to keep." />
             <ExplorationPanel appId={app.id} websiteUrl={app.url} active={screen.view === "explore" && screen.app.id === app.id} onSave={(capabilities) => saveTasks(app, capabilities)} />
-            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Nothing becomes an assistant tool yet.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
+            <div className="teaching-actions"><p>Recorded requests stay in MCParrot Explorer until you delete them. Saved reading tasks become tools in this app’s ChatGPT connection.</p><button className="button" onClick={() => navigate({ view: "app", app })}>Return to app</button></div>
           </div>)}
 
         </main>

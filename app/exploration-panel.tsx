@@ -116,7 +116,7 @@ export function ExplorationPanel({ appId, websiteUrl, active, onSave }: { appId:
     {choices.length > 0 && <div className="pilot-candidates">
       <h3>Choose the tasks to keep</h3>
       <div className="capability-list">{choices.map((choice, index) => <CapabilityChoice key={index} choice={choice} onChange={(changes) => changeChoice(index, changes)} />)}</div>
-      <p className="field-help">Saving replaces this app’s current tasks. Tasks are not assistant tools yet.</p>
+      <p className="field-help">Saving replaces this app’s current tasks. Reading tasks become tools in this app’s ChatGPT connection.</p>
       <div className="pilot-controls"><button className="button primary" disabled={chosen.length === 0} onClick={() => onSave(chosen.map(({ selected, ...capability }) => capability))}>Save {chosen.length} {chosen.length === 1 ? "task" : "tasks"}</button></div>
     </div>}
     {error && <p className="pilot-error" role="alert">{error}</p>}

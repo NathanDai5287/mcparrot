@@ -54,6 +54,34 @@ function SignInSection({ app, onChange }: { app: Website; onChange: (changes: Ap
   </section>;
 }
 
-export function AssistantPanel({ app, onChange }: { app: Website; onChange: (changes: AppChanges) => void }) {
-  return <SignInSection app={app} onChange={onChange} />;
+function ConnectionSection({ app, connectionSecret }: { app: Website; connectionSecret?: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!connectionSecret) return <section className="assistant-section"><div><h2>Use tasks in ChatGPT</h2><p>The connection link is available on the production site.</p></div></section>;
+  const link = `${window.location.origin}/mcp/apps/${app.id}?x-vercel-protection-bypass=${connectionSecret}`;
+
+  async function copyLink() {
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+  }
+
+  return <section className="assistant-section">
+    <div>
+      <h2>Use tasks in ChatGPT</h2>
+      <p>This private link contains a secret code. Anyone with the link can use MCParrot, so keep it private. ChatGPT gets this app’s reading tasks only.</p>
+      <ol className="field-help">
+        <li>Copy the link.</li>
+        <li>In ChatGPT, open Settings, then Apps &amp; Connectors, then Advanced settings, and turn on Developer mode.</li>
+        <li>Select Create, name the connector {app.name}, paste the link as the MCP server URL, and choose No authentication.</li>
+        <li>In a new chat, ask ChatGPT to use {app.name}.</li>
+      </ol>
+    </div>
+    <button className="button primary" onClick={copyLink}>{copied ? "Link copied" : "Copy link"}</button>
+  </section>;
+}
+
+export function AssistantPanel({ app, connectionSecret, onChange }: { app: Website; connectionSecret?: string; onChange: (changes: AppChanges) => void }) {
+  return <>
+    <SignInSection app={app} onChange={onChange} />
+    <ConnectionSection app={app} connectionSecret={connectionSecret} />
+  </>;
 }
