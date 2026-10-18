@@ -158,7 +158,7 @@ Its inputs are `name`, `description`, an optional `method` of `GET` or `POST` th
 The `earlierRequests` description tells ChatGPT to use [step placeholders](#using-saved-tools) for a value, such as a cart ID, that an earlier JSON response returns.
 It rejects a URL pattern that is not on the app's website domain, a body on a GET request, a request that the checkout and payment guard refuses, a step placeholder that does not name an earlier request, placeholders other than step placeholders that do not match the inputs one to one, a name that gives an empty tool name or a connection tool's name, and a tool whose tool name or request list, ignoring placeholder names, matches an existing tool.
 A saved tool appears on the app page, where **Delete** removes it, and appears in ChatGPT's next new chat; the confirmation tells ChatGPT to keep using `read_page` in the current chat.
-ChatGPT saves a tool only when the user asks, because an automatic save after each `read_page` added a second write call, and often a confirmation, to the turn, while the saved tool helps only in a later chat.
+ChatGPT saves a tool only when the user asks, so a page that the user reads often stays a `read_page` call until the user asks to save it.
 
 Nathan chose a private connection link for each app instead of MCP sign-in.
 The link is `https://mcparrot.vercel.app/mcp/apps/<app-id>?token=<token>`, where the token is 32 random bytes that MCParrot creates when the user selects **Create link** or **Regenerate link** on the app page.
