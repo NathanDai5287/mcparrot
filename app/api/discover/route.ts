@@ -22,18 +22,19 @@ const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
 const secretLabels = String.raw`password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code`;
 const labelledSecret = new RegExp(String.raw`\b(${secretLabels})(\s*[:=]\s*)(\\?"[^"\\]*\\?"|'[^']*'|(?:[^\s&;,"'<>]|[&;,](?![\w.-]+=|(?:${secretLabels})\s*[:=]|\s|$))+)`, "gi");
 
+const clipped = (maximumLength: number) => z.string().transform((value) => value.slice(0, maximumLength));
 const capturedRequestSchema = z.object({
   kind: z.literal("page").optional(),
   method: z.string().max(16),
-  url: z.string().max(2000),
-  pattern: z.string().max(2000),
+  url: clipped(2000),
+  pattern: clipped(2000),
   status: z.number().int(),
-  contentType: z.string().max(200),
-  sample: z.string().max(3000),
+  contentType: clipped(200),
+  sample: clipped(3000),
 });
 const discoveryBodySchema = z.object({
   appId: appIdSchema,
-  requests: z.array(capturedRequestSchema).max(150),
+  requests: z.array(capturedRequestSchema).transform((requests) => requests.slice(0, 150)),
 });
 type CapturedRequest = z.infer<typeof capturedRequestSchema>;
 
