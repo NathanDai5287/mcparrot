@@ -2,17 +2,14 @@ import * as Sentry from "@sentry/nextjs";
 import { capabilitySchema, type Capability, type DiscoveredCapability, type TaskRequest, type Website } from "./capabilities";
 import { addressOnWebsite } from "./run-task";
 import { bodyPlaceholderPattern, isAllowedRequest, paymentRefusal, requestPlaceholders, usesOnlyEarlierSteps } from "./task-request";
+import { connectionToolNames, toolName } from "./tool-names";
 import { changeApp } from "./workspace";
 
 type PageRequest = { method?: "GET" | "POST"; urlPattern: string; bodyPattern?: string; contentType?: string };
 
 type PageTask = Omit<Capability, "requests"> & PageRequest & { earlierRequests?: PageRequest[] };
 
-export const connectionToolNames = ["read_page", "view_image", "save_task", "submit_verification_code", "prepare_order", "check_order", "place_order", "cancel_order"];
-
-export function toolName(taskName: string) {
-  return taskName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
-}
+export { connectionToolNames, toolName };
 
 function taskNameProblem(taskName: string) {
   const name = toolName(taskName);

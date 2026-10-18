@@ -242,15 +242,15 @@ function bodyMatches(bodyPattern: string, body: string) {
   return pattern && recorded ? valueMatches(pattern.value, recorded.value) : valueMatches(bodyPattern, body);
 }
 
-const wasRecorded = (request: TaskRequest, recorded: CapturedRequest[], origin: string) => recorded.some((candidate) =>
+const recordedAs = (request: TaskRequest, candidate: CapturedRequest, origin: string) =>
   candidate.method.toUpperCase() === request.method
   && ((URL.canParse(candidate.pattern) && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin)) || addressMatches(request.urlPattern, candidate.url, origin))
-  && (request.bodyPattern === undefined ? !candidate.body : candidate.body !== undefined && bodyMatches(request.bodyPattern, candidate.body)));
+  && (request.bodyPattern === undefined ? !candidate.body : candidate.body !== undefined && bodyMatches(request.bodyPattern, candidate.body));
 
-const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: string) => capability.requests.every((request) => wasRecorded(request, recorded, origin));
+const isUsable = (capability: Capability, recorded: CapturedRequest[], origin: string) => capability.requests.every((request) => recorded.some((candidate) => recordedAs(request, candidate, origin)));
 
 function withRecordedHeaders(request: TaskRequest, recorded: CapturedRequest[], origin: string): TaskRequest {
-  const match = recorded.find((candidate) => candidate.requestHeaders && candidate.method.toUpperCase() === request.method && pathOf(candidate.pattern, origin) === pathOf(request.urlPattern, origin));
+  const match = recorded.find((candidate) => candidate.requestHeaders && recordedAs(request, candidate, origin));
   const tokenSource = recorded.find((candidate) => candidate.tokenHeaders?.length && originOf(candidate.pattern, origin) === originOf(request.urlPattern, origin));
   return { ...request, ...(match ? { headers: match.requestHeaders } : {}), ...(tokenSource ? { tokenHeaders: tokenSource.tokenHeaders } : {}) };
 }
