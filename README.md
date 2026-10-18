@@ -154,7 +154,8 @@ Sending private website content to the AI model is allowed; only secrets stay ou
 The data leaves the browser only when the user selects **Find what this site can do**, and it contains no headers, cookies, credentials, request bodies, or sign-in traffic.
 The server reads `GEMINI_API_KEY` from a Sensitive Vercel production variable or from `.env.local`; it never sends the key to the browser or writes it to logs.
 Vercel Authentication protects the production site, so only Nathan can start discovery.
-If the key is missing or the Gemini call fails, the exploration screen shows a clear error.
+When Gemini is busy, the server retries twice, then tries `gemini-flash-lite-latest` once.
+If the key is missing or the Gemini call still fails, the exploration screen shows a clear error.
 
 ## Browser visibility by phase
 

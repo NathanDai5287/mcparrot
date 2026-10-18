@@ -1,6 +1,14 @@
 import type { CapturedRequest } from "../../../lib/capabilities";
 
-const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+export const maxDuration = 60;
+
+const geminiAttempts = [
+  { model: "gemini-flash-latest", waitMs: 0 },
+  { model: "gemini-flash-latest", waitMs: 1000 },
+  { model: "gemini-flash-latest", waitMs: 2000 },
+  { model: "gemini-flash-lite-latest", waitMs: 0 },
+];
+const overloadedStatuses = [429, 503];
 const text = { type: "STRING" };
 const capabilitiesSchema = {
   type: "OBJECT",
@@ -34,20 +42,30 @@ Requests:
 ${JSON.stringify(requests)}`;
 }
 
+async function askGemini(apiKey: string, body: string) {
+  let response = new Response(null, { status: 503 });
+  for (const { model, waitMs } of geminiAttempts) {
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
+      body,
+    });
+    if (!overloadedStatuses.includes(response.status)) return response;
+  }
+  return response;
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return Response.json({ error: "Discovery is not set up. Add GEMINI_API_KEY to the server environment." }, { status: 500 });
   const { websiteUrl, requests } = await request.json() as { websiteUrl: string; requests: CapturedRequest[] };
   if (!requests?.length) return Response.json({ error: "Explore the website first so there are requests to read." }, { status: 400 });
 
-  const response = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: discoveryPrompt(websiteUrl, requests) }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: capabilitiesSchema },
-    }),
-  });
+  const response = await askGemini(apiKey, JSON.stringify({
+    contents: [{ parts: [{ text: discoveryPrompt(websiteUrl, requests) }] }],
+    generationConfig: { responseMimeType: "application/json", responseSchema: capabilitiesSchema },
+  }));
   if (!response.ok) return Response.json({ error: `Gemini could not read the requests (error ${response.status}). Try again.` }, { status: 502 });
   const result = await response.json();
   const answer: string | undefined = result.candidates?.[0]?.content?.parts?.[0]?.text;
