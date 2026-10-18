@@ -1,4 +1,5 @@
 // @ts-check
+import { constants } from "node:os";
 import { BrowserUse } from "browser-use-sdk/v4";
 
 const RUN_TIMEOUT_MS = 15 * 60 * 1000;
@@ -35,10 +36,12 @@ async function cancelRun() {
   }
 }
 
-process.once("SIGINT", async () => {
-  await cancelRun();
-  process.exit(130);
-});
+for (const signal of /** @type {const} */ (["SIGINT", "SIGTERM", "SIGHUP"])) {
+  process.once(signal, async () => {
+    await cancelRun();
+    process.exit(128 + constants.signals[signal]);
+  });
+}
 
 try {
   const run = await created;
