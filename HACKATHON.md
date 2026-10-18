@@ -112,7 +112,7 @@ For example, the Commit Fellowship requires a supplemental form.
 | Sponsor | Challenge | Why it matches |
 | --- | --- | --- |
 | Browser Use | Best Use of Browser Use | The user signs in once in a Browser Use cloud browser with a persistent profile, and each ChatGPT tool call runs the saved tool in a hidden Browser Use browser with that profile; when the website signs out, a Browser Use agent signs in again with the saved login through secret bindings, chooses the text-message check, and finishes after the user types the code in ChatGPT; this use is a gap until Nathan's live demonstration passes |
-| Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; MCParrot sends error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring, and the demo must show how that evidence changed what we built, which is a gap |
+| Sentry | Best Use of Sentry | Requires error monitoring plus at least two other Sentry products, such as Replay, Logs, Tracing, Profiling, Uptime, or AI agent monitoring; MCParrot sends error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring, and the demo must show how that evidence changed what we built, using the three production errors that changed the product, which the [status page](STATUS.md) records |
 | Fetch.ai | ASI:One Agent Challenge (Agentverse) | Rewards agents that turn intent into action; it fits only if the demo shows MCP tools registered as agents; Devpost lists $3,000, so confirm the amount on Devpost |
 
 ### Secondary sponsor challenges
