@@ -47,7 +47,26 @@ function wordsOf(text: string) {
   return decoded(text).replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join(" ");
 }
 
-export const looksLikePayment = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [urlPattern.replace(/^https?:\/\/[^/]+/i, ""), bodyPattern].some((text) => paymentWords.test(wordsOf(text)));
+type GraphqlOperation = { query?: unknown; operationName?: unknown };
+
+function graphqlOperations(body: string): GraphqlOperation[] | undefined {
+  try {
+    const operations: GraphqlOperation[] = [JSON.parse(body)].flat();
+    return operations.every((operation) => typeof operation?.query === "string" || typeof operation?.operationName === "string") ? operations : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function looksLikePaymentOperation({ query, operationName }: GraphqlOperation) {
+  const name = typeof operationName === "string" ? operationName : "";
+  const isMutation = typeof query === "string" && /\bmutation\b/.test(query);
+  return paymentWords.test(wordsOf(isMutation ? `${name} ${query}` : name));
+}
+
+const looksLikePaymentBody = (body: string) => graphqlOperations(body)?.some(looksLikePaymentOperation) ?? paymentWords.test(wordsOf(body));
+
+export const looksLikePayment = ({ urlPattern, bodyPattern = "" }: TaskRequest) => paymentWords.test(wordsOf(urlPattern.replace(/^https?:\/\/[^/]+/i, ""))) || looksLikePaymentBody(bodyPattern);
 
 export function isAllowedRequest(request: TaskRequest) {
   const method = request.method.toUpperCase();
