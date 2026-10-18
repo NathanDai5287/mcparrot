@@ -4,11 +4,22 @@ const maximumStringLength = 80;
 const maximumArrayItems = 2;
 const maximumSampleLength = 3000;
 const maximumTextSampleLength = 400;
+const maximumUrlLength = 2000;
+const retentionDays = 30;
 const dataResourceTypes = ["XHR", "Fetch", "EventSource"];
 const dataContentType = /json|xml|graphql/i;
-const authenticationPath = /\b(log-?in|log-?out|sign-?in|sign-?out|auth|authorize|oauth2?|token|session|password|sso|saml|cas)\b/i;
+const authenticationWords = new Set(["login", "logout", "signin", "signout", "auth", "authorize", "oauth", "oauth2", "token", "session", "password", "sso", "saml", "saml2", "cas", "refresh", "otp", "mfa", "verify"]);
 const analyticsHost = /google-analytics|googletagmanager|doubleclick|segment\.(io|com)|mixpanel|sentry\.io|hotjar|amplitude|newrelic|nr-data|datadoghq|fullstory|clarity\.ms|heapanalytics|facebook\.net/i;
-const secretParameter = /token|key|auth|password|secret|session|sig/i;
+const secretParameterWords = new Set(["token", "apikey", "accesskey", "auth", "password", "passwd", "pwd", "secret", "session", "sessionid", "sid", "sig", "signature", "verifier", "ticket", "jwt", "nonce", "otp", "credential", "csrf", "xsrf", "bearer", "assertion", "samlresponse", "authorization"]);
+const exactSecretParameters = new Set(["code", "key"]);
+const secretKeyWords = new Set(["auth", "session", "refresh", "access"]);
+const secretKeyText = /token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|bearer|cookie|credential|signature/i;
+const jwtText = /eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
+const bearerText = /\bbearer\s+[\w\-.~+/]+=*/gi;
+const secretName = "[\\w-]*(?:token|secret|password|passwd|api[_-]?key|csrf|xsrf|jwt|session[_-]?id|sessionid|credential|signature|authorization)[\\w-]*";
+const secretAssignmentText = new RegExp(`\\b(${secretName})(["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|<[^<>\\s]*>|(?:(?:basic|bearer|digest)\\s+)?[^\\s"'&,;}<]+)`, "gi");
+const secretElementText = new RegExp(`(<(${secretName})\\b[^>]*>)[^<]*(</\\2\\s*>)`, "gi");
+const longValueText = /[\w+=\-~]{32,}/g;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
@@ -17,6 +28,49 @@ function update(operation) {
   const result = updates.then(operation);
   updates = result.catch(() => {});
   return result;
+}
+
+function wordsOf(name) {
+  return name.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+function hasWord(words, set) {
+  const has = (word) => set.has(word) || set.has(word.replace(/s$/, ""));
+  return words.some((word, index) => has(word) || (index > 0 && has(words[index - 1] + word)));
+}
+
+function isAuthenticationPath(pathname) {
+  return hasWord(wordsOf(pathname), authenticationWords);
+}
+
+function isSecretKey(key) {
+  return secretKeyText.test(key) || hasWord(wordsOf(key), secretKeyWords);
+}
+
+function isHighEntropy(text) {
+  if (text.length < 32 || !/^[\w+=\-~]+$/.test(text) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false;
+  const hex = /^[0-9a-f]+$/i.test(text);
+  if (!hex && !(/[a-z]/.test(text) && /[A-Z]/.test(text) && /\d/.test(text))) return false;
+  const counts = {};
+  for (const character of text) counts[character] = (counts[character] ?? 0) + 1;
+  const entropy = Object.values(counts).reduce((total, count) => total - (count / text.length) * Math.log2(count / text.length), 0);
+  return entropy >= (hex ? 3 : 3.5);
+}
+
+function looksSecret(text) {
+  return /^\s*(bearer|basic)\s/i.test(text) || new RegExp(`^${jwtText.source}$`).test(text) || isHighEntropy(text);
+}
+
+function redactText(text) {
+  return text.replace(jwtText, "redacted").replace(bearerText, "Bearer redacted").replace(secretElementText, "$1redacted$3").replace(secretAssignmentText, (_, name, separator, value) => `${name}${separator}${/^["']/.test(value) ? `${value[0]}redacted${value[0]}` : "redacted"}`).replace(longValueText, (value) => isHighEntropy(value) ? "redacted" : value);
+}
+
+function redact(value, key = "") {
+  if (Array.isArray(value)) return value.map((item) => redact(item, key));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, redact(item, name)]));
+  if (key && isSecretKey(key) && value !== null && value !== "" && typeof value !== "boolean") return "redacted";
+  if (typeof value === "string") return looksSecret(value) ? "redacted" : redactText(value);
+  return value;
 }
 
 function shorten(value) {
@@ -28,26 +82,38 @@ function shorten(value) {
 
 function sampleOf(text) {
   try {
-    return JSON.stringify(shorten(JSON.parse(text))).slice(0, maximumSampleLength);
+    return JSON.stringify(shorten(redact(JSON.parse(text)))).slice(0, maximumSampleLength);
   } catch {
-    return text.slice(0, maximumTextSampleLength);
+    return redactText(text.slice(0, maximumTextSampleLength * 2)).slice(0, maximumTextSampleLength);
   }
 }
 
 function withoutSecrets(href) {
   const url = new URL(href);
-  for (const name of [...url.searchParams.keys()]) if (secretParameter.test(name)) url.searchParams.set(name, "redacted");
-  return url.href;
+  url.hash = "";
+  url.pathname = url.pathname.split("/").map((segment) => isSecretSegment(segment) ? "redacted" : segment).join("/");
+  for (const [name, value] of [...url.searchParams]) if (hasWord(wordsOf(name), secretParameterWords) || exactSecretParameters.has(name.toLowerCase()) || looksSecret(value)) url.searchParams.set(name, "redacted");
+  return url.href.slice(0, maximumUrlLength);
+}
+
+function isSecretSegment(segment) {
+  try {
+    return looksSecret(decodeURIComponent(segment));
+  } catch {
+    return looksSecret(segment);
+  }
 }
 
 function pathPattern(url) {
-  return url.pathname.split("/").map((segment) => /^\d+$|^[0-9a-f-]{32,36}$/i.test(segment) ? "{id}" : segment).join("/");
+  return url.pathname.split("/").map((segment) => /^\d+$|^[0-9a-f-]{32,36}$/i.test(segment) || isSecretSegment(segment) ? "{id}" : segment).join("/");
 }
 
 function rememberRequest({ requestId, request }) {
   const url = new URL(request.url);
-  if (!url.protocol.startsWith("http") || analyticsHost.test(url.hostname) || authenticationPath.test(url.pathname)) return;
-  pendingRequests.set(requestId, { method: request.method, url: withoutSecrets(request.url), pattern: url.origin + pathPattern(url) });
+  if (!url.protocol.startsWith("http") || analyticsHost.test(url.hostname) || isAuthenticationPath(url.pathname)) return;
+  const pattern = url.origin + pathPattern(url);
+  if (pattern.length > maximumUrlLength) return;
+  pendingRequests.set(requestId, { method: request.method, url: withoutSecrets(request.url), pattern });
 }
 
 function rememberResponse({ requestId, type, response }) {
@@ -58,16 +124,37 @@ function rememberResponse({ requestId, type, response }) {
   request.contentType = response.mimeType;
 }
 
+const explorationKey = (appId) => `explorations:${appId}`;
+
+async function readRequests(appId) {
+  const key = explorationKey(appId);
+  const { [key]: exploration, explorations: legacy } = await chrome.storage.local.get([key, "explorations"]);
+  return exploration?.requests ?? legacy?.[appId] ?? [];
+}
+
+async function tidyStorage() {
+  const stored = await chrome.storage.local.get(null);
+  const now = Date.now();
+  const legacy = stored.explorations;
+  for (const appId of Object.keys(legacy ?? {})) {
+    await chrome.storage.local.set({ [explorationKey(appId)]: { recordedAt: now, requests: legacy[appId] } });
+    delete legacy[appId];
+    await chrome.storage.local.set({ explorations: legacy });
+  }
+  if (legacy) await chrome.storage.local.remove("explorations");
+  const { active } = await chrome.storage.session.get("active");
+  const expired = Object.entries(stored).filter(([key, value]) => key.startsWith("explorations:") && key !== explorationKey(active?.appId) && !(now - (value?.recordedAt ?? 0) < retentionDays * 86400000)).map(([key]) => key);
+  if (expired.length) await chrome.storage.local.remove(expired);
+}
+
 function save(tabId, captured) {
   return update(async () => {
     const { active } = await chrome.storage.session.get("active");
-    const { explorations = {} } = await chrome.storage.local.get("explorations");
     if (active?.tabId !== tabId) return;
-    const requests = explorations[active.appId] ?? [];
+    const requests = await readRequests(active.appId);
     if (requests.length >= maximumRequests || requests.some(({ method, pattern }) => method === captured.method && pattern === captured.pattern)) return;
-    explorations[active.appId] = [...requests, captured];
-    await chrome.storage.local.set({ explorations });
-  });
+    await chrome.storage.local.set({ [explorationKey(active.appId)]: { recordedAt: Date.now(), requests: [...requests, captured] } });
+  }).catch((error) => chrome.storage.session.set({ saveError: `Could not save a recorded request: ${error.message}` }));
 }
 
 async function recordRequest(tabId, requestId) {
@@ -83,33 +170,40 @@ async function recordPage(tabId) {
   const page = evaluation?.result?.value;
   if (page?.contentType !== "text/html") return;
   const url = new URL(page.url);
-  if (!url.protocol.startsWith("http") || authenticationPath.test(url.pathname)) return;
-  const sample = page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength);
-  await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern: url.origin + pathPattern(url), status: page.status, contentType: page.contentType, sample });
+  const pattern = url.origin + pathPattern(url);
+  if (!url.protocol.startsWith("http") || isAuthenticationPath(url.pathname) || pattern.length > maximumUrlLength) return;
+  const sample = redactText(page.text.replace(/\s+/g, " ").trim().slice(0, maximumSampleLength * 2)).slice(0, maximumSampleLength);
+  await save(tabId, { kind: "page", method: "GET", url: withoutSecrets(page.url), pattern, status: page.status, contentType: page.contentType, sample });
 }
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (method === "Page.loadEventFired") void recordPage(source.tabId);
+  if (method === "Page.loadEventFired") void recordPage(source.tabId).catch(() => {});
   if (method === "Network.requestWillBeSent") rememberRequest(params);
   if (method === "Network.responseReceived") rememberResponse(params);
   if (method === "Network.loadingFailed") pendingRequests.delete(params.requestId);
-  if (method === "Network.loadingFinished") void recordRequest(source.tabId, params.requestId);
+  if (method === "Network.loadingFinished") void recordRequest(source.tabId, params.requestId).catch(() => {});
 });
 
 async function status(appId) {
-  const { active } = await chrome.storage.session.get("active");
-  const { explorations = {} } = await chrome.storage.local.get("explorations");
-  return { recording: active?.appId === appId, requests: explorations[appId] ?? [] };
+  const { active, saveError = "" } = await chrome.storage.session.get(["active", "saveError"]);
+  return { recording: active?.appId === appId, requests: await readRequests(appId), activeAppId: active?.appId ?? null, saveError };
 }
 
 async function startRecording(appId, websiteUrl) {
   const { active } = await chrome.storage.session.get("active");
   if (active) throw new Error("Stop your current exploration before opening another.");
   if (!/^https?:\/\//.test(websiteUrl)) throw new Error("The app needs a website address that starts with http or https.");
+  await chrome.storage.session.remove("saveError");
   const tab = await chrome.tabs.create({ url: "about:blank" });
-  await chrome.debugger.attach({ tabId: tab.id }, "1.3");
-  await chrome.debugger.sendCommand({ tabId: tab.id }, "Network.enable");
-  await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
+  try {
+    await chrome.debugger.attach({ tabId: tab.id }, "1.3");
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Network.enable");
+    await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.enable");
+  } catch (error) {
+    await chrome.debugger.detach({ tabId: tab.id }).catch(() => {});
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    throw error;
+  }
   await chrome.storage.session.set({ active: { appId, tabId: tab.id } });
   await chrome.tabs.update(tab.id, { url: websiteUrl });
 }
@@ -121,14 +215,19 @@ async function stopRecording(tabId) {
 }
 
 async function operate({ action, appId, websiteUrl }) {
+  await tidyStorage().catch(() => {});
   if (action === "start") await startRecording(appId, websiteUrl);
   if (action === "status" || action === "start") return status(appId);
   const { active } = await chrome.storage.session.get("active");
-  if (active?.appId === appId) await stopRecording(active.tabId);
+  if (active && (action === "stop" || active.appId === appId)) await stopRecording(active.tabId);
   if (action === "clear") {
-    const { explorations = {} } = await chrome.storage.local.get("explorations");
-    delete explorations[appId];
-    await chrome.storage.local.set({ explorations });
+    await chrome.storage.local.remove(explorationKey(appId));
+    const { explorations: legacy } = await chrome.storage.local.get("explorations");
+    if (legacy?.[appId]) {
+      delete legacy[appId];
+      await chrome.storage.local.set({ explorations: legacy });
+    }
+    await chrome.storage.session.remove("saveError");
   }
   return status(appId);
 }
