@@ -79,8 +79,8 @@
         <p><em>[Slide 6, then clip 4: Gradescope and Ed]</em><br>Here, my agent used two servers at once: Gradescope for my midterm score, and Ed for the class mean and standard deviation, which it read from a chart image. I'm point eight one standard deviations above the mean.</p>
         <p><em>[Slide 7, then clip 5: Canvas signs back in]</em><br>In this one, Canvas had signed me out. A Browser Use agent signed back in, asked me for my two-factor code, and once I sent it, it finished and listed my assignments.</p>
         <p><em>[Slide 8, then clip 6: DoorDash]</em><br>And here, it added a pizza to my DoorDash cart without placing the order. When I say yes, it checks out with Stripe Pay with Link, within my spending limit.</p>
-        <p><em>[Slide 9: the stack]</em><br>Under the hood, MCParrot isn't a browser bot. A Chrome extension records the site's API requests. An LLM turns them into tools. An MCP server serves them to any agent. Each call goes straight to the site's own API, and the answer is cut down to a fraction of its size. And Browser Use keeps it all signed in as you.</p>
-        <p><em>[Slide 10: the close]</em><br>MCParrot turns every website into data for your agent. Next, we'll test every tool automatically and let you add new websites just by asking. Try it at mcparrot dot vercel dot app.</p>
+        <p><em>[Slide 9: the stack]</em><br>MCParrot isn't a browser bot that clicks through screens. Here's the stack, from front to back. The front end is a Next.js and React app on Vercel, with Clerk for accounts. A Chrome extension records each site's API requests through the Chrome DevTools Protocol. The back end is Next.js server routes plus an MCP server that any agent can connect to. Upstash Redis stores the apps, the tools, and encrypted logins. Claude, through the Cursor SDK, is the LLM we use today to turn recordings into tools and to read images. Browser Use runs the signed-in cloud browsers, which we drive with Playwright. Stripe Pay with Link handles checkout, and Sentry watches every call for errors and slow steps.</p>
+        <p><em>[Slide 10: the close]</em><br>MCParrot turns every website into data for your agent. So, what's next? First: what if every new tool tested itself before your agent ever used it? Second: what if you could add a new website just by asking, with no recording at all? And third: what if you could run MCParrot itself from your agent? Try it at mcparrot dot vercel dot app.</p>
       </section>
 
       <section id="rules">
@@ -166,13 +166,13 @@
               <tr>
                 <th scope="row">2:14–2:21</th>
                 <td>Slide 9: "Not a browser bot. A full stack from clicks to API."</td>
-                <td>"Under the hood, MCParrot isn't a browser bot. A Chrome extension records the site's API requests. An LLM turns them into tools. An MCP server serves them to any agent. Each call goes straight to the site's own API, and the answer is cut down to a fraction of its size. And Browser Use keeps it all signed in as you."</td>
+                <td>"MCParrot isn't a browser bot that clicks through screens. Here's the stack, from front to back. The front end is a Next.js and React app on Vercel, with Clerk for accounts. A Chrome extension records each site's API requests through the Chrome DevTools Protocol. The back end is Next.js server routes plus an MCP server that any agent can connect to. Upstash Redis stores the apps, the tools, and encrypted logins. Claude, through the Cursor SDK, is the LLM we use today to turn recordings into tools and to read images. Browser Use runs the signed-in cloud browsers, which we drive with Playwright. Stripe Pay with Link handles checkout, and Sentry watches every call for errors and slow steps."</td>
                 <td>Highlight each of the six boxes as it is named.</td>
               </tr>
               <tr>
                 <th scope="row">2:21–2:32</th>
                 <td>Slide 10, the close, held for 2 seconds after the last word.</td>
-                <td>"MCParrot turns every website into data for your agent. Next, we'll test every tool automatically and let you add new websites just by asking. Try it at mcparrot dot vercel dot app."</td>
+                <td>"MCParrot turns every website into data for your agent. So, what's next? First: what if every new tool tested itself before your agent ever used it? Second: what if you could add a new website just by asking, with no recording at all? And third: what if you could run MCParrot itself from your agent? Try it at mcparrot dot vercel dot app."</td>
                 <td>Optional: end on clip 7, the face cam outro, instead of holding the slide.</td>
               </tr>
             </tbody>
