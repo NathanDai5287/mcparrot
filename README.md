@@ -25,6 +25,7 @@ See [how agents work with Nathan](WORKING_WITH_NATHAN.md) and [hackathon judging
 | [Signing in to websites](#signing-in-to-websites) | How the user signs in once in a Browser Use cloud browser |
 | [Using saved tasks](#using-saved-tasks) | How ChatGPT runs saved tasks and where this can fail |
 | [Reconnecting expired sessions](#reconnecting-expired-sessions) | What happens when a website sign-in expires |
+| [Ordering with Pay with Link](#ordering-with-pay-with-link) | How ChatGPT and the app page place test-mode orders that Browser Use pays for with Stripe Link |
 | [Production deployment setup](#production-deployment-setup) | Automatic publishing, hosting, storage, and the service architecture |
 | [Authentication and private data](#authentication-and-private-data) | Owner access, the connection link secret, and recordings |
 | [Diagnostics with Sentry](#diagnostics-with-sentry) | Which Sentry products MCParrot uses and which data stays out |
@@ -54,6 +55,7 @@ Neither interface may bypass the other's authorization or user verification requ
 This rule covers both managing MCParrot and running taught website tasks.
 Each website app's connection runs its saved reading tasks and reads its pages through MCP, but no dashboard capability has a management MCP operation, which the [status page](STATUS.md) lists as a gap.
 Running a task and reading a page work only through MCP, and the dashboard has no matching control, which the status page also lists as a gap.
+Ordering has both paths: the app page's **Test order** box and the app connection's ordering tools call the same operations, and `check_order` reports the Pay with Link status that the app page shows.
 The table maps each frontend capability to its aspirational management MCP equivalent.
 
 | Frontend capability | Aspirational management MCP equivalent |
@@ -71,6 +73,7 @@ The table maps each frontend capability to its aspirational management MCP equiv
 | Sign in to the website, then finish signing in | `start_sign_in`, `finish_sign_in` |
 | Save, replace, or delete the app's login | `get_login_status`, `request_login_entry_link`, `delete_login` |
 | Copy the app's connection link | `get_connection_link` |
+| Turn ordering on or off and set its spending limit | `set_ordering` |
 | Delete an app and its tasks | `delete_app` |
 
 These operation names are examples.
@@ -100,11 +103,12 @@ The route uses the official MCP TypeScript SDK's Streamable HTTP transport in st
 Each saved task whose requests all use GET becomes one read-only tool: the tool name comes from the task name, the description from the task description and its result, and each task input becomes an optional text parameter.
 The tool name is the task name in lowercase, with each run of characters other than letters and digits replaced by an underscore, leading and trailing underscores removed, and cut to 64 characters.
 So names that differ only in capitalization, spaces, or punctuation, such as `Read Course` and `Read-Course`, give the same tool name `read_course`.
-Each tool in a connection needs its own name, so saving rejects or skips a task whose name gives an empty tool name, the name `read_page`, `save_task`, or `submit_verification_code`, or the tool name of another task in the app.
+Each tool in a connection needs its own name, so saving rejects or skips a task whose name gives an empty tool name, the name of a connection tool, such as `read_page`, `save_task`, `submit_verification_code`, `prepare_order`, `check_order`, `place_order`, or `cancel_order`, or the tool name of another task in the app.
 If stored tasks still share a tool name, the connection adds the first 8 characters of the later task's ID to its name, skips the task when that name is also taken, and writes a warning log either way.
 Tasks that use other methods stay off the connection, because the first version only reads website data.
 The route answers only POST requests; GET and DELETE return 405.
 Each connection also has a `submit_verification_code` tool, which finishes an automatic sign-in, as [reconnecting expired sessions](#reconnecting-expired-sessions) describes.
+When the app's **Ordering** switch is on, the connection also lists `prepare_order`, `check_order`, `place_order`, and `cancel_order`, as [ordering with Pay with Link](#ordering-with-pay-with-link) describes.
 
 Each connection also has a read-only `read_page` tool, titled "Read a page on <app name>", whose one input `url` is a full address or a path on the app's website.
 It opens that page with the app's saved sign-in in a hidden Browser Use browser and returns its text the same way a task does, as [using saved tasks](#using-saved-tasks) describes, with the same length limit, signed-out check, and automatic sign-in.
@@ -306,6 +310,61 @@ The saved-login operations follow the parity rule: MCP operations may return sav
 Those management MCP operations remain aspirational, as the [UI and MCP parity section](#ui-and-mcp-parity) records.
 School rules, device checks, and Duo settings can prevent automated sign-in, and reconnection cannot guarantee access to every website.
 
+## Ordering with Pay with Link
+
+Nathan decided that ChatGPT and the dashboard can place food and shopping orders through a Browser Use agent that pays with Browser Use's built-in Pay with Link, which uses Stripe Link.
+Link issues a one-time card for each payment that the user approves, so MCParrot stores no card number or security code.
+DoorDash is the first live target, and Nathan's hard requirement is that ordering must never charge his real card.
+So MCParrot places an order only while the Link connection is in test mode, as [payment safety rules](#payment-safety-rules) describes.
+Ordering is the first path that changes website data, and it runs through Browser Use agent runs, not through saved tasks, which still only read.
+This ordering path is a gap until a live check passes, as the [status page](STATUS.md) records.
+
+### Ordering settings
+
+Each app page has an **Ordering** section with an **Allow ordering** switch, which is off by default, and a spending limit for each order in US dollars.
+The limit can be at most $500, because Link refuses larger payments.
+The `setOrdering` workspace operation stores both with the app.
+The section also shows whether Pay with Link is connected and whether its mode is test or live, and live mode shows that it is blocked.
+The app's connection lists the four ordering tools only while the switch is on.
+
+### Order steps
+
+1. The user asks ChatGPT to order something, or types the request in the app page's **Test order** box and selects **Prepare order**.
+2. `prepare_order` starts a Browser Use agent run with the app's browser profile; the agent builds the cart, opens the checkout page, and stops without selecting any place-order or pay button. The tool returns at once with an order ID.
+3. `check_order`, or the app page every 5 seconds, reads the run; when it finishes, the result lists the items, subtotal, fees, tip, total, delivery address, and delivery estimate.
+4. ChatGPT shows the cart and asks the user to approve the exact total, and the app page shows the cart with **Place order for $total** and **Cancel order**.
+5. `place_order` checks the safety rules, then runs a short agent step in the same browser that reads the checkout total again without paying, and compares it with the approved total.
+6. When every rule passes, MCParrot starts the payment run with the Link connection, and Link asks the user to approve the payment in the Link app on their phone.
+7. `check_order` reports the website's confirmation or why the payment failed, and MCParrot stops the browser.
+
+`cancel_order`, or **Cancel order**, cancels the agent run and stops its browser, but the cart can stay in the website account.
+Only one order runs at a time for each app; preparing another order while one is preparing, ready, or placing returns a message to check or cancel it first.
+The order record lives in Redis under `pending-order:<app-id>` for one hour after its last change, and the browser stays open for 30 minutes after each run so that the user has time to approve.
+Browser Use keeps the browser for only 2 minutes on free projects, so the total check then opens the checkout again in a new browser.
+Each order's Browser Use session may spend at most $5 of Browser Use credit.
+The app needs a Browser Use profile from **Sign in to website**; without one, or when the agent finds a sign-in page, the order fails with the signed-out message, because automatic sign-in does not run for orders.
+
+### Payment safety rules
+
+The server enforces these rules in code, not only in the agent's instructions.
+
+- MCParrot reads the Link connection from Browser Use's `GET /api/v4/stripe-link` before the total check and again just before payment, and it places the order only when the mode is `test`. A `live` mode, a missing mode or connection, or a failed status read refuses the order with a clear message. Nathan chose test mode only, and no setting overrides it in this version.
+- Only the payment run receives the Link connection ID, so the prepare and total-check runs cannot pay with Link.
+- MCParrot refuses when the total is above the app's spending limit.
+- MCParrot refuses when the checkout total read just before payment differs from the approved total by one cent or more. It keeps the new cart, so the user can approve the new total and place the order again.
+
+Every ordering run's instructions tell the agent to pay only with the card that Pay with Link issues and never with a payment method saved on the website.
+The prepare and total-check runs also tell the agent never to select a place-order, pay, or submit button, and the payment run tells it to stop without paying when the total is not the approved total.
+Link itself also asks the user to approve each payment.
+
+### Ordering limits and risks
+
+Test mode means that a payment can succeed only on a website that accepts Stripe test cards.
+DoorDash has no test mode, so on DoorDash the payment step cannot succeed: the website declines the test-mode Link card, and the order fails with that message.
+A card saved in the website account is a risk that the code cannot fully block, because only the agent's instructions keep the agent from choosing it.
+The user must remove every saved card from the website account before testing.
+When a payment run fails for another reason, the order may still have gone through, so the message tells the user to check the website's order history before trying again.
+
 ## Production deployment setup
 
 The Vercel project `mcparrot` is linked to the public GitHub repository on the existing Hobby plan.
@@ -314,19 +373,19 @@ Each push starts a deployment; other branches receive preview deployments.
 The production build runs `npm run check` and `npm run build` before publishing.
 The production dashboard is available at [mcparrot.vercel.app](https://mcparrot.vercel.app).
 
-The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
+The Next.js app deploys the workspace, the routes `/api/workspace`, `/api/discover`, `/api/sign-in`, `/api/login`, `/api/order`, and `/mcp/apps/<app-id>`, the Sentry forwarding route `/monitoring`, and the HTML guides at `/docs`.
 Vercel Authentication protects every deployment, including the production domain; only requests that carry the automation bypass secret skip it.
 Browser profiles, environment files, recordings, and local test state stay outside deployment and source control.
 Next.js serves the guides as public static files from `public/`, so they must never contain secrets.
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tasks as the dashboard.
 MCParrot has one owner for now, because Vercel Authentication lets only Nathan, and anyone with a connection link, reach the dashboard, so the whole workspace is one JSON value under the Redis key `workspace`.
-The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, and login-saved time; it holds no credentials, and recorded requests stay in the extension.
-Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, and each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes.
+The value holds each app's name, website address, chosen tasks, Browser Use profile ID, sign-in time, login-saved time, and ordering setting; it holds no credentials, and recorded requests stay in the extension.
+Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
-Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, or delete one task.
+Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tasks, delete one task, or set the app's ordering.
 The server reads the current workspace from Redis, changes only that app or task, and writes it back in one atomic Redis step only if no other change arrived in between, retrying otherwise; it then returns the updated apps, which the dashboard shows.
-Deleting an app removes its saved login and pending sign-in in that same step and stops the pending sign-in browser.
+Deleting an app removes its saved login, pending sign-in, and order in that same step, stops the pending sign-in browser, and cancels the order's agent run and stops its browser.
 `/api/sign-in` stores the app's profile ID and sign-in time, and `/api/login` stores or clears its login-saved time, in the same way.
 So a task that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
@@ -390,20 +449,21 @@ MCParrot keeps every trace and every session because it has one user, and it sen
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Cursor Composer failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, one `task.request` for each request a task or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the task name for each `save_task` call |
-| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each task run's and `read_page` call's outcome, including whether the website was signed out, and each task that ChatGPT saved, with only the app ID and task name |
+| Tracing | Each route request, with the spans `discover.composer`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a task or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, and one `task.save` with the task name for each `save_task` call |
+| Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in and verification code outcome, each task run's and `read_page` call's outcome, including whether the website was signed out, each task that ChatGPT saved, with only the app ID and task name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
 | AI agent monitoring | The `discover.composer` span as a `gen_ai.invoke_agent` span with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
 
 Spans carry only non-secret attributes, such as the app ID, task name, request count, response status, and response size.
 The SDK sends no cookies, headers, request or response bodies, URL query values, stack-frame variables, user details, or AI prompts and replies.
 MCP spans record neither tool inputs nor tool results, because inputs can hold verification codes and results are website responses; `read_page` logs carry only the app ID, the result size, and any failure reason, never the page text.
+Order logs and spans never carry the delivery address, the items, the order request, the Link connection ID, or the Link email.
 Before sending, the SDK removes URL query strings from span names, events, and breadcrumbs, and replaces the bypass secret with `[Filtered]` in spans, events, and logs.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
 The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
-Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, and a failed sign-in, so they do not hide real failures in Issues.
+Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and each order refusal, so they do not hide real failures in Issues.
 
 ## Workspace navigation behavior
 

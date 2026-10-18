@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const app = await findApp(new URL(request.url).searchParams.get("appId") ?? "");
   if (!app) return appNotFound();
   const [link, order] = await Promise.all([readLinkStatus(), checkOrder(app)]);
-  return Response.json({ link: link && { connected: link.isConnected, mode: link.mode ?? null }, order });
+  return Response.json({ link: link ? { connected: link.isConnected, mode: link.mode ?? null } : null, order });
 }
 
 function apply(action: OrderAction, app: Website) {

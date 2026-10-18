@@ -10,6 +10,7 @@ Today, MCParrot is a hosted dashboard that runs on Vercel behind Vercel Authenti
 Users create website apps, explore any website with MCParrot Explorer in a normal browser tab, ask Cursor Composer 2.5 Fast to find what the site can do, and save the capabilities they choose as tasks in Upstash Redis.
 Each app page offers **Sign in to website** through a Browser Use cloud browser, a **Save login** form that stores an encrypted username and password, and a private ChatGPT connection link whose MCP route serves that app's saved reading tasks, a `read_page` tool for any page on its website, and a `save_task` tool that saves a useful page as a new task.
 When a task finds the website signed out, a Browser Use agent signs in again with the saved login, and the user types any text-message code in the ChatGPT chat.
+When an app's **Ordering** switch is on, ChatGPT and the app page can prepare, check, place, and cancel orders that a Browser Use agent pays for with Pay with Link, only while Link is in test mode.
 The MCP route and saved logins passed direct Node checks, but Browser Use sign-in, automatic sign-in, task execution, and live ChatGPT use still need Nathan's demonstration.
 Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring are wired in, but they need events from Nathan's use of the deployed app.
 Task testing and the management connection remain aspirational.
@@ -47,10 +48,11 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Saving tasks from ChatGPT | gap | Each connection's `save_task` tool adds a page-reading task to the app in Redis; on October 17, 2026, a direct Node check of the route handler with an in-memory Redis replacement listed the tool, rejected another origin, a missing input, an extra input, a duplicate name, and a duplicate URL pattern, and saved a valid task that the next tool list showed; it needs Nathan's live ChatGPT use |
 | Delete one task | shipped | Each task on the app page has **Delete**; a direct Node check on October 17, 2026 removed only that task through `PATCH /api/workspace`; Nathan tests the live flow; its management MCP operation remains a parity gap |
 | Browser Use Cloud task runner | dormant | `browser.mjs` passes the syntax check, but no product path uses it; sign-in and tasks use Browser Use cloud browsers directly |
-| UI and MCP parity | gap | App connections run saved tasks and read pages, but no dashboard capability has a management MCP operation, and running a task or reading a page has no dashboard control |
+| UI and MCP parity | gap | App connections run saved tasks and read pages, but no dashboard capability has a management MCP operation, including the ordering switch and spending limit, and running a task or reading a page has no dashboard control; ordering itself has both paths |
 | Task testing with changed inputs | aspirational | Run a chosen task's requests with changed inputs and compare the result with the website before it becomes a tool |
 | Task input derivation | aspirational | Separate task inputs from authentication data and unrelated traffic in a tested request sequence |
-| Write tasks | aspirational | Run tasks that change website data; the first version runs GET requests only |
+| Write tasks | aspirational | Run saved tasks that change website data; saved tasks still run GET requests only, and ordering, the first path that changes website data, has its own row |
+| Ordering with Pay with Link | gap | `lib/order.ts`, `/api/order`, the app page's **Ordering** section, and the connection's `prepare_order`, `check_order`, `place_order`, and `cancel_order` tools prepare a cart, show it, and pay with Pay with Link only in test mode; on October 17, 2026, a throwaway script passed the safety rules, and checks on the branch's Vercel preview passed the settings, tool list, and refusals, as [ordering checks](#ordering-checks) describes; a live Link status read, a live prepare and place run, and Nathan's DoorDash test must pass |
 | Management MCP connection | aspirational | Add MCP operations that match each dashboard capability; Nathan scoped the first version to app connections only |
 | Owner authentication | aspirational | Product accounts, MCP sign-in, and multi-user ownership remain unavailable; the private link is the only MCP access control |
 | Session reconnection and verification | gap | A signed-out task starts a Browser Use agent sign-in with the saved login, keeps the browser for a text-message code, and `submit_verification_code` finishes sign-in; a direct Node check with Browser Use replaced by a stub returned the code request and stored the pending sign-in on October 17, 2026; Nathan's live Canvas test with Duo must pass |
@@ -58,8 +60,8 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Long task status | aspirational | Store operation status for tasks that take longer than one 300-second request |
 | Sentry connection and source maps | shipped | `@sentry/nextjs` starts in the browser and on the server; on October 17, 2026, the production build uploaded source maps, and a direct Node event sent with the project's DSN reached `nathan-s4/mcparrot`, where the Sentry API returned it |
 | Sentry error monitoring | gap | Server route errors, React render errors, and Composer failures go to Sentry Issues; events from the deployed app need Nathan's use |
-| Sentry Tracing | gap | Spans cover Composer discovery (`discover.composer`), Browser Use start and stop, the CDP connection, each automatic sign-in and verification code agent run with its outcome (`browser_use.agent_sign_in`, `browser_use.agent_verification_code`), each request a task or `read_page` runs (`task.request`), each HTML page opened as text (`page.read`), and each `save_task` call (`task.save`); traces from the deployed app need Nathan's use |
-| Sentry Logs | gap | Discovery started and finished, sign-in started and done, login saved and deleted, automatic sign-in started and finished, each verification code outcome, each task run's and `read_page` call's outcome with whether the website was signed out, and each task saved from ChatGPT go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
+| Sentry Tracing | gap | Spans cover Composer discovery (`discover.composer`), Browser Use start and stop, the CDP connection, each automatic sign-in and verification code agent run with its outcome (`browser_use.agent_sign_in`, `browser_use.agent_verification_code`), each order step with its total and outcome (`browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, `browser_use.agent_order_place`), each request a task or `read_page` runs (`task.request`), each HTML page opened as text (`page.read`), and each `save_task` call (`task.save`); traces from the deployed app need Nathan's use |
+| Sentry Logs | gap | Discovery started and finished, sign-in started and done, login saved and deleted, automatic sign-in started and finished, each verification code outcome, each task run's and `read_page` call's outcome with whether the website was signed out, each task saved from ChatGPT, and each order outcome with only the app ID, the reason, and the amounts go to Sentry Logs through the SDK, not a Vercel Log Drain, which needs a paid plan; the direct Node test log was sent, but the available token cannot read logs to confirm it arrived |
 | Sentry Session Replay | gap | Every dashboard session is recorded with text, inputs, and link and image addresses masked; replays need Nathan's use |
 | Sentry AI agent monitoring | gap | The Composer call is a `gen_ai.invoke_agent` span, and each ChatGPT tool call is an MCP span; they need Nathan's use |
 | Sentry evidence that changed the product | gap | Find a real failure or delay in Sentry during Nathan's testing, change MCParrot because of it, and show both in the demo |
@@ -98,6 +100,14 @@ After `save_task` saved a syllabus task, an add-tasks operation from a dashboard
 Deleting one task removed only that task, deleting a login cleared only the login-saved time, and deleting an app removed only that app.
 These checks cannot prove a real Browser Use run or a live recording, because the Browser Use key is readable only on Vercel and the extension needs Nathan's browser.
 
+### Ordering checks
+
+On October 17, 2026, a throwaway script called the ordering safety rules directly.
+They refused a Link connection in live mode, with no mode, with no connection, or with no status at all; a total above the spending limit; and a checkout total that differed from the approved total by one cent in either direction, and they allowed a matching total within the limit.
+Checks on the branch's Vercel preview deployment then used a throwaway app: `setOrdering` rejected a $600 limit and saved a $20 limit, and the connection listed `prepare_order`, `check_order`, `place_order`, and `cancel_order` with their annotations only after the switch was on.
+`prepare_order` returned the signed-out message for an app without a Browser Use profile, `place_order` and `cancel_order` rejected an unknown order ID through MCP and `/api/order`, and `check_order` reported that the Link status could not be read.
+`BROWSER_USE_API_KEY` exists only in the Production environment, so the preview could not read the Link mode or start a Browser Use run, and no live prepare or place run happened.
+
 On October 17, 2026, the production build uploaded source maps to the Sentry project `nathan-s4/mcparrot`.
 A direct Node script then sent one test error and one test log with the project's DSN, and the Sentry API returned the test error by its event ID.
 The available auth token cannot read organization data, so the API could not confirm the log.
@@ -124,6 +134,11 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The extension requires one manual unpacked installation and Chrome or Edge. It has no store listing, automatic updates, or management MCP controls.
 - Sentry has not yet received errors, traces, logs, or replays from the deployed app, and no Sentry evidence has changed the product yet.
+- Ordering has not met a real Browser Use run, Link connection, or website; the agent instructions, the cart report, and the total check need a live test.
+- Ordering places orders only in Link test mode, which Nathan chose; DoorDash has no test mode, so a DoorDash order always stops when the website declines the test-mode Link card.
+- A card saved in the website account can still be charged if the agent ignores its instructions, so the user must remove saved cards from the website account before testing ordering.
+- Orders do not start automatic sign-in; a signed-out app returns the signed-out message instead.
+- `BROWSER_USE_API_KEY` exists only in the Production environment, so preview deployments cannot sign in, run tasks, read the Link status, or run orders.
 
 ## Aspirational work order
 

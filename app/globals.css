@@ -84,7 +84,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 50px 48px 60px; }
 .editor .order-switch { display: flex; align-items: center; gap: 9px; }
 .editor .order-switch input { width: auto; }
 .order-test { border-top: 1px solid var(--line); padding-top: 20px; }
-.order-test h3 { font-size: 13px; font-weight: 600; }
+.order-test h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; }
 .order-cart { max-width: 560px; margin-top: 14px; border-top: 1px solid var(--line); }
 .assistant-section .order-cart p { display: flex; justify-content: space-between; gap: 20px; max-width: none; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--ink); overflow-wrap: anywhere; }
 .assistant-section .order-cart .order-total { font-weight: 600; }
