@@ -5,6 +5,7 @@ import { AlreadyInstalled, installListing, ListingRejected, listingDescriptionSc
 import { AppNotFound, ownedApp, StorageUnavailable, WorkspaceLimit } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const MarketplaceAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("publish"), appId: appIdSchema, description: listingDescriptionSchema }),

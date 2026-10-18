@@ -13,7 +13,7 @@ const listingIdFor = (appId: string) => createHash("sha256").update(appId).diges
 const maxListings = 200;
 const maxListingTasks = 100;
 const maxListingCharacters = 200_000;
-const lockSeconds = 30;
+const lockSeconds = 60;
 
 export const listingDescriptionSchema = z.string().trim().min(1, "Describe the app in a sentence.").max(500);
 
