@@ -16,7 +16,8 @@ const secretKeyWords = new Set(["token", "key", "secret", "password", "passwd", 
 const secretKeyFragments = /token|secret|passw|csrf|xsrf|jwt|bearer|credential|apikey|accesskey|privatekey|nonce|session|verifier|signature/i;
 const jwtLike = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
 const tokenLike = /[A-Za-z0-9_\-+=]{32,}/g;
-const labelledSecret = /\b(password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code)(\s*[:=]\s*)(\\?"[^"\\]*\\?"|'[^']*'|(?:[^\s&;,"'<>]|[&;,](?![\w.-]+(?: [\w.-]+)?\s*[:=]|\s|$))+)/gi;
+const secretLabels = String.raw`password|passcode|passwd|pwd|pin|otp|token|secret|api[ _-]?key|access[ _-]?key|verification code|security code`;
+const labelledSecret = new RegExp(String.raw`\b(${secretLabels})(\s*[:=]\s*)(\\?"[^"\\]*\\?"|'[^']*'|(?:[^\s&;,"'<>]|[&;,](?![\w.-]+=|(?:${secretLabels})\s*[:=]|\s|$))+)`, "gi");
 
 const capturedRequestSchema = z.object({
   kind: z.literal("page").optional(),
