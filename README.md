@@ -529,7 +529,7 @@ When a payment run fails for another reason, the order may still have gone throu
 ## Accounts and ownership
 
 Nathan decided that MCParrot has real accounts, so other people can use it with their own apps.
-Users sign in with Google through Clerk, which Nathan installed from the Vercel Marketplace; the `/sign-in` page shows Clerk's sign-in box, and the sidebar has an account button to sign out.
+Users sign in with Google through Clerk, which Nathan installed from the Vercel Marketplace; the `/sign-in` page shows Clerk's sign-in box, and the workspace sidebar has an account button to sign out; the marketplace page's sidebar has none.
 The dashboard and every `/api` route need a signed-in user, except the marketplace page and its read route, and `/docs`, `/monitoring`, `/sign-in`, and the app connections at `/mcp/apps/<app-id>` are public; each connection checks its own token.
 Each page and route checks the session itself, because Clerk deprecates path matching in middleware, and `proxy.ts` runs Clerk's middleware and still rejects cross-site `/api` writes.
 A signed-out visit to the dashboard, or to an `/api` route that needs sign-in, redirects to `/sign-in`, which returns to the page afterwards.
@@ -584,13 +584,15 @@ Next.js serves the guides as public static files from `public/`, so they must ne
 
 Nathan chose Upstash Redis from the Vercel Marketplace so the MCP route can read the same apps and tools as the dashboard.
 Each user's workspace is one JSON value under `workspace:<user-id>`, as [accounts and ownership](#accounts-and-ownership) describes.
-The value holds each app's name, website address, chosen tools, Browser Use profile ID, sign-in time, login-saved time, automatic sign-in choice with any Google account email, ordering setting, connection token hash, and listing details; it holds no credentials, and recorded requests stay in the extension.
-Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
+The value holds each app's name, website address, chosen tools, Browser Use profile ID, sign-in time, login-saved time, automatic sign-in choice with any Google account email, ordering setting, connection token hash, and listing details.
+Each tool keeps the requests that discovery or `save_task` built from a recording or a page, with their address and body patterns, the short list of non-secret recorded headers, and the names of token headers without their values; it holds no passwords, cookies, or tokens, and the recordings themselves stay in the extension.
+Each saved login is a separate encrypted value under `login:<app-id>`, so the dashboard never reads it, each pending sign-in is a value under `pending-sign-in:<app-id>` that expires after 15 minutes and holds the waiting browser's IDs and its control address, which works like a password while that browser runs, and each order is a value under `pending-order:<app-id>` that expires one hour after its last change.
 Each app's last discovery result is a separate value under `discovery:<app-id>`.
 The dashboard reads the workspace through `/api/workspace` when it opens, and it never writes the whole workspace back.
-Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tools, replace one tool, delete one tool, or set the app's ordering.
+Each dashboard change is one small operation sent to `PATCH /api/workspace`: create an app, delete an app, add chosen tools, replace one tool, delete one tool, set the app's ordering, or set its automatic sign-in choice.
 The server reads the current workspace from Redis, changes only that app or tool, and writes it back in one atomic Redis step only if no other change arrived in between, retrying otherwise; it then returns the updated apps, which the dashboard shows.
-Deleting an app removes its saved login, pending sign-in, last discovery result, and order in that same step, stops the pending sign-in browser, and cancels the order's agent run and stops its browser.
+Deleting an app removes its owner key, saved login, pending sign-in, last discovery result, and order in that same step.
+Follow-up steps then remove its marketplace listing, stop its warm browser and the pending sign-in browser, and cancel the order's agent run and stop its browser; they run after the atomic step, so a failure in one of them leaves the app deleted and returns an error.
 `/api/sign-in` stores the app's profile ID and sign-in time, and `/api/login` stores or clears its login-saved time, in the same way.
 So a tool that ChatGPT saves with `save_task` stays when an older open dashboard makes a change, and it appears there after the next change or reload.
 The Upstash integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`, which `@upstash/redis` reads; the dashboard shows a storage warning when they are missing.
@@ -657,7 +659,7 @@ MCParrot keeps every trace and every session because it has few users, and it se
 | Sentry product | What MCParrot sends |
 | --- | --- |
 | Error monitoring | Unhandled server route errors, React render errors, and Claude failures that discovery reports to the user |
-| Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, one `task.run` for each tool run, `read_page` call, and image read with `browser.reused`, `browser_use.warm_lookup` for the warm browser lookup, `page.open_website` for opening the website, `browser_use.agent_sign_in` and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, one `image.read` with the picture size and one `image.describe` as a `gen_ai.invoke_agent` span with Claude's outcome for each image read, and one `task.save` with the tool name for each `save_task` call |
+| Tracing | Each route request, with the spans `discover.agent`, `browser_use.start`, `browser_use.cdp_connect`, `browser_use.stop`, one `task.run` for each tool run, `read_page` call, and image read with `browser.reused`, `browser_use.warm_lookup` for the warm browser lookup, `page.open_website` for opening the website, `browser_use.agent_sign_in`, `browser_use.agent_google_sign_in`, and `browser_use.agent_verification_code` with the agent's outcome, `browser_use.agent_order_prepare`, `browser_use.agent_order_check_total`, and `browser_use.agent_order_place` with the order total and outcome, one `task.request` for each request a tool or `read_page` runs, one `page.read` with the text size for each HTML page opened as text, one `image.read` with the picture size and one `image.describe` as a `gen_ai.invoke_agent` span with Claude's outcome for each image read, and one `task.save` with the tool name for each `save_task` call |
 | Logs | Discovery started and finished with the request and capability counts, sign-in started and done, login saved and deleted, each automatic sign-in, automatic Google sign-in, and verification code outcome, each tool run's, `read_page` call's, and image read's outcome, including whether the website was signed out, whether the warm browser was reused, and each step's duration in milliseconds, such as `browserStartMs`, `cdpConnectMs`, `websiteOpenMs`, `request1Ms`, `request1PageReadMs`, and `totalMs`, each image that Claude described with its reply length, each tool that ChatGPT saved, with only the app ID and tool name, and each order's prepare, payment, refusal, and cancel outcome with only the app ID, the outcome or refusal reason, and the amounts |
 | Session Replay | Recordings of dashboard sessions, with all text, inputs, and link and image addresses masked |
 | AI agent monitoring | The `discover.agent` and `image.describe` spans as `gen_ai.invoke_agent` spans with the model name, and one MCP span for each ChatGPT tool call, tagged with the app ID |
@@ -671,7 +673,7 @@ Never attach credentials, cookies, tokens, verification codes, or the bypass sec
 
 ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
 The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
-Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
+Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a website that blocked the automated browser, a website that refused the request's protection code, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, an unknown order ID, and a `save_task` tool whose name or page matches a saved tool, so they do not hide real failures in Issues.
 
 ## Workspace navigation behavior
 
@@ -681,7 +683,7 @@ The same apps appear on any device where the user signs in.
 Each app page shows the app name, its website address, **Delete app** beside **Explore website**, and status labels for sign-in, a saved login, and ordering.
 On wide screens the app's tools fill the main column, one row each with its name and description, and selecting a row shows its inputs, its result, its answer fields, its requests, and **Delete tool**.
 A filter box appears above the list when the app has more than 8 tools.
-A setup column beside the list holds Website sign-in, Saved login, Use in ChatGPT, Marketplace, View image, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
+A setup column beside the list holds Website sign-in, with the saved login and the automatic sign-in choice inside it, Use in ChatGPT, Marketplace, View image, and, for the owner, Ordering in that order, and it stays in view while the list scrolls.
 On screens 700 pixels wide or narrower, the setup sections come first as collapsed sections that show their status, and the tools list follows.
 Select **Delete app** at the top of an app page, then confirm in the dialog to remove that app, its tools, its saved login, its ChatGPT link, and its marketplace listing from MCParrot and delete its recorded requests in the extension.
 **Keep app** or Escape closes the dialog and returns focus to **Delete app**.
@@ -692,15 +694,14 @@ An old link to a deleted app shows an unavailable page with a return to the app 
 
 Use Node.js 24, which `.nvmrc` and the `engines` field in `package.json` pin.
 `.env.example` lists every environment variable the app needs.
-The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, which `npx vercel env pull .env.local` writes.
-That command replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tools again afterwards.
+The dashboard needs `KV_REST_API_URL` and `KV_REST_API_TOKEN` in `.env.local`, and they must point at a separate Redis database, never the production one.
+`npx vercel env pull .env.local` writes the production values, so a local server started with them changes production data: signing in as the owner moves the production `workspace` value, app changes reach production apps, and a saved login overwrites the app's production login with one that production cannot decrypt.
+If you pull the file, replace those two values with a separate Redis database before you start the server.
+That command also replaces the file, so add `CURSOR_API_KEY` for discovery and `BROWSER_USE_API_KEY` for sign-in and tools again afterwards.
 Add `MCPARROT_CREDENTIAL_KEY` to save logins; it must be standard base64 of exactly 32 bytes, for example from `openssl rand -base64 32`, or saving a login returns a setup error.
 The production key is Sensitive and cannot be pulled, so logins saved locally cannot be read in production.
-The pulled `KV_REST_API_URL` and `KV_REST_API_TOKEN` point at the production Redis, so a login saved from a local server overwrites the app's production login with one that production cannot decrypt, and other local changes reach production apps too.
-Replace those two values with a separate Redis database before you save logins or change apps locally.
 Add `NEXT_PUBLIC_SENTRY_DSN` to send diagnostics and `SENTRY_AUTH_TOKEN` to upload source maps during `npm run build`; without them, Sentry stays off.
 Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk integration, and `MCPARROT_OWNER_EMAIL`; the app needs the Clerk keys to start.
-Signing in locally as the owner moves the production `workspace` value when the pulled Redis values point at production.
 The development server listens on `localhost`, because Clerk's development middleware sends requests to that host name.
 
 ```sh

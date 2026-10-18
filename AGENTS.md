@@ -10,8 +10,7 @@ Read the product specification and the collaboration process before material wor
 | Document | Reader | What it covers |
 | --- | --- | --- |
 | [Product specification](README.md) | Agents | Product behavior, UI and MCP parity, technical assumptions, and local setup |
-| [Product design record](PRODUCT.md) | Agents | Users, purpose, positioning, and principles that design work must respect |
-| [Product design record](PRODUCT.md) | Agents | Users, purpose, brand, and principles that design work must respect |
+| [Product design record](PRODUCT.md) | Agents | Users, purpose, positioning, brand, and principles that design work must respect |
 | [Status page](STATUS.md) | Agents | What is shipped, dormant, aspirational, and known gaps |
 | [Documentation guide](DOCUMENTATION.md) | Agents | How to write and organize every document in this repository |
 | [Collaboration process](WORKING_WITH_NATHAN.md) | Agents | How to reach a shared understanding with Nathan and record the agreement |

@@ -37,7 +37,7 @@ The [documentation guide](DOCUMENTATION.md#use-status-vocabulary) is the home fo
 | Workspace dashboard | shipped | `app/page.tsx` creates website apps, opens exploration, and lists chosen tools beside a setup column, with a filter above 8 tools; automatic type and production build checks pass |
 | App and exploration addresses | shipped | `/apps/<app-id>` and `/apps/<app-id>/explore` use browser history and Next.js rewrites; automatic type and production build checks pass; Nathan tests live navigation |
 | App deletion | shipped | **Delete app** in the app page header opens a confirmation dialog that removes an app, its tools, saved login, ChatGPT link, and marketplace listing from storage and asks the extension to delete its recorded requests; automatic checks pass; management MCP parity remains a gap |
-| Persistent storage in Upstash Redis | shipped | `/api/workspace` stores the workspace under one Redis key; on October 17, 2026, the production MCP route listed all 23 Canvas tools from the production Upstash Redis |
+| Persistent storage in Upstash Redis | shipped | `/api/workspace` stores each user's apps under one Redis key per user, `workspace:<user-id>`, with an `app-owner:<app-id>` key for each app, and changes them in one atomic compare-and-set script; on October 17, 2026, the production MCP route listed all 23 Canvas tools from the production Upstash Redis |
 | Hosted dashboard on Vercel | shipped | The first Git-triggered deployment passed its build and public HTTP checks on October 17, 2026 |
 | Vercel Authentication | shipped | On October 17, 2026, the production address redirected to Vercel sign-in before serving the app; Nathan decided to turn it off for production after accounts ship |
 | HTML guides in the app | shipped | `public/docs/` returned its pages and assets from the local development server and from https://mcparrot.vercel.app/docs on October 17, 2026 |
@@ -195,7 +195,7 @@ These gaps exist inside shipped work and stay open until a change closes them:
 - While Vercel Authentication protects production, the older owner links carry the bypass secret, which opens the whole site, and Vercel blocks the new token links, so token links work only after Nathan turns Vercel Authentication off.
 - The owner's older apps have no owner key until Nathan opens the dashboard once after the accounts change is published, so their ChatGPT connections return 404 until then.
 - Nathan chose no usage limits, so every user's discovery spends his Cursor credit and every user's sign-in and tools spend his Browser Use credit.
-- A signed-out request to an `/api` route that needs sign-in redirects to the sign-in page instead of returning 401, which Clerk does in route handlers.
+- A signed-out request to an `/api` route that needs sign-in gets no 401: Clerk's `auth.protect()` redirects a page request, such as a browser visit, to the sign-in page and returns 404 for a `fetch` call, which the dashboard shows as the storage warning.
 - The extension and `/api/discover` redact secrets in samples and addresses only by matching patterns, such as secret names, JWTs, and `Bearer` values, so a secret in another form can reach extension storage and Claude.
 - Live recording with the extension and discovery from that recording need Nathan's production demonstration.
 - The explore page's **New** and **Updates** labels, replacing a tool from an update, and reopening the last discovery result need Nathan's live test; an update renamed before saving appears again in the saved result until the next run.
