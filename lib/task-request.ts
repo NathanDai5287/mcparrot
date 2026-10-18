@@ -5,6 +5,10 @@ export const bodyPlaceholderPattern = /\{([A-Za-z_]\w*)\}/g;
 const paymentWords = /\b(check ?out|payments?|pay|purchases?|place order|create order|submit order|order create)\b/;
 export const paymentRefusal = "MCParrot refuses tool requests that look like checkout or payment, so a tool can never place an order. Orders go only through the Pay with Link ordering tools.";
 
+const replayedHeaderNames = ["accept", "apollographql-client-name", "apollographql-client-version", "x-apollo-operation-name", "x-channel-id", "x-experience-id", "x-requested-with"];
+
+export const replayedHeaders = (headers: Record<string, string> = {}) => Object.fromEntries(Object.entries(headers).filter(([name]) => replayedHeaderNames.includes(name.toLowerCase())));
+
 export const requestPlaceholders = ({ urlPattern, bodyPattern = "" }: TaskRequest) => [...urlPattern.matchAll(urlPlaceholderPattern), ...bodyPattern.matchAll(bodyPlaceholderPattern)].map((match) => match[1]);
 
 export const isGetRequest = (request: TaskRequest) => request.method.toUpperCase() === "GET";
