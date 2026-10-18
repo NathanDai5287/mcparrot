@@ -216,7 +216,7 @@ It records data requests, such as fetch and XHR requests and other JSON or XML r
 Nathan chose to also record each whole page that loads in the tab, such as a server-rendered Canvas syllabus, because those pages never make a separate data request.
 A page is recorded as a GET with its URL, status, and the content type `text/html`, marked with `kind: "page"`, and its sample is the start of the page's visible text, not its HTML.
 It skips static files such as images, fonts, style sheets, scripts, and media, and it skips common analytics hosts.
-It skips requests and pages only on real sign-in pages, whose path contains one of the words `login`, `logout`, `signin`, `signout`, `sign_in`, `sign_out`, `password`, `oauth`, `saml`, `sso`, `mfa`, `otp`, or `2fa`.
+It skips requests and pages only on real sign-in pages, whose path contains one of the words `login`, `logout`, `signin`, `signout`, `sign_in`, `sign_out`, `password`, `oauth`, `saml`, `sso`, `mfa`, `otp`, `2fa`, `idp`, or `passcode`, or on a sign-in host, whose first label is `login`, `logon`, `signin`, `auth`, `sso`, or `idp`, or that ends in `okta.com`, `oktapreview.com`, or `auth0.com`.
 Words such as `auth`, `token`, `session`, `refresh`, and `verify` are not sign-in words, so it records paths such as `/api/auth/me`, `/api/v0/chat_session/create`, and `/sessions/{id}`.
 For each data request that is not a GET, such as a POST GraphQL request, it also records the request body, at most 30,000 characters so that a whole GraphQL query fits, and the value of the request's `Content-Type` header as `requestContentType`.
 For every data request, including a GET, it also records, as `requestHeaders`, every request header of at most 200 characters except the ones in this list:
@@ -232,7 +232,7 @@ For any request, when a request header whose name contains `auth`, `token`, `jwt
 Before it compares, it removes a `Bearer `, `Token `, or `JWT ` scheme from the header value and records that scheme as `prefix`.
 When a local storage value is JSON, it also looks for the token in its string fields up to three levels deep and records the field path as `path`, so `Authorization: Bearer abc` with `{"value":"abc"}` under `userToken` becomes `{ "header": "authorization", "fromLocalStorage": "userToken", "prefix": "Bearer ", "path": "value" }`.
 It never records a cookie, an `authorization` value, a sign-in header value, or a response header.
-It removes URL fragments, and it replaces with `redacted` each query value, sample value, and request body value under a secret name, and each query value or path segment that looks like a secret.
+It removes URL fragments, and it replaces with `redacted` each query value, sample value, and request body value under a secret name, including a whole object or list under that name, and each query value or path segment that looks like a secret.
 A secret name is a name that contains `token`, `secret`, `password`, `passwd`, `apikey` or `api_key`, `privatekey` or `private_key`, `cookie`, `authorization`, `csrf`, `xsrf`, `jsessionid`, or `phpsessid`, in any letter case and with any separator, so `access_token`, `refresh_token`, `id_token`, `csrfToken`, `client_secret`, `sessionToken`, and `session_token` are redacted.
 Names such as `sessionId`, `session_id`, `sessionid`, `sid`, `auth`, `code`, `sig`, and `key` are not secret names, so their values stay.
 A value looks like a secret only when it is a JWT or starts with `Bearer ` or `Basic `; long or random-looking values, such as UUIDs, file IDs, order IDs, and GraphQL persisted-query `sha256Hash` values, stay.
@@ -245,11 +245,13 @@ Nathan chose these recording and redaction rules on October 18, 2026, because AI
 
 Each sample keeps at most 400 characters per text value and 5 items per list, up to about 12 KB per response, and a response that is not JSON keeps its first 1,600 characters.
 A page sample keeps the first 8,000 characters of its visible text, with spaces collapsed.
-Requests and pages that share a method and path pattern, with numbers and identifiers replaced by `{id}`, are stored once, up to 150 requests per app.
+Requests and pages that share a method, a path pattern, with numbers and identifiers replaced by `{id}`, and a GraphQL operation are stored once, up to 150 requests per app.
+The GraphQL operation is the URL's `operationName`, `queryId`, or `query` name, or else the body's `operationName`, `query` name, or persisted-query hash, taken before redaction and stored only as a short digest in `operation`, so each operation sent to one `/graphql` address is recorded.
+A data response without a content type, such as a 204, is recorded with an empty `contentType`.
 Recording stops when the user selects **Stop exploring**, closes the tab, dismisses the debugging bar, or restarts the browser.
-Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording.
-The extension, version 0.8.0, asks only for the `storage`, `unlimitedStorage`, and `debugger` permissions and no host permissions; `unlimitedStorage` lets recordings of several apps with longer samples go past the browser's 10 MB storage limit.
-The extension accepts commands from the dashboard at `https://mcparrot.vercel.app`, `http://localhost:4317`, and `http://127.0.0.1:4317`.
+Recorded requests stay in extension storage until the user deletes them, deletes the app, or removes the extension, and when the dashboard next contacts the extension, it deletes each recording whose last request is 30 or more days old, except the one that is recording, at most once a day.
+The extension, version 0.8.1, needs Chrome or Edge 118 or later and asks only for the `storage`, `unlimitedStorage`, and `debugger` permissions and no host permissions; `unlimitedStorage` lets recordings of several apps with longer samples go past the browser's 10 MB storage limit.
+The extension accepts commands from the dashboard at `https://mcparrot.vercel.app` and `http://localhost:4317`, and it sends its version with each reply.
 
 Download the ZIP from the exploration screen, extract it, enable Developer mode on the browser extensions page, and select **Load unpacked** on the extracted folder.
 To update, remove the old MCParrot Explorer from the extensions page, then load the new extracted folder the same way.
@@ -258,6 +260,7 @@ Versions before 0.6.0 do not record `tokenHeaders`, so tools on a website that s
 Versions before 0.6.1 do not record `requestHeaders` for GET requests, so a GET tool on a website that requires one of those headers, such as LinkedIn, needs a new recording with version 0.6.1 and a new discovery run.
 Versions before 0.7.0 skip paths with the word `session` and record no `tokenHeaders` for a `Bearer` value or a token inside JSON, so such websites need a new recording with version 0.7.0 and a new discovery run.
 Versions before 0.8.0 record only a short list of request headers, redact session IDs and random-looking values such as persisted-query hashes, skip paths with words such as `auth` or `token`, and keep shorter samples, so tools found from those recordings can miss headers or values until the user loads version 0.8.0, explores again, and finds tools again.
+Versions before 0.8.1 keep a password nested inside an object, record Okta sign-ins, and keep only the first GraphQL operation for each address, so users should delete those recordings and record again with version 0.8.1.
 Reload MCParrot after installation.
 The extension is not published in an extension store, and website policies can disable unpacked extensions.
 
