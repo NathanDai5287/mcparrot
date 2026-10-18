@@ -222,7 +222,7 @@ async function readPageAt(page: Page, website: string, url: string, steps: RunSt
 
 const graphqlPath = /\/(api\/)?graphql(?:[?#]|$)/;
 
-const needsHomePage = (requests: TaskRequest[]) => requests.some((request) => request.method.toUpperCase() !== "GET" || graphqlPath.test(request.urlPattern));
+const needsHomePage = (requests: TaskRequest[]) => requests.some((request) => request.method.toUpperCase() !== "GET" || graphqlPath.test(request.urlPattern) || !!request.tokenHeaders?.length);
 
 async function openBlankPage(page: Page, website: string) {
   const address = website + blankPagePath;
