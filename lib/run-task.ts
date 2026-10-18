@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Page } from "playwright-core";
 import { startBrowser, stopBrowser, withPage } from "./browser-use";
+import { compactAnswer } from "./compact-answer";
 import type { Task, TaskRequest, TokenHeader, Website } from "./capabilities";
 import { bodyPlaceholderPattern, isAllowedRequest, isOnWebsite, paymentRefusal, replayedHeaders, stepPlaceholderPattern, urlPlaceholderPattern } from "./task-request";
 
@@ -106,10 +107,6 @@ const withoutQuery = (address: string) => {
 
 const sanitized = (message: string) => (message.split("\n")[0] ?? "").replace(/\bhttps?:\/\/[^\s"'<>]+/g, withoutQuery);
 
-function shortened(text: string) {
-  return text.length > maximumResponseCharacters ? `${text.slice(0, maximumResponseCharacters)}\n[Response shortened to ${maximumResponseCharacters} characters]` : text;
-}
-
 function requireOnWebsite(page: Page, website: string) {
   if (looksSignedOut(page.url())) throw signedOut();
   if (!isOnWebsite(page.url(), website)) throw new TaskError("off_site", `This address left the website ${website}, so MCParrot did not read it.`);
@@ -191,10 +188,10 @@ async function readRequest(page: Page, website: string, request: FilledRequest) 
   if (response.redirected && !isOnWebsite(response.url, website)) throw new TaskError("off_site", `This address redirects off the website ${website}, so MCParrot did not read it.`);
   if (response.status >= 400) throw httpError(method, url, response.status);
   if (response.failed && method !== "GET") throw new TaskError("fetch_failed", `${method} ${withoutQuery(url)} could not be sent.`);
-  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${shortened(response.body)}` };
+  if (!response.failed && !(method === "GET" && response.contentType.includes("html"))) return { body: response.body, summary: `${method} ${url} returned ${response.status}\n${compactAnswer(response.body)}` };
   const { status, text } = await readPageText(page, website, url);
   if (status >= 400) throw httpError(method, url, status);
-  return { body: text, summary: `${method} ${url} returned ${status}\n${shortened(text)}` };
+  return { body: text, summary: `${method} ${url} returned ${status}\n${compactAnswer(text)}` };
 }
 
 async function readRequests(page: Page, website: string, requests: RequestFiller[]) {
