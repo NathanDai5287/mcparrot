@@ -15,6 +15,9 @@ const shortPageWait = 1_500;
 const pageLoadTimeout = requestTimeout - settleTimeout;
 const shortPageCharacters = 200;
 const blankPagePath = "/__mcparrot";
+const maximumPageLinks = 50;
+const maximumPageImages = 20;
+const linkTextCharacters = 60;
 const imageTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const maximumImageSide = 1600;
 const maximumImageCharacters = 1_500_000;
@@ -321,10 +324,30 @@ export function addressOnWebsite(app: Website, url: string) {
   return address;
 }
 
+const pageLinks = (page: Page) => page.evaluate(({ maximumLinks, maximumImages, textCharacters }) => {
+  const links = new Map<string, string>();
+  for (const link of document.querySelectorAll("a[href]")) {
+    const address = new URL((link as HTMLAnchorElement).href, location.href);
+    const path = address.pathname + address.search;
+    const text = ((link as HTMLElement).innerText || link.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, textCharacters);
+    if (address.origin === location.origin && text && path !== location.pathname + location.search && !links.has(path)) links.set(path, text);
+    if (links.size >= maximumLinks) break;
+  }
+  const images = [...new Set([...document.images].map((image) => image.currentSrc || image.src).filter((source) => /^https?:/.test(source)))].slice(0, maximumImages);
+  return [links.size ? `Links on this page (text -> path):\n${[...links].map(([path, text]) => `${text} -> ${path}`).join("\n")}` : "", images.length ? `Images on this page:\n${images.join("\n")}` : ""].filter(Boolean).join("\n\n");
+}, { maximumLinks: maximumPageLinks, maximumImages: maximumPageImages, textCharacters: linkTextCharacters });
+
+async function readWholePage(page: Page, website: string, url: string, steps: RunSteps) {
+  const { status, text } = await timed(steps, "request1PageReadMs", () => readPageText(page, website, url, steps, "request1"));
+  if (status >= 400) throw httpError("GET", url, status);
+  const links = await pageLinks(page).catch(() => "");
+  return `GET ${url} returned ${status}\n${compactAnswer(links ? `${links}\n\n${text}` : text)}`;
+}
+
 export function readPage(app: Website, url: string) {
   const address = addressOnWebsite(app, url);
   const website = new URL(app.url).origin;
-  return logOutcome("Page read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, async (page) => (await timed(steps, "request1Ms", () => readPageAt(page, website, address.href, steps, "request1"))).summary));
+  return logOutcome("Page read", { appId: app.id }, (steps) => inSignedInBrowser(app, steps, (page) => timed(steps, "request1Ms", () => readWholePage(page, website, address.href, steps))));
 }
 
 async function inEmptyContext(page: Page, read: (page: Page) => Promise<string>) {

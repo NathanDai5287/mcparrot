@@ -125,6 +125,7 @@ When the app's **Ordering** switch is on, the connection also lists `prepare_ord
 
 Each connection also has a read-only `read_page` tool, titled "Read a page on <app name>", whose one input `url` is a full address or a path on the app's website.
 It opens that page directly with the app's saved sign-in in a hidden Browser Use browser, without opening the home page or fetching the address first, and returns its visible text the same way a tool does, as [using saved tools](#using-saved-tools) describes, or the raw response when the page is not HTML, with the same length limit, signed-out check, and automatic sign-in.
+Before the text, the answer lists up to 50 links on the page's own origin, each once, as its text cut to 60 characters, then `->` and its path, followed by up to 20 `http` or `https` image addresses, so ChatGPT can open the next page or image without guessing its address; both lists count toward the same 20,000-character limit.
 It rejects any address that is not on the app's website or one of its subdomains with an error that names the allowed website, before it starts a browser.
 Nathan chose this tool so that ChatGPT can answer from pages that no saved tool covers, such as a syllabus link he pastes.
 He accepted the trade-off that ChatGPT can read any page his account can see on that website, not only the tools he chose; it only opens pages, so it changes nothing on websites where opening a page has no side effects, but a page that changes data when it is opened, such as a sign-out link, still makes that change.
