@@ -1,5 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { createMcpHandler, isLegacyRequest, McpServer, WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { isOwner } from "../../../../lib/account";
@@ -21,7 +20,7 @@ const fullAnswerInput = z.boolean().optional().describe("Set true only if a fiel
 const isIdInput = (name: string) => /(^|_)id$|I[dD]$/.test(name);
 
 function inputSchema(task: Task) {
-  return { ...Object.fromEntries(task.inputs.map((input) => [input.name, isIdInput(input.name) ? z.string().describe(`${input.description} For example, ${input.example}.`) : z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput };
+  return z.object({ ...Object.fromEntries(task.inputs.map((input) => [input.name, isIdInput(input.name) ? z.string().describe(`${input.description} For example, ${input.example}.`) : z.string().optional().describe(`${input.description} Defaults to ${input.example}, the value recorded when the tool was saved.`)])), fullAnswer: fullAnswerInput });
 }
 
 const serverInstructions = (app: Website) => `Tools read ${app.name} as the signed-in user. Call the saved tool that matches the request directly; one call returns the whole answer. Use read_page only when no saved tool fits. Answers are already shortened; set fullAnswer only if a needed field is missing. If a result says the site is signed out, tell the user and stop. Run independent tools at once.`;
@@ -52,11 +51,11 @@ function linkText(link: LinkStatus | undefined) {
 }
 
 function registerOrderTools(server: McpServer, app: Website, limitUsd: number) {
-  const orderIdInput = { orderId: orderIdSchema.describe("The order ID that prepare_order returned.") };
+  const orderIdInput = z.object({ orderId: orderIdSchema.describe("The order ID that prepare_order returned.") });
   server.registerTool("prepare_order", {
     title: `Prepare an order on ${app.name}`,
     description: `Start a Browser Use agent that builds a cart on ${app.name} from the user's request and stops at checkout without paying. It returns at once with an order ID; call check_order until the cart is ready. Orders are limited to $${limitUsd} each.`,
-    inputSchema: { request: orderRequestSchema.describe("What to order, such as one large pepperoni pizza from a named restaurant.") },
+    inputSchema: z.object({ request: orderRequestSchema.describe("What to order, such as one large pepperoni pizza from a named restaurant.") }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async ({ request }) => textResult(orderText(await prepareOrder(app, request))));
   server.registerTool("check_order", {
@@ -117,19 +116,19 @@ function appServer(app: Website, orderLimitUsd?: number) {
   server.registerTool("read_page", {
     title: `Read a page on ${app.name}`,
     description: `Open any page on ${website} that the signed-in user can see and return its text. Use only when no other tool covers the page, such as a link that the user shares.`,
-    inputSchema: { url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) },
+    inputSchema: z.object({ url: z.string().describe(`A full address on ${website}, or a path such as /courses.`) }),
     annotations: readOnlyAnnotations,
   }, async ({ url }) => textResult(await readSigningIn(app, (signedInApp) => readPage(signedInApp, url))));
   server.registerTool("view_image", {
     title: `Read an image on ${app.name}`,
     description: "Read the text, numbers, and charts in one image address from an earlier answer. Use only when that image holds the answer.",
-    inputSchema: { url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) },
+    inputSchema: z.object({ url: z.string().describe(`The full image address from an earlier tool answer, such as the src of an <image> or <img> element.`) }),
     annotations: { ...readOnlyAnnotations, openWorldHint: true },
   }, async ({ url }) => textResult((await viewImage(app, url)).text));
   server.registerTool("save_task", {
     title: `Save a tool for ${app.name}`,
     description: `Save a page or one POST request on ${app.name} as a reusable tool for future chats. Call it only when the user asks to save or reuse it. Replace values that change with {placeholders}, one input each.`,
-    inputSchema: {
+    inputSchema: z.object({
       name: z.string().describe("A short plain tool name, such as Read course syllabus."),
       description: z.string().describe("What the tool does, in one plain sentence."),
       method: z.enum(["GET", "POST"]).optional().describe("GET to read a page, which is the default, or POST to send bodyPattern."),
@@ -140,13 +139,13 @@ function appServer(app: Website, orderLimitUsd?: number) {
       inputs: z.array(z.object({ name: z.string(), description: z.string(), example: z.string() })).describe("One input for each placeholder other than {stepN.path} placeholders, with the value from the page you read as the example."),
       returns: z.string().describe("What the tool returns, in a few words."),
       keepFields: z.array(z.string()).max(50).optional().describe("Optional JSON paths the answer keeps, such as threads[].title."),
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async (pageTask) => textResult(await saveTask(app, pageTask)));
   server.registerTool("submit_verification_code", {
     title: "Submit verification code",
     description: `Finish signing in to ${app.name} with the text-message code that the user received. Call it only after a tool result says that a code was sent.`,
-    inputSchema: { code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") },
+    inputSchema: z.object({ code: z.string().regex(/^\d+$/).describe("The digits from the text message, exactly as the user typed them.") }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
   }, async ({ code }) => textResult(await submitVerificationCode(app, code)));
   if (orderLimitUsd) registerOrderTools(server, app, orderLimitUsd);
@@ -160,8 +159,10 @@ async function POST(request: Request, { params }: RouteContext<"/mcp/apps/[appId
   if (!found) return Response.json({ error: "This MCParrot app does not exist." }, { status: 404 });
   if (!await connectionAllowed(request, found.app, found.ownerId)) return Response.json({ error: "This connection link is not valid. Copy a new link from the app page in MCParrot." }, { status: 401 });
   const orderLimitUsd = found.app.ordering?.enabled && await isOwner(found.ownerId) ? found.app.ordering.limitUsd : undefined;
+  const server = () => appServer(found.app, orderLimitUsd);
+  if (!await isLegacyRequest(request)) return createMcpHandler(server, { legacy: "reject" }).fetch(request);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await appServer(found.app, orderLimitUsd).connect(transport);
+  await server().connect(transport);
   return transport.handleRequest(request);
 }
 

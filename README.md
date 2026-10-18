@@ -111,7 +111,7 @@ Management MCP support is required by the parity rule, and its absence is a gap.
 Users who manage apps only through the UI do not need the management connection, but users who manage apps through an assistant do.
 
 Each app connection lives at `/mcp/apps/<app-id>` in the same Next.js deployment, so the connections are access scopes within one hosted service, not separate servers.
-The route uses the official MCP TypeScript SDK's Streamable HTTP transport in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
+The route uses version 2 of the official MCP TypeScript SDK, `@modelcontextprotocol/server`, in stateless mode, with JSON responses and no MCP sessions, which ChatGPT connectors support.
 Its initialize result carries server instructions of fewer than 450 characters, which tell ChatGPT to call the matching saved tool directly, to use `read_page` only when no saved tool fits, to set `fullAnswer` only when a needed field is missing, to tell the user and stop when a result says the website is signed out, and to run independent tools at once.
 Each saved tool whose requests all use GET or POST and pass the checkout and payment guard becomes one MCP tool: the MCP tool name comes from the saved tool's name, the description from its description and its result, and each tool input becomes a text parameter.
 An input whose name is `id` or ends in `Id`, `ID`, or `_id`, such as `courseId`, is required and its description gives the recorded example, so ChatGPT cannot silently read the recorded course or store; every other input is optional and its description says that it defaults to the recorded example, because a run fills a missing input with that example.
@@ -609,7 +609,7 @@ The following table describes the complete product; the [status page](STATUS.md)
 | Capability discovery | Claude Opus 5.5 at low effort in fast mode through the Cursor SDK in a Next.js server route | Suggest capabilities from recorded requests |
 | Browser sessions | Browser Use Cloud browsers with one persistent profile per app, and Browser Use agent runs with secret bindings | Keep the user's website sign-in, run each tool in a hidden browser, and sign in again with the saved login or the profile's Google session |
 | Tool execution | Playwright over the Chrome DevTools Protocol, with `fetch` inside the website page | Run a tool's GET and POST requests or `read_page` with the website's own cookies, and turn HTML pages into their visible text |
-| Assistant connection | Official MCP TypeScript SDK, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
+| Assistant connection | Official MCP TypeScript SDK version 2, stateless Streamable HTTP, private link with a secret token for each app | Give ChatGPT one connection per website app |
 | Accounts | Clerk from the Vercel Marketplace, with Google sign-in | Give each user their own workspace and identify the owner |
 | Persistent storage | Upstash Redis from the Vercel Marketplace | Store each user's apps and tools, owner keys, Browser Use profile IDs, encrypted saved logins, pending sign-ins, last discovery results, and marketplace listings |
 | Diagnostics | Sentry error monitoring, Tracing, Logs, Session Replay, and AI agent monitoring | Find and explain failures and delays |
@@ -673,9 +673,9 @@ Order logs and spans never carry the delivery address, the items, the order requ
 Before sending, the SDK removes URL query strings from span names, events, and breadcrumbs, and replaces `token` and bypass secret query values with `[Filtered]` in spans, events, and logs.
 Never attach credentials, cookies, tokens, verification codes, or the bypass secret to Sentry data.
 
-ChatGPT first sends each request in the MCP protocol version 2026-07-28, which no MCP TypeScript SDK release supports yet.
-The route answers with a 400 error that names the supported versions, and the 2026-07-28 specification tells clients to then fall back to the `initialize` handshake, which settles on version 2025-11-25.
-Sentry ignores that expected error, and also the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
+ChatGPT first sends each request in the MCP protocol version 2026-07-28.
+The route serves that version directly through the SDK's `createMcpHandler`, and it serves clients that start with the `initialize` handshake, such as version 2025-11-25, through the SDK's Streamable HTTP transport.
+Sentry ignores the expected tool outcomes for a signed-out website, a code with no waiting sign-in, an address on another origin, a rejected login, a failed sign-in, and the order refusals for Link in live mode or an unreadable Link status, a total above the limit or a changed total, ordering turned off, and an unknown order ID, so they do not hide real failures in Issues.
 
 ## Workspace navigation behavior
 
