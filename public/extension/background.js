@@ -31,7 +31,7 @@ const secretStringArgumentText = new RegExp(`\\b(${secretName})(\\s*:\\s*)"[^"]*
 const graphqlDocument = /^\s*(query|mutation|subscription|fragment)\b|^\s*\{/;
 const pageSnapshot = `({ url: location.href, status: performance.getEntriesByType("navigation")[0]?.responseStatus ?? 0, contentType: document.contentType, text: document.body?.innerText ?? "" })`;
 const maximumTokenFieldDepth = 3;
-const tokenSourcesOf = (values) => `(${findLocalStorageTokens})(${JSON.stringify(values)}, ${maximumTokenFieldDepth})`;
+const tokenSourcesOf = (values) => `(${findLocalStorageTokens})(${JSON.stringify(values)}, ${maximumTokenFieldDepth}, ${maximumHeaderLength})`;
 const pendingRequests = new Map();
 let updates = Promise.resolve();
 
@@ -124,7 +124,7 @@ function replayedHeaders(headers = {}) {
   return Object.fromEntries(Object.entries(headers).filter(([name, value]) => replayedHeaderNames.includes(name.toLowerCase()) && value.length <= maximumHeaderLength && !looksSecret(value)));
 }
 
-function findLocalStorageTokens(values, maximumDepth) {
+function findLocalStorageTokens(values, maximumDepth, maximumLength) {
   const parsed = (text) => {
     try {
       return JSON.parse(text);
@@ -142,11 +142,12 @@ function findLocalStorageTokens(values, maximumDepth) {
     return undefined;
   };
   const sourceOf = (value, key, text) => {
+    if (key.length > maximumLength) return undefined;
     const [, prefix = "", token = value] = value.match(/^((?:bearer|token|jwt)\s+)(\S.*)$/i) ?? [];
     if (text === value) return { key };
     if (text === token) return { key, prefix };
     const path = pathTo(parsed(text), token, 0);
-    return path?.length ? { key, prefix, path: path.join(".") } : undefined;
+    return path?.length && path.join(".").length <= maximumLength ? { key, prefix, path: path.join(".") } : undefined;
   };
   const stored = Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]);
   return values.map((value) => stored.map(([key, text]) => sourceOf(value, key, text)).find(Boolean));
@@ -158,7 +159,7 @@ async function tokenHeadersOf(tabId, tokenValues = []) {
   const sources = evaluation?.result?.value ?? [];
   return tokenValues.flatMap(([name], index) => {
     const source = sources[index];
-    return source && source.key.length <= maximumHeaderLength && (source.path ?? "").length <= maximumHeaderLength ? [{ header: name.toLowerCase(), fromLocalStorage: source.key, ...(source.prefix ? { prefix: source.prefix } : {}), ...(source.path ? { path: source.path } : {}) }] : [];
+    return source ? [{ header: name.toLowerCase(), fromLocalStorage: source.key, ...(source.prefix ? { prefix: source.prefix } : {}), ...(source.path ? { path: source.path } : {}) }] : [];
   });
 }
 
